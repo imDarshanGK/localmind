@@ -1,0 +1,32 @@
+version: "3.9"
+
+services:
+  backend:
+    build: ./backend
+    container_name: localmind-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data          # persist DB + uploads + ChromaDB
+    environment:
+      - OLLAMA_HOST=host.docker.internal  # connects to Ollama on host
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  frontend:
+    build: ./frontend
+    container_name: localmind-frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  localmind-data:
