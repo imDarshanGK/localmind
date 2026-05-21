@@ -6,7 +6,8 @@ Run: pytest --tb=short -q
 import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import patch, AsyncMock
-import sys, os
+import os
+import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 

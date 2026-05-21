@@ -6,7 +6,6 @@ Handles document indexing and semantic search using ChromaDB + sentence-transfor
 import os
 import logging
 from pathlib import Path
-from typing import Optional
 
 import chromadb
 from chromadb.config import Settings

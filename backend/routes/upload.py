@@ -1,7 +1,6 @@
 """Upload routes — /api/upload"""
 
 import os
-import shutil
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 
 from models.schemas import UploadResponse

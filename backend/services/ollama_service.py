@@ -4,7 +4,6 @@ Connects to Ollama running on localhost
 """
 
 import logging
-from typing import AsyncGenerator
 import httpx
 
 logger = logging.getLogger(__name__)
