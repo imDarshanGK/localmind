@@ -44,7 +44,7 @@ export default function PluginsPanel({ sessionId, onClose }) {
       {/* Plugin selector */}
       <div className="flex flex-wrap gap-2 mb-3">
         {plugins.map(p => (
-          <button key={p.id} onClick={() => { setSelected(p); setOutput(""); setError(""); }}
+          <button key={p.id} onClick={() => { setSelected(p); setInput(""); setOutput(""); setError(""); }}
             className={`text-xs px-3 py-1.5 rounded-lg border transition font-medium
               ${selected?.id === p.id ? "border-purple-500 bg-purple-900/30 text-purple-300" : "border-gray-700 text-gray-400 hover:bg-gray-800"}`}>
             {(() => {
