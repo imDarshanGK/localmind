@@ -58,7 +58,7 @@ export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSes
           </p>
         )}
         {filtered.map(s => (
-          <div key={s.id} className={`group flex items-center gap-1 rounded-lg mb-0.5 transition
+          <div key={s.id} className={`group flex items-center gap-1 rounded-lg mb-0.5 transition min-w-0
             ${currentSession === s.id ? "bg-gray-700" : "hover:bg-gray-800"}`}>
             <button onClick={()=>onLoadSession(s.id)}
               className="flex-1 text-left text-xs px-3 py-2 truncate text-gray-400 group-hover:text-gray-200">
