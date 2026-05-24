@@ -73,7 +73,7 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
                 <div className="flex items-center gap-1.5 mb-1.5 ml-1">
                   <AppLogoIcon className="w-4 h-4 text-purple-400" />
                   <span className="text-xs font-semibold text-purple-400">LocalMind</span>
-                  {msg.streaming && <span className="text-xs text-gray-500 animate-pulse">typing...</span>}
+                  {msg.streaming && <span className="text-xs text-gray-500 animate-blink">typing...</span>}
                 </div>
               )}
               <div className={`px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words
@@ -81,7 +81,7 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
                   ? "bg-purple-700 text-white rounded-br-sm"
                   : "bg-gray-800 text-gray-100 rounded-bl-sm border border-gray-700"}`}>
                 {msg.content}
-                {msg.streaming && <span className="inline-block w-1.5 h-4 bg-purple-400 ml-1 animate-pulse rounded" />}
+                {msg.streaming && <span className="inline-block w-1.5 h-4 bg-purple-400 ml-1 animate-blink rounded" />}
               </div>
               {msg.sources?.length > 0 && (
                 <div className="mt-1.5 ml-1 flex flex-wrap gap-1">
