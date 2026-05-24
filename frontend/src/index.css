@@ -11,3 +11,17 @@ body { font-family: 'JetBrains Mono', 'Fira Code', monospace; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #374151; border-radius: 2px; }
 ::-webkit-scrollbar-thumb:hover { background: #4B5563; }
+
+/* Custom blink animation for streaming cursor */
+@keyframes blink {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+.animate-blink {
+  animation: blink 1s step-end infinite;
+}
