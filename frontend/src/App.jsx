@@ -37,7 +37,8 @@ export default function App() {
         if (settRes.value.default_model) setModel(settRes.value.default_model);
         if (settRes.value.default_language) setLanguage(settRes.value.default_language);
       }
-      if (stRes.status === "fulfilled") setOllamaOk(stRes.value.ollama_running);
+      if (stRes.status === "fulfilled") setOllamaOk(stRes.value?.ollama_running || false);
+      else setOllamaOk(false);
     } catch {}
   }
 
