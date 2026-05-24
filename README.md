@@ -219,7 +219,31 @@ Issues labeled [`good-first-issue`](https://github.com/yourusername/localmind/is
 Read [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide.
 
 ---
+## Screenshots
 
+> 📸 Screenshots are coming soon! Contributors are welcome to add UI screenshots here.
+
+### Chat Interface
+![Main Chat UI](docs/screenshots/chat-ui.png)
+*Main chat interface with streaming responses*
+
+### Document Upload
+![Document Upload Panel](docs/screenshots/upload-panel.png)
+*Upload PDF, TXT, CSV, DOCX files for RAG*
+
+### Plugins Panel
+![Plugins Panel](docs/screenshots/plugins-panel.png)
+*Built-in plugins: Calculator, Summarizer, JSON Formatter and more*
+
+### Settings Panel
+![Settings Panel](docs/screenshots/settings-panel.png)
+*Configure model, temperature, language and RAG chunks*
+
+### Session Sidebar
+![Sidebar with Sessions](docs/screenshots/sidebar-sessions.png)
+*Manage, search and switch between chat sessions*
+
+---
 ## License
 
 MIT © 2026
