@@ -6,10 +6,12 @@ Backend: FastAPI + Ollama + LangChain + ChromaDB + WebSockets
 import logging
 import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from routes.chat import router as chat_router
@@ -26,6 +28,7 @@ logging.basicConfig(
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
 )
 logger = logging.getLogger(__name__)
+FRONTEND_DIST = Path(os.getenv("FRONTEND_DIST", "/app/frontend/dist"))
 
 
 @asynccontextmanager
@@ -72,8 +75,15 @@ app.include_router(export_router,   prefix="/api/export",   tags=["Export"])
 app.include_router(settings_router, prefix="/api/settings", tags=["Settings"])
 
 
+if (FRONTEND_DIST / "assets").exists():
+    app.mount("/assets", StaticFiles(directory=str(FRONTEND_DIST / "assets")), name="assets")
+
+
 @app.get("/", tags=["Health"])
 async def root():
+    index_file = FRONTEND_DIST / "index.html"
+    if index_file.exists():
+        return FileResponse(index_file)
     return {"app": "LocalMind", "version": "2.0.0", "status": "running"}
 
 
