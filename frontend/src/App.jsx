@@ -24,6 +24,11 @@ export default function App() {
   const [useStream,  setUseStream]  = useState(true);
 
   useEffect(() => { bootstrap(); }, []);
+  useEffect(() => {
+    const activeSession = sessions.find(s => s.id === sessionId);
+    const sessionTitle = activeSession?.title?.trim();
+    document.title = sessionTitle || "LocalMind";
+  }, [sessions, sessionId]);
 
   async function bootstrap() {
     try {
