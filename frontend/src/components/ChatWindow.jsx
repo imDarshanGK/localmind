@@ -4,13 +4,20 @@ import { AppLogoIcon, FileIcon, LockIcon } from "./Icons";
 
 export default function ChatWindow({ messages, loading, onSend, sessionId }) {
   const [input, setInput] = useState("");
+  const [sending, setSending] = useState(false);
   const bottomRef = useRef(null);
   const textareaRef = useRef(null);
+
+  // Reset sending flag when loading changes (API call complete)
+  useEffect(() => {
+    if (!loading) setSending(false);
+  }, [loading]);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
   function send() {
-    if (!input.trim() || loading) return;
+    if (!input.trim() || sending || loading) return;
+    setSending(true);
     onSend(input.trim());
     setInput("");
     if (textareaRef.current) { textareaRef.current.style.height = "auto"; }
@@ -136,7 +143,7 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
             className="flex-1 bg-transparent text-sm text-gray-100 placeholder-gray-500 resize-none outline-none"
             style={{ minHeight: "24px", maxHeight: "160px" }}
           />
-          <button onClick={send} disabled={!input.trim() || loading}
+          <button onClick={send} disabled={!input.trim() || sending || loading}
             className="shrink-0 text-sm bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white px-4 py-2 rounded-xl transition font-medium">
             Send →
           </button>
