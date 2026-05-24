@@ -7,7 +7,9 @@ from unittest.mock import patch, AsyncMock
 
 # Point to temp DB
 import tempfile, services.db_service as db
-_tmp = tempfile.mktemp(suffix=".db")
+_tmpfile = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+_tmp = _tmpfile.name
+_tmpfile.close()
 db.DB_PATH = _tmp
 db.init_db()
 
