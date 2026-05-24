@@ -26,7 +26,7 @@ async def export_session(session_id: str, fmt: ExportFormat):
         filename  = f"localmind_{session_id[:8]}.json"
 
     elif fmt == ExportFormat.markdown:
-        lines = [f"# {title}\n", f"*Exported: {ts} | Model: {session.get('model','?')}*\n\n---\n"]
+        lines = [f"# {title}\n", f"*Exported: {ts} | Model: {session.get('model','?')}*\n\n\n---\n\n"]
         for m in messages:
             role_label = "**You**" if m["role"] == "user" else "**LocalMind**"
             lines.append(f"{role_label}\n\n{m['content']}\n")
