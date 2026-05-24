@@ -229,3 +229,26 @@ MIT © 2026 — Made with ❤️ for [Social Summer of Code 2026](https://ssoc.d
 ⭐ **If LocalMind helped you, please star the repo!** ⭐
 
 </div>
+## Screenshots
+
+> The following screenshots provide a visual overview of the LocalMind interface.
+
+### Main Chat UI
+![Main Chat UI](docs/screenshots/main-chat-ui.png)
+*Chat with your documents locally using LocalMind*
+
+### Document Upload Panel
+![Document Upload Panel](docs/screenshots/document-upload.png)
+*Upload and manage your documents securely*
+
+### Plugins Panel
+![Plugins Panel](docs/screenshots/plugins-panel.png)
+*Extend LocalMind functionality with plugins*
+
+### Settings Panel
+![Settings Panel](docs/screenshots/settings-panel.png)
+*Configure your local AI preferences*
+
+### Sidebar with Sessions
+![Sidebar Sessions](docs/screenshots/sidebar-sessions.png)
+*Manage multiple chat sessions from the sidebar*
