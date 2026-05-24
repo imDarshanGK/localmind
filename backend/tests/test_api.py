@@ -60,6 +60,29 @@ def test_delete_session():
     r2 = client.delete(f"/api/sessions/{sid}")
     assert r2.status_code == 200
 
+def test_delete_session_deletes_uploads():
+    """Verify that DELETE /api/sessions/{id} also removes uploaded files from disk."""
+    import os
+    from pathlib import Path
+    
+    # Create session
+    r = client.post("/api/sessions/", json={"title": "Upload Delete Test"})
+    sid = r.json()["id"]
+    
+    # Simulate uploaded files by creating the upload directory
+    upload_dir = Path("data/uploads") / sid
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    test_file = upload_dir / "test.txt"
+    test_file.write_text("test content")
+    assert upload_dir.exists(), "Upload dir should exist before delete"
+    
+    # Delete session
+    r2 = client.delete(f"/api/sessions/{sid}")
+    assert r2.status_code == 200
+    
+    # Verify upload directory was deleted
+    assert not upload_dir.exists(), "Upload dir should be deleted after session delete"
+
 
 def test_get_messages_empty():
     r = client.post("/api/sessions/", json={"title": "Msg Test"})
