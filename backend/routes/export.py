@@ -7,6 +7,14 @@ from fastapi.responses import Response
 from models.schemas import ExportFormat
 from services import db_service
 
+def slugify(text, max_len=30):
+    """Convert text to URL-friendly slug: lowercase, spaces→hyphens, strip special chars."""
+    import re
+    s = text.lower().strip()
+    s = re.sub(r'[^\w\s-]', '', s)  # remove special chars
+    s = re.sub(r'[-\s]+', '-', s)  # spaces/hyphens → single hyphen
+    return s[:max_len] or "chat"
+
 router = APIRouter()
 
 
@@ -23,7 +31,7 @@ async def export_session(session_id: str, fmt: ExportFormat):
     if fmt == ExportFormat.json:
         content   = json.dumps({"session": session, "messages": messages, "exported_at": ts}, indent=2, ensure_ascii=False)
         media     = "application/json"
-        filename  = f"localmind_{session_id[:8]}.json"
+        filename  = f"localmind_{slugify(title)}.json"
 
     elif fmt == ExportFormat.markdown:
         lines = [f"# {title}\n", f"*Exported: {ts} | Model: {session.get('model','?')}*\n\n---\n"]
@@ -35,7 +43,7 @@ async def export_session(session_id: str, fmt: ExportFormat):
             lines.append("\n---\n")
         content   = "\n".join(lines)
         media     = "text/markdown"
-        filename  = f"localmind_{session_id[:8]}.md"
+        filename  = f"localmind_{slugify(title)}.md"
 
     else:  # txt
         lines = [f"LocalMind Export — {title}", f"Exported: {ts}", "=" * 50, ""]
@@ -44,7 +52,7 @@ async def export_session(session_id: str, fmt: ExportFormat):
             lines += [f"[{role}]", m["content"], ""]
         content   = "\n".join(lines)
         media     = "text/plain"
-        filename  = f"localmind_{session_id[:8]}.txt"
+        filename  = f"localmind_{slugify(title)}.txt"
 
     return Response(
         content=content.encode("utf-8"),
