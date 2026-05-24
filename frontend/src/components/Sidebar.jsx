@@ -10,7 +10,14 @@ const LANGUAGES = [
 export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSession, onDeleteSession, model, models, onModelChange, language, onLanguageChange }) {
   const [search, setSearch] = useState("");
   const modelList = models.length > 0 ? models.map(m=>m.name) : ["llama3","mistral","phi3","gemma2"];
-  const filtered  = sessions.filter(s => s.title?.toLowerCase().includes(search.toLowerCase()));
+  
+  // Normalize string: handle null, case-insensitive, remove accents
+  function normalizeString(str) {
+    if (!str) return "";
+    return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  }
+  
+  const filtered = sessions.filter(s => normalizeString(s.title).includes(normalizeString(search)));
 
   return (
     <div className="w-64 flex flex-col bg-gray-900 border-r border-gray-800 shrink-0">
