@@ -136,8 +136,11 @@ def _jsonformat(text: str) -> str:
 def _coderunner(code: str) -> str:
     """Run Python code in a restricted subprocess with timeout."""
     # Strip markdown code fences if present
-    code = re.sub(r'^```(?:python)?\n?', '', code.strip())
-    code = re.sub(r'\n?```$', '', code)
+    code = code.strip()
+    # Match opening fence: ``` optionally followed by language (with optional whitespace)
+    code = re.sub(r'^```\s*(?:python)?\s*\n?', '', code, flags=re.MULTILINE)
+    # Match closing fence: optional newline followed by ```
+    code = re.sub(r'\n?\s*```$', '', code, flags=re.MULTILINE)
 
     # Basic safety: block dangerous imports
     BLOCKED = ["import os", "import sys", "import subprocess", "import socket",
