@@ -57,7 +57,11 @@ def index_document(file_path: str, session_id: str) -> int:
         raise ValueError(f"Unsupported file type: {ext}. Supported: {list(LOADERS)}")
 
     docs   = loader_cls(file_path).load()
-    chunks = SPLITTER.split_documents(docs)
+    try:
+        chunks = SPLITTER.split_documents(docs)
+    except Exception as e:
+        logger.warning(f"Splitting failed for {file_path}: {e}")
+        return 0
     if not chunks:
         return 0
 
