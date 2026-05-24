@@ -13,7 +13,12 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
     if (!input.trim() || loading) return;
     onSend(input.trim());
     setInput("");
-    if (textareaRef.current) { textareaRef.current.style.height = "auto"; }
+    // Reset height after React re-renders
+    requestAnimationFrame(() => {
+      if (textareaRef.current) {
+        textareaRef.current.style.height = "auto";
+      }
+    });
   }
 
   function handleKey(e) {
