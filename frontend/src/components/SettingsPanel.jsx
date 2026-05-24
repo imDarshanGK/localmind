@@ -2,7 +2,7 @@ import { useState } from "react";
 import { SettingsIcon } from "./Icons";
 
 const MODELS    = ["llama3","mistral","phi3","gemma2","deepseek-r1"];
-const LANGUAGES = [{code:"en",label:"English"},{code:"hi",label:"हिन्दी"},{code:"ta",label:"தமிழ்"},{code:"te",label:"తెలుగు"},{code:"kn",label:"ಕನ್ನಡ"},{code:"fr",label:"Français"}];
+const LANGUAGES = [{code:"en",label:"English"},{code:"hi",label:"हिन्दी"},{code:"ta",label:"தமிழ்"},{code:"te",label:"తెలుగు"},{code:"kn",label:"ಕನ್ನಡ"},{code:"fr",label:"Français"},{code:"de",label:"Deutsch"},{code:"es",label:"Español"},{code:"ja",label:"日本語"}];
 
 export default function SettingsPanel({ settings, onSave, onClose }) {
   const [form, setForm] = useState({
