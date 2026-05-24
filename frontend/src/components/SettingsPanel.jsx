@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { SettingsIcon } from "./Icons";
 
 const MODELS    = ["llama3","mistral","phi3","gemma2","deepseek-r1"];
@@ -13,6 +13,20 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
     rag_top_k:        settings.rag_top_k        || 4,
     theme:            settings.theme            || "dark",
   });
+
+  // Update form when settings prop changes (async fetch)
+  useEffect(() => {
+    if (settings && Object.keys(settings).length > 0) {
+      setForm(prev => ({
+        default_model:    settings.default_model    ?? prev.default_model,
+        default_language: settings.default_language ?? prev.default_language,
+        temperature:      settings.temperature      ?? prev.temperature,
+        max_history_turns:settings.max_history_turns ?? prev.max_history_turns,
+        rag_top_k:        settings.rag_top_k        ?? prev.rag_top_k,
+        theme:            settings.theme            ?? prev.theme,
+      }));
+    }
+  }, [settings]);
 
   function set(key, val) { setForm(p => ({...p, [key]: val})); }
 
