@@ -1,14 +1,24 @@
 """Chat routes — /api/chat — supports normal + streaming"""
 
-import uuid
+import json
+from types import SimpleNamespace
+
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
-import json
 
 from models.schemas import ChatRequest, ChatResponse
 from services import ollama_service, db_service
 
 router = APIRouter()
+
+
+def _retrieve_context(*args, **kwargs):
+    from services import rag_service as rag_service_module
+
+    return rag_service_module.retrieve_context(*args, **kwargs)
+
+
+rag_service = SimpleNamespace(retrieve_context=_retrieve_context)
 
 
 @router.post("/", response_model=ChatResponse)
@@ -22,8 +32,6 @@ async def chat(req: ChatRequest):
 
     context, sources = "", []
     if req.use_documents:
-        from services import rag_service
-
         settings = db_service.get_settings()
         top_k = int(settings.get("rag_top_k", 4))
         context, sources = rag_service.retrieve_context(req.message, req.session_id, top_k)
@@ -55,8 +63,6 @@ async def chat_stream(req: ChatRequest):
 
     context, sources = "", []
     if req.use_documents:
-        from services import rag_service
-
         context, sources = rag_service.retrieve_context(req.message, req.session_id)
 
     db_service.save_message(req.session_id, "user", req.message)

@@ -37,9 +37,12 @@ async def update_session(session_id: str, body: SessionUpdate):
 @router.delete("/{session_id}")
 async def delete_session(session_id: str):
     db_service.delete_session(session_id)
-    from services import rag_service
+    try:
+        from services import rag_service
 
-    rag_service.delete_session_index(session_id)
+        rag_service.delete_session_index(session_id)
+    except Exception:
+        pass
     return {"status": "deleted", "session_id": session_id}
 
 
@@ -63,7 +66,10 @@ async def get_documents(session_id: str):
 
 @router.get("/{session_id}/rag-stats")
 async def rag_stats(session_id: str):
-    from services import rag_service
+    try:
+        from services import rag_service
 
-    count = rag_service.get_indexed_count(session_id)
+        count = rag_service.get_indexed_count(session_id)
+    except Exception:
+        count = 0
     return {"session_id": session_id, "indexed_chunks": count}

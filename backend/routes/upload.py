@@ -21,8 +21,6 @@ MAX_BYTES = 50 * 1024 * 1024  # 50 MB
 
 @router.post("/", response_model=UploadResponse)
 async def upload(file: UploadFile = File(...), session_id: str = Form(...)):
-    from services import rag_service
-
     content_type = file.content_type or ""
     # Be lenient — also allow by extension
     ext = Path(file.filename).suffix.lower()
@@ -41,6 +39,9 @@ async def upload(file: UploadFile = File(...), session_id: str = Form(...)):
         f.write(content)
 
     size_kb = round(len(content) / 1024, 1)
+
+    from services import rag_service
+
     chunks  = rag_service.index_document(file_path, session_id)
 
     db_service.create_session(session_id)
