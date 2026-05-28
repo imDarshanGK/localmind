@@ -44,6 +44,11 @@ SPLITTER = RecursiveCharacterTextSplitter(
 
 
 def _collection(session_id: str):
+    """Get or create a ChromaDB collection for the given session.
+    
+    Each session gets its own collection, keyed by a sanitized session ID.
+    Collections use cosine distance for similarity search.
+    """
     return chroma_client.get_or_create_collection(
         name=f"lm_{session_id.replace('-', '_')}",
         metadata={"hnsw:space": "cosine"},
@@ -51,22 +56,39 @@ def _collection(session_id: str):
 
 
 def index_document(file_path: str, session_id: str) -> int:
+    """Index a document into the RAG pipeline.
+    
+    Steps:
+    1. Load the document using the appropriate loader for its file type
+    2. Split the document into overlapping text chunks
+    3. Generate embeddings for each chunk using sentence-transformers
+    4. Store chunks, embeddings, and metadata in ChromaDB
+    
+    Returns the number of chunks indexed.
+    """
+    # Step 1: Select the right document loader based on file extension
     ext = Path(file_path).suffix.lower()
     loader_cls = LOADERS.get(ext)
     if not loader_cls:
         raise ValueError(f"Unsupported file type: {ext}. Supported: {list(LOADERS)}")
 
+    # Step 1b: Load the document into LangChain Document objects
     docs   = loader_cls(file_path).load()
+    # Step 2: Split the document into overlapping chunks for better retrieval
     chunks = SPLITTER.split_documents(docs)
     if not chunks:
         return 0
 
+    # Step 3: Extract text from chunks and generate embeddings
     texts      = [c.page_content for c in chunks]
+    # Generate dense vector embeddings using sentence-transformers (all-MiniLM-L6-v2)
     embeddings = embedder.encode(texts, show_progress_bar=False).tolist()
+    # Step 4: Store everything in ChromaDB for similarity search
     ids        = [f"{session_id}_{i}" for i in range(len(texts))]
     metadatas  = [{"source": Path(file_path).name, "chunk": i} for i in range(len(texts))]
 
     col = _collection(session_id)
+    # Upsert: add new chunks or update existing ones in the collection
     col.upsert(ids=ids, documents=texts, embeddings=embeddings, metadatas=metadatas)
     logger.info(f"Indexed {len(chunks)} chunks for session={session_id}")
     return len(chunks)
@@ -78,6 +100,7 @@ def retrieve_context(query: str, session_id: str, top_k: int = 4) -> tuple[str, 
         return "", []
 
     q_emb   = embedder.encode([query]).tolist()
+    # Step 2: Query ChromaDB for the most similar chunks
     results = col.query(
         query_embeddings=q_emb,
         n_results=min(top_k, col.count()),
