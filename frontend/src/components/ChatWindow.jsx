@@ -1,11 +1,13 @@
 import { useState, useRef, useEffect } from "react";
 import { exportSession } from "../utils/api";
+import { PROMPTS, pickRandomPromptIndex } from "../prompts";
 import { AppLogoIcon, FileIcon, LockIcon } from "./Icons";
 
 export default function ChatWindow({ messages, loading, onSend, sessionId }) {
   const [input, setInput] = useState("");
   const bottomRef = useRef(null);
   const textareaRef = useRef(null);
+  const lastPromptIndexRef = useRef(null);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
@@ -23,6 +25,27 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
   function autoResize(e) {
     e.target.style.height = "auto";
     e.target.style.height = Math.min(e.target.scrollHeight, 160) + "px";
+  }
+
+  function resizeTextarea(el) {
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = Math.min(el.scrollHeight, 160) + "px";
+  }
+
+  function insertRandomPrompt() {
+    const index = pickRandomPromptIndex(lastPromptIndexRef.current);
+    if (index === null) return;
+    lastPromptIndexRef.current = index;
+    const text = PROMPTS[index];
+    setInput(text);
+    requestAnimationFrame(() => {
+      const el = textareaRef.current;
+      if (!el) return;
+      resizeTextarea(el);
+      el.focus();
+      el.setSelectionRange(text.length, text.length);
+    });
   }
 
   const SUGGESTIONS = [
@@ -136,6 +159,16 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
             className="flex-1 bg-transparent text-sm text-gray-100 placeholder-gray-500 resize-none outline-none"
             style={{ minHeight: "24px", maxHeight: "160px" }}
           />
+          <button
+            type="button"
+            onClick={insertRandomPrompt}
+            disabled={loading}
+            title="Random prompt"
+            aria-label="Insert random prompt"
+            className="shrink-0 text-lg leading-none text-gray-500 hover:text-purple-400 disabled:opacity-40 disabled:cursor-not-allowed px-2 py-2 rounded-lg hover:bg-gray-800 transition"
+          >
+            🎲
+          </button>
           <button onClick={send} disabled={!input.trim() || loading}
             className="shrink-0 text-sm bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white px-4 py-2 rounded-xl transition font-medium">
             Send →
