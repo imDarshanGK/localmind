@@ -1,6 +1,6 @@
 """Pydantic v2 schemas for LocalMind API."""
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field  # type: ignore[import]
 from typing import Optional, List
 from datetime import datetime
 from enum import Enum
@@ -95,3 +95,11 @@ class ExportFormat(str, Enum):
     markdown = "markdown"
     json = "json"
     txt = "txt"
+
+
+class SessionRenameItem(BaseModel):
+    session_id: str
+    new_title: str
+
+class BulkSessionRenameRequest(BaseModel):
+    sessions: List[SessionRenameItem]

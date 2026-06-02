@@ -2,8 +2,9 @@
 
 import uuid
 from fastapi import APIRouter, HTTPException
-from models.schemas import SessionCreate, SessionUpdate
+from models.schemas import SessionCreate, SessionUpdate, BulkSessionRenameRequest
 from services import db_service
+# from backend.models.schemas import BulkSessionRenameRequest  # Adjust if other items are imported from here
 
 router = APIRouter()
 
@@ -73,3 +74,27 @@ async def rag_stats(session_id: str):
     except Exception:
         count = 0
     return {"session_id": session_id, "indexed_chunks": count}
+
+
+@router.patch("/bulk-rename")
+async def bulk_rename_sessions(body: BulkSessionRenameRequest):
+    try:
+        # Loop through each session block in the request payload body
+        for item in body.sessions:
+            # We fetch the current session to preserve its model configuration while updating the title
+            current_session = db_service.get_session(item.session_id)
+            if current_session:
+                # Use the project's native db_service wrapper to update the record safely
+                db_service.update_session(
+                    session_id=item.session_id, 
+                    title=item.new_title, 
+                    model=current_session.get("model")  # Keeps the existing model value intact
+                )
+        
+        return {"status": "success", "message": f"Successfully renamed {len(body.sessions)} sessions."}
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Bulk rename failed: {str(e)}"
+        )
