@@ -208,6 +208,23 @@ pytest tests/ -v
 
 ---
 
+## CLI Usage
+
+Install once for true global usage (`localmind` from anywhere):
+
+```bash
+# from repo root
+pip install -e .
+
+# now works globally in that Python environment
+localmind --help
+localmind chat "Summarize this"
+localmind upload ./sample.pdf
+localmind sessions list
+```
+
+---
+
 ## 🤝 Contributing
 
 1. Fork → Clone → Create branch (`git checkout -b feature/your-feature`)
