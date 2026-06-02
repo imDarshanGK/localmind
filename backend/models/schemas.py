@@ -1,6 +1,6 @@
 """Pydantic v2 schemas for LocalMind API."""
 
-from pydantic import BaseModel, Field  # type: ignore[import]
+from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime
 from enum import Enum
