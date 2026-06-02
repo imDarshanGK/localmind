@@ -34,7 +34,8 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose 
 
       {/* Drop zone */}
       <div
-        onDragOver={e=>{e.preventDefault();e.dataTransfer.dropEffect = "copy";setDragging(true)}}
+        onDragEnter={e=>{e.dataTransfer.dropEffect = "copy";setDragging(true)}}
+        onDragOver={e=>e.preventDefault()}
         onDragLeave={()=>setDragging(false)}
         onDrop={onDrop}
         onClick={()=>fileRef.current.click()}
