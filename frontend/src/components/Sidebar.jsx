@@ -2,7 +2,7 @@ import { useState } from "react";
 import { AppLogoIcon, ChatIcon, LockIcon, StarIcon } from "./Icons";
 
 const LANGUAGES = [
-  {code:"en",label:"English"},{code:"hi",label:"हिन्दी"},{code:"ta",label:"தமிழ்"},
+  {code:"en",label:"English"},{code:"hi",label:"हिन्दी"},{code:"ta",label:"தமிழ்"},{code:"pt-BR",label:"Português"},
   {code:"te",label:"తెలుగు"},{code:"kn",label:"ಕನ್ನಡ"},{code:"fr",label:"Français"},
   {code:"de",label:"Deutsch"},{code:"es",label:"Español"},
 ];
