@@ -1,6 +1,9 @@
 """Chat routes — /api/chat — supports normal + streaming"""
 
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 from types import SimpleNamespace
 
 from fastapi import APIRouter, HTTPException
@@ -23,6 +26,12 @@ rag_service = SimpleNamespace(retrieve_context=_retrieve_context)
 
 @router.post("/", response_model=ChatResponse)
 async def chat(req: ChatRequest):
+    logger.info("Chat request", extra={
+        "session_id": req.session_id,
+        "model": req.model,
+        "message_len": len(req.message),
+        "use_documents": req.use_documents,
+    })
     """Standard (non-streaming) chat endpoint."""
     if not await ollama_service.is_ollama_running():
         raise HTTPException(503, "Ollama not running. Run: `ollama serve`")
@@ -54,6 +63,12 @@ async def chat(req: ChatRequest):
 
 @router.post("/stream")
 async def chat_stream(req: ChatRequest):
+    logger.info("Chat stream request", extra={
+        "session_id": req.session_id,
+        "model": req.model,
+        "message_len": len(req.message),
+        "use_documents": req.use_documents,
+    })
     """Streaming chat — returns Server-Sent Events."""
     if not await ollama_service.is_ollama_running():
         raise HTTPException(503, "Ollama not running. Run: `ollama serve`")
