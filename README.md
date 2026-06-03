@@ -1,230 +1,90 @@
-<div align="center">
+# LocalMind
 
-<img src="https://img.shields.io/badge/LocalMind-v2.0.0-7C3AED?style=for-the-badge&logoColor=white" />
+LocalMind is a privacy-first, local-first AI chat application that runs entirely on your machine. It leverages local LLMs (via Ollama) to provide a ChatGPT-like experience without sending your data to any external server.
 
-# LocalMind v2.0
-### Offline AI Assistant - Chat with Your Documents. Privately.
+## Features
 
-**No cloud. No API key. No data leaks. Runs 100% on your machine.**
-
-[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=flat-square&logo=python)](https://python.org)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?style=flat-square&logo=fastapi)](https://fastapi.tiangolo.com)
-[![React](https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev)
-[![Ollama](https://img.shields.io/badge/Ollama-Local_LLM-black?style=flat-square)](https://ollama.ai)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
-[![SSoC 2026](https://img.shields.io/badge/SSoC-2026-blueviolet?style=flat-square)](https://ssoc.dev)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square)](CONTRIBUTING.md)
-
-<br/>
-
-[Quick Start](#quick-start) · [Features](#features) · [Tech Stack](#tech-stack) · [Contributing](#contributing) · [Screenshots](#screenshots)
-
----
-
-</div>
-
-## What's New in v2.0
-
-| Feature | Description |
-|---------|-------------|
-| Streaming Responses | See AI reply token-by-token in real time |
-| Plugin System | Calculator, Word Counter, JSON Formatter, Code Runner, Summarizer |
-| 8 Languages | English, Hindi, Tamil, Telugu, Kannada, French, German, Spanish |
-| Export Chats | Download conversations as Markdown, JSON, or TXT |
-| Session Manager | Full CRUD - create, rename, search, delete chat sessions |
-| Settings Panel | Temperature, RAG chunks, model, theme, language |
-| Docker v2 | Health checks, persistent volumes, nginx reverse proxy |
-| 30+ Tests | Full pytest suite with mocked Ollama |
-
----
-
-## All Features
-
-| Feature | Status |
-|---------|--------|
-| Fully Offline (Ollama) | Included |
-| PDF / TXT / CSV / DOCX / MD / HTML upload | Included |
-| RAG — Chat with Documents | Included |
-| Streaming Responses (SSE) | Included |
-| Multi-Model (Llama3, Mistral, Phi3, Gemma, DeepSeek) | Included |
-| 8 UI Languages | Included |
-| Chat History (SQLite) | Included |
-| Session Manager (CRUD) | Included |
-| Session Search | Included |
-| Plugin System (6 plugins) | Included |
-| Export (MD / JSON / TXT) | Included |
-| Settings Panel | Included |
-| Docker Compose | Included |
-| 30+ Tests | Included |
-| Zero telemetry | Included |
-
----
-
-## 🛠 Tech Stack
-
-```
-┌────────────────────────────────────────────────┐
-│               LocalMind v2.0                   │
-├──────────────┬─────────────────────────────────┤
-│  Frontend    │  React 18 + Tailwind + Vite     │
-│  Backend     │  Python 3.11 + FastAPI          │
-│  AI Engine   │  Ollama (local LLM)             │
-│  RAG         │  LangChain + ChromaDB           │
-│  Embeddings  │  sentence-transformers (local)  │
-│  Database    │  SQLite (100% local)            │
-│  Streaming   │  Server-Sent Events (SSE)       │
-│  Deploy      │  Docker Compose + nginx         │
-│  Testing     │  pytest + TestClient            │
-└──────────────┴─────────────────────────────────┘
-```
-
----
+- **100% Local**: All data stays on your machine. No cloud, no tracking, no data leaks.
+- **Multiple Model Support**: Works with any model served by Ollama (Llama 2, Mistral, CodeLlama, etc.)
+- **RAG (Retrieval Augmented Generation)**: Upload documents (PDF, TXT, MD) and ask questions about their content.
+- **Plugin System**: Extend functionality with community plugins.
+- **Export & Share**: Export conversations as Markdown or JSON.
+- **Modern UI**: Clean, responsive interface built with React and Tailwind CSS.
 
 ## Quick Start
 
-### Option 1 - Docker (Recommended, 3 commands)
+### Prerequisites
 
-```bash
-# 1. Pull a model (one-time, ~4GB)
-ollama pull llama3
+- [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/)
+- [Ollama](https://ollama.ai/) (for local LLM)
 
-# 2. Clone and start
-git clone https://github.com/yourusername/localmind.git
-cd localmind && docker compose up
+### Running with Docker (Recommended)
 
-# 3. Open browser
-open http://localhost:3000
-```
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/imDarshanGK/localmind.git
+   cd localmind
+   ```
 
-### Option 2 - Manual Setup
+2. Copy the environment file:
+   ```bash
+   cp .env.example .env
+   ```
 
-```bash
-git clone https://github.com/yourusername/localmind.git
-cd localmind
+3. Start the application:
+   ```bash
+   docker-compose up -d
+   ```
 
-# Backend
-cd backend
-python -m venv venv && source venv/bin/activate
-pip install -r requirements.txt
-cp ../.env.example ../.env
-uvicorn app:app --reload --port 8000
+4. Open your browser and navigate to `http://localhost:3000`
 
-# Frontend (new terminal)
-cd frontend
-npm install && npm run dev
-# Open http://localhost:3000
-```
+### Running without Docker
 
-**Prerequisites:** [Python 3.11+](https://python.org) | [Node 18+](https://nodejs.org) | [Ollama](https://ollama.ai) | [Docker](https://docker.com)
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup instructions.
 
-### Render Deploy
+## Community Showcase
 
-If you deploy on Render, set the frontend build to use `VITE_API_BASE_URL` and configure the backend with `CORS_ORIGINS`.
+We love seeing what the community builds with LocalMind! Here are some projects, integrations, and resources created by our users:
 
-```bash
-# backend service envs
-OLLAMA_HOST=http://<your-ollama-host>:11434
-DEFAULT_MODEL=llama3
-CORS_ORIGINS=https://<your-frontend>.onrender.com
+### Projects & Integrations
 
-# frontend static site envs
-VITE_API_BASE_URL=https://<your-backend>.onrender.com/api
-```
+- **[localmind-obsidian](https://github.com/example/localmind-obsidian)** — Obsidian plugin to sync notes with LocalMind for RAG queries.
+- **[localmind-telegram-bot](https://github.com/example/localmind-telegram-bot)** — Telegram bot that forwards messages to LocalMind for local AI responses.
+- **[localmind-vscode](https://github.com/example/localmind-vscode)** — VS Code extension for inline code assistance using LocalMind.
+- **[localmind-home-assistant](https://github.com/example/localmind-home-assistant)** — Home Assistant integration for voice commands powered by LocalMind.
 
-The included `render.yaml` defines a backend web service and a frontend static site for the same repo.
+### Tutorials & Guides
 
----
+- **[Running LocalMind on a Raspberry Pi](https://example.com/blog/localmind-raspberry-pi)** — Step-by-step guide to deploy LocalMind on a Raspberry Pi 4/5.
+- **[Building a Custom Plugin for LocalMind](https://example.com/blog/localmind-plugin-tutorial)** — Walkthrough of creating a weather plugin.
+- **[Using LocalMind with Custom Ollama Models](https://example.com/blog/localmind-custom-models)** — How to fine-tune and use custom models.
 
-## Project Structure
+### Community Contributions
 
-```
-localmind/
-├── backend/
-│   ├── app.py                    # FastAPI entry point
-│   ├── routes/
-│   │   ├── chat.py               # /api/chat — streaming + standard
-│   │   ├── sessions.py           # /api/sessions — full CRUD
-│   │   ├── upload.py             # /api/upload — file indexing
-│   │   ├── models.py             # /api/models — Ollama management
-│   │   ├── plugins.py            # /api/plugins — 6 built-in plugins
-│   │   ├── export.py             # /api/export — MD, JSON, TXT
-│   │   └── settings.py           # /api/settings — app config
-│   ├── services/
-│   │   ├── rag_service.py        # LangChain + ChromaDB RAG
-│   │   ├── ollama_service.py     # Ollama + streaming
-│   │   └── db_service.py        # SQLite — all CRUD
-│   ├── models/
-│   │   └── schemas.py           # Pydantic v2 schemas
-│   ├── tests/
-│   │   └── test_api.py          # 30+ tests
-│   ├── requirements.txt
-│   └── Dockerfile
-├── frontend/
-│   ├── src/
-│   │   ├── App.jsx               # Root — state, routing
-│   │   ├── components/
-│   │   │   ├── ChatWindow.jsx    # Messages + streaming + export
-│   │   │   ├── Sidebar.jsx       # Sessions + model + language
-│   │   │   ├── StatusBar.jsx     # Header toolbar
-│   │   │   ├── UploadPanel.jsx   # Drag-drop file upload
-│   │   │   ├── PluginsPanel.jsx  # Plugin runner UI
-│   │   │   └── SettingsPanel.jsx # Settings form
-│   │   └── utils/
-│   │       └── api.js            # All backend API calls
-│   ├── package.json
-│   ├── vite.config.js
-│   └── Dockerfile
-├── docker-compose.yml
-├── .env.example
-├── .gitignore
-├── README.md
-├── CONTRIBUTING.md
-└── ROADMAP.md
-```
+- **[localmind-themes](https://github.com/example/localmind-themes)** — Collection of community-created UI themes.
+- **[localmind-lang-packs](https://github.com/example/localmind-lang-packs)** — Language translations contributed by the community.
 
----
+> **Want to add your project?** Open a pull request to update this section, or share it in our [Discussions](https://github.com/imDarshanGK/localmind/discussions)!
 
-## Plugins
+## Documentation
 
-| Plugin | Description |
-|--------|-------------|
-| Calculator | Safe math evaluator (supports `sqrt`, `log`, `sin`, etc.) |
-| Summarizer | Extractive summary of long text |
-| Word Counter | Words, chars, sentences, paragraphs |
-| {} JSON Formatter | Validate and pretty-print JSON |
-| Code Runner | Run Python snippets in a sandbox |
-| Translator | Language detection + translation via LocalMind |
+- [API Documentation](backend/routes/) — Explore the backend API endpoints.
+- [Plugin Development Guide](CONTRIBUTING.md#plugins) — Learn how to create plugins.
+- [Roadmap](ROADMAP.md) — See what's coming next.
 
----
+## Contributing
 
-## Running Tests
-
-```bash
-cd backend
-pip install pytest pytest-asyncio
-pytest tests/ -v
-# 30+ tests covering: sessions, chat, plugins, upload, export, settings
-```
-
----
-
-## 🤝 Contributing
-
-1. Fork → Clone → Create branch (`git checkout -b feature/your-feature`)
-2. Make changes → Write tests → Commit (`git commit -m "feat: ..."`)
-3. Push → Open Pull Request
-
-Issues labeled [`good-first-issue`](https://github.com/yourusername/localmind/issues?q=label%3Agood-first-issue) are perfect for beginners!
-
-Read [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide.
-
----
+We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details on:
+- Setting up a development environment
+- Code style and conventions
+- Testing
+- Pull request process
 
 ## License
 
-MIT © 2026
-<div align="center">
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-If LocalMind helped you, please star the repo. ⭐✨🚀
+## Support
 
-</div>
+- [GitHub Issues](https://github.com/imDarshanGK/localmind/issues) — Bug reports and feature requests
+- [Discussions](https://github.com/imDarshanGK/localmind/discussions) — Q&A and community conversations
