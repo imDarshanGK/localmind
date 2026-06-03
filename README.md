@@ -14,6 +14,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
 [![SSoC 2026](https://img.shields.io/badge/SSoC-2026-blueviolet?style=flat-square)](https://ssoc.dev)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square)](CONTRIBUTING.md)
+[![Discord](https://img.shields.io/badge/Discord-Join%20Community-5865F2?style=flat-square&logo=discord&logoColor=white)](https://discord.gg/gvTUuMXk)
 
 <br/>
 
