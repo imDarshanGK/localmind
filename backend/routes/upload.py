@@ -4,7 +4,10 @@ import os
 from pathlib import Path
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from models.schemas import UploadResponse
+import logging
 from services import db_service
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -21,6 +24,11 @@ MAX_BYTES = 50 * 1024 * 1024  # 50 MB
 
 @router.post("/", response_model=UploadResponse)
 async def upload(file: UploadFile = File(...), session_id: str = Form(...)):
+    logger.info("Upload request", extra={
+        "filename": file.filename,
+        "content_type": file.content_type,
+        "session_id": session_id,
+    })
     content_type = file.content_type or ""
     # Be lenient — also allow by extension
     ext = Path(file.filename).suffix.lower()
@@ -39,6 +47,12 @@ async def upload(file: UploadFile = File(...), session_id: str = Form(...)):
         f.write(content)
 
     size_kb = round(len(content) / 1024, 1)
+    logger.info("Upload complete", extra={
+        "filename": file.filename,
+        "size_kb": size_kb,
+        "chunks": chunks,
+        "session_id": session_id,
+    })
 
     from services import rag_service
 
