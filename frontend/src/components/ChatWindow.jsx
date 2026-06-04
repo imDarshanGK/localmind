@@ -95,11 +95,15 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
                   ))}
                 </div>
               )}
-              {msg.role === "user" && (
-                <div className="text-right mt-1 mr-1">
-                  <span className="text-xs text-gray-600">You</span>
-                </div>
-              )}
+              {/* Message Timestamp & Label */}
+<div className={`mt-1 flex gap-2 text-xs text-gray-500 ${msg.role === "user" ? "justify-end mr-1" : "justify-start ml-1"}`}>
+  {msg.role === "user" && <span className="font-medium text-gray-600">You</span>}
+  {msg.timestamp && (
+    <span>
+      {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+    </span>
+  )}
+</div>
             </div>
           </div>
         ))}
