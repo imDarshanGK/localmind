@@ -58,6 +58,17 @@ export default function App() {
       setStreaming(true);
       const aiMsg = { role: "assistant", content: "", sources: [], id: Date.now() + 1, streaming: true };
       setMessages(prev => [...prev, aiMsg]);
+      // Safety timeout: if the server hangs or returns no tokens for 60s,
+      // force the "typing..." cursor away and show a fallback message.
+      // Prevents stuck UI on empty/hung streaming responses (issue #228).
+      const safetyTimeout = setTimeout(() => {
+        setMessages(prev => prev.map(m =>
+          m.id === aiMsg.id && m.streaming
+            ? { ...m, content: m.content || "(empty response)", streaming: false }
+            : m
+        ));
+        setStreaming(false);
+      }, 60000);
       try {
         await api.streamMessage(
           { message: text, session_id: sessionId, model, use_documents: documents.length > 0, language },
@@ -69,7 +80,18 @@ export default function App() {
         );
       } catch (e) {
         setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, content: e.message, streaming: false } : m));
-      } finally { setStreaming(false); }
+      } finally {
+        clearTimeout(safetyTimeout);
+        // Safety net: if streaming is still true after the await returns,
+        // force-clear it so the cursor doesn't get stuck. This covers edge
+        // cases where the server returns 200 OK with an empty body.
+        setMessages(prev => prev.map(m =>
+          m.id === aiMsg.id && m.streaming
+            ? { ...m, content: m.content || "(empty response)", streaming: false }
+            : m
+        ));
+        setStreaming(false);
+      }
     } else {
       setLoading(true);
       try {
