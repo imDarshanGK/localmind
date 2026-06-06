@@ -14,6 +14,8 @@ from langchain_community.document_loaders import (
 )
 from sentence_transformers import SentenceTransformer
 
+from services.citation_utils import build_sources
+
 logger = logging.getLogger(__name__)
 
 CHROMA_PATH = os.getenv("CHROMADB_DIR", "./data/chromadb")
@@ -72,7 +74,7 @@ def index_document(file_path: str, session_id: str) -> int:
     return len(chunks)
 
 
-def retrieve_context(query: str, session_id: str, top_k: int = 4) -> tuple[str, list[str]]:
+def retrieve_context(query: str, session_id: str, top_k: int = 4) -> tuple[str, list[dict]]:
     col = _collection(session_id)
     if col.count() == 0:
         return "", []
@@ -88,7 +90,10 @@ def retrieve_context(query: str, session_id: str, top_k: int = 4) -> tuple[str, 
     metas = results["metadatas"][0]  if results["metadatas"] else []
 
     context = "\n\n---\n\n".join(docs)
-    sources = list({m.get("source", "unknown") for m in metas})
+
+    # Build structured source list: one entry per unique (filename, chunk) pair,
+    # preserving a short preview of the retrieved text for inline citation display.
+    sources = build_sources(docs, metas)
     return context, sources
 
 
