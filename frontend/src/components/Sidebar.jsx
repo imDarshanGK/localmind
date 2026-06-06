@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { AppLogoIcon, ChatIcon, LockIcon, StarIcon } from "./Icons";
+import SessionActivityIndicator from "./SessionActivityIndicator";
 
 const LANGUAGES = [
   {code:"en",label:"English"},{code:"hi",label:"हिन्दी"},{code:"ta",label:"தமிழ்"},
