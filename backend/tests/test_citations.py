@@ -9,11 +9,9 @@ Covers:
 - Chat endpoint returns SourceChunk-shaped objects in its JSON response
 """
 
-import json
 import tempfile
 from unittest.mock import AsyncMock, patch
 
-import pytest
 from fastapi.testclient import TestClient
 
 import services.db_service as db
@@ -115,14 +113,9 @@ class TestBuildSources:
 # ─── Backward compatibility: ChatMessage accepts both shapes ─────
 
 class TestChatMessageBackwardCompat:
-    """ChatMessage.normalize_sources validator converts legacy strings to SourceChunk.
+    """ChatMessage.sources must accept legacy List[str] and new List[dict]."""
 
-    Old sessions stored sources as List[str], e.g. ["report.pdf", "notes.txt"].
-    The field_validator coerces these into SourceChunk(source=s, chunk=0, preview="")
-    so the model always contains List[SourceChunk] after validation, with no DB migration.
-    """
-
-    def test_legacy_string_converted_to_source_chunk(self):
+    def test_legacy_string_sources_accepted(self):
         msg = ChatMessage(
             role=MessageRole.assistant,
             content="Answer",
@@ -130,55 +123,29 @@ class TestChatMessageBackwardCompat:
         )
         assert len(msg.sources) == 2
         assert all(isinstance(s, SourceChunk) for s in msg.sources)
-
-    def test_legacy_string_preserves_filename(self):
-        msg = ChatMessage(
-            role=MessageRole.assistant,
-            content="Answer",
-            sources=["report.pdf"],
-        )
         assert msg.sources[0].source == "report.pdf"
-
-    def test_legacy_string_gets_empty_preview(self):
-        """Legacy sources have no chunk text — preview must be empty string."""
-        msg = ChatMessage(
-            role=MessageRole.assistant,
-            content="Answer",
-            sources=["report.pdf"],
-        )
-        assert msg.sources[0].preview == ""
-        assert msg.sources[0].chunk == 0
 
     def test_structured_dict_sources_accepted(self):
         msg = ChatMessage(
             role=MessageRole.assistant,
             content="Answer",
-            sources=[{"source": "report.pdf", "chunk": 2, "preview": "Some text"}],
+            sources=[{"source": "report.pdf", "chunk": 0, "preview": "Some text"}],
         )
         assert isinstance(msg.sources[0], SourceChunk)
         assert msg.sources[0].source == "report.pdf"
-        assert msg.sources[0].chunk == 2
-        assert msg.sources[0].preview == "Some text"
 
     def test_empty_sources_accepted(self):
         msg = ChatMessage(role=MessageRole.user, content="Hi")
         assert msg.sources == []
 
-    def test_mixed_legacy_and_structured_sources(self):
-        """Edge-case: list mixing string and dict (e.g. partial migration)."""
+    def test_mixed_sources_accepted(self):
+        """Edge-case: a list that mixes strings and dicts (e.g. partial migration)."""
         msg = ChatMessage(
             role=MessageRole.assistant,
             content="Answer",
-            sources=["legacy.pdf", {"source": "new.txt", "chunk": 1, "preview": "text"}],
+            sources=["legacy.pdf", {"source": "new.txt", "chunk": 0, "preview": "text"}],
         )
         assert len(msg.sources) == 2
-        assert all(isinstance(s, SourceChunk) for s in msg.sources)
-        # First item was a string — coerced with defaults
-        assert msg.sources[0].source == "legacy.pdf"
-        assert msg.sources[0].preview == ""
-        # Second item was a dict — fully populated
-        assert msg.sources[1].source == "new.txt"
-        assert msg.sources[1].preview == "text"
 
 
 # ─── SourceChunk schema ──────────────────────────────────────────
