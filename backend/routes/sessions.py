@@ -2,8 +2,9 @@
 
 import uuid
 from fastapi import APIRouter, HTTPException
-from models.schemas import SessionCreate, SessionUpdate
+from models.schemas import SessionCreate, SessionUpdate, BulkSessionRenameRequest
 from services import db_service
+# from backend.models.schemas import BulkSessionRenameRequest  # Adjust if other items are imported from here
 
 router = APIRouter()
 
@@ -19,7 +20,50 @@ async def create_session(body: SessionCreate):
     session = db_service.create_session(sid, title=body.title, model=body.model)
     return session
 
-
+@router.patch("/bulk-rename")
+async def bulk_rename_sessions(body: BulkSessionRenameRequest):
+    try:
+        updated_count = 0
+        missing_sessions = []
+        
+        for item in body.sessions:
+            # 1. Strict Session Handling: Check if it actually exists in the DB
+            current_session = db_service.get_session(item.session_id)
+            
+            if not current_session:
+                # Track the missing session instead of using an unsafe fallback model
+                missing_sessions.append(item.session_id)
+                continue
+                
+            # 2. Safe Update: Use the verified existing model configuration
+            db_service.update_session(
+                session_id=item.session_id, 
+                title=item.new_title, 
+                model=current_session.get("model")
+            )
+            # 3. Correct Success Count: Only increment if the database update actually fired
+            updated_count += 1
+            
+        # If some requested sessions weren't found, alert the client transparently
+        if missing_sessions:
+            return {
+                "status": "partial_success",
+                "message": f"Successfully renamed {updated_count} sessions. {len(missing_sessions)} session(s) were not found.",
+                "missing_session_ids": missing_sessions
+            }
+        
+        return {
+            "status": "success", 
+            "message": f"Successfully processed all {updated_count} session updates."
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Bulk rename failed: {str(e)}"
+        )
+    
+    
 @router.get("/{session_id}")
 async def get_session(session_id: str):
     s = db_service.get_session(session_id)
@@ -73,3 +117,4 @@ async def rag_stats(session_id: str):
     except Exception:
         count = 0
     return {"session_id": session_id, "indexed_chunks": count}
+

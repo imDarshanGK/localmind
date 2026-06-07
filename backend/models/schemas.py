@@ -95,3 +95,11 @@ class ExportFormat(str, Enum):
     markdown = "markdown"
     json = "json"
     txt = "txt"
+
+
+class SessionRenameItem(BaseModel):
+    session_id: str
+    new_title: str
+
+class BulkSessionRenameRequest(BaseModel):
+    sessions: List[SessionRenameItem]

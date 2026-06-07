@@ -7,6 +7,8 @@ import sqlite3
 import json
 import os
 from contextlib import contextmanager
+import time
+from sqlite3 import OperationalError
 
 DB_PATH = os.getenv("DB_PATH", "./data/localmind.db")
 os.makedirs(os.path.dirname(DB_PATH) if os.path.dirname(DB_PATH) else ".", exist_ok=True)
@@ -14,19 +16,45 @@ os.makedirs(os.path.dirname(DB_PATH) if os.path.dirname(DB_PATH) else ".", exist
 
 @contextmanager
 def get_db():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA foreign_keys=ON")
+    retries = 3
+    delay = 0.2
+
+    conn = None
+
+    for attempt in range(retries):
+        try:
+            conn = sqlite3.connect(DB_PATH, timeout=5)
+            conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA foreign_keys=ON")
+            break
+
+        except OperationalError as e:
+            if "locked" in str(e).lower() and attempt < retries - 1:
+                time.sleep(delay)
+                continue
+            raise
+
     try:
         yield conn
         conn.commit()
+
+    except OperationalError as e:
+        if "locked" in str(e).lower():
+            conn.rollback()
+            raise RuntimeError(
+                "Database is busy. Please try again in a moment."
+            ) from e
+        conn.rollback()
+        raise
+
     except Exception:
         conn.rollback()
         raise
-    finally:
-        conn.close()
 
+    finally:
+        if conn:
+            conn.close()
 
 def init_db():
     """Create all tables on startup."""
