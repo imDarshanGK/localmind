@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { AppLogoIcon, ChatIcon, LockIcon, StarIcon } from "./Icons";
+import { highlightText } from "../utils/search";
 
 const LANGUAGES = [
   {code:"en",label:"English"},{code:"hi",label:"हिन्दी"},{code:"ta",label:"தமிழ்"},
@@ -65,7 +66,7 @@ export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSes
               <span className={currentSession === s.id ? "text-white" : ""}>
                 <span className="inline-flex items-center gap-1.5">
                   <ChatIcon className="w-3.5 h-3.5 text-gray-500" />
-                  <span>{s.title || "New Chat"}</span>
+                  <span>{highlightText(s.title || "New Chat", search)}</span>
                 </span>
               </span>
               {s.message_count > 0 && (
