@@ -25,6 +25,19 @@ export default function App() {
 
   useEffect(() => { bootstrap(); }, []);
 
+  // ── Global keyboard shortcut: Ctrl+Shift+N (or Cmd+Shift+N on Mac) → New Chat ──
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      console.log("Key pressed:", e.key, "Ctrl:", e.ctrlKey, "Shift:", e.shiftKey); // ADD THIS
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "N") {
+        e.preventDefault();
+        newChat();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   async function bootstrap() {
     try {
       const [mRes, sRes, settRes, stRes] = await Promise.allSettled([
@@ -83,14 +96,16 @@ export default function App() {
   }
 
   async function newChat() {
-    const sid = uuidv4();
-    await api.createSession({ title: "New Chat", model });
-    setSessionId(sid);
-    setMessages([]);
-    setDocuments([]);
-    setPanel(null);
-    refreshSessions();
-  }
+      const sid = uuidv4();
+      try {
+        await api.createSession({ title: "New Chat", model });
+      } catch {}
+      setSessionId(sid);
+      setMessages([]);
+      setDocuments([]);
+      setPanel(null);
+      refreshSessions();
+    }
 
   async function loadSession(sid) {
     setSessionId(sid);

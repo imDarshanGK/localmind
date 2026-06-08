@@ -24,8 +24,10 @@ export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSes
           </div>
         </div>
         <button onClick={onNewChat}
+          title="New Chat"
           className="w-full text-sm bg-purple-700 hover:bg-purple-600 active:bg-purple-800 text-white py-2 rounded-xl font-medium transition">
           + New Chat
+          <span className="block text-xs text-purple-300 font-normal opacity-75">Ctrl+Shift+N</span>
         </button>
       </div>
 
