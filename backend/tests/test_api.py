@@ -205,3 +205,63 @@ def test_export_txt():
     r2 = client.get(f"/api/export/{sid}/txt")
     assert r2.status_code == 200
     assert b"Plain text export" in r2.content
+
+# ─── Prompt Templates ────────────────────────────────────────
+def test_create_prompt_template():
+    r = client.post("/api/prompt-templates/", json={
+        "prompt_title": "Code Reviewer",
+        "prompt": "Review this code for bugs and suggest improvements."
+    })
+    assert r.status_code == 200
+    assert r.json()["prompt_title"] == "Code Reviewer"
+    assert "id" in r.json()
+
+
+def test_list_prompt_templates():
+    r = client.get("/api/prompt-templates/")
+    assert r.status_code == 200
+    assert isinstance(r.json(), list)
+    assert len(r.json()) >= 1
+
+
+def test_update_prompt_template():
+    r = client.post("/api/prompt-templates/", json={
+        "prompt_title": "Old Title",
+        "prompt": "Old prompt text"
+    })
+    tid = r.json()["id"]
+    r2 = client.put(f"/api/prompt-templates/{tid}", json={
+        "prompt_title": "New Title"
+    })
+    assert r2.json()["prompt_title"] == "New Title"
+
+
+def test_delete_prompt_template():
+    r = client.post("/api/prompt-templates/", json={
+        "prompt_title": "To Delete",
+        "prompt": "This will be deleted."
+    })
+    tid = r.json()["id"]
+    r2 = client.delete(f"/api/prompt-templates/{tid}")
+    assert r2.status_code == 200
+    assert r2.json()["status"] == "deleted"
+
+
+def test_get_prompt_template_not_found():
+    r = client.put("/api/prompt-templates/99999", json={
+        "prompt_title": "Nope"
+    })
+    assert r.status_code == 404
+
+
+def test_delete_prompt_template_not_found():
+    r = client.delete("/api/prompt-templates/99999")
+    assert r.status_code == 404
+
+
+def test_create_prompt_template_empty_title():
+    r = client.post("/api/prompt-templates/", json={
+        "prompt_title": "",
+        "prompt": "Some prompt"
+    })
+    assert r.status_code == 422

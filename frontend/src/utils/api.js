@@ -29,6 +29,12 @@ export const saveSettings   = (b)    => req("/settings/", { method: "PUT", body:
 export const exportSession  = (id, fmt) => window.open(`${BASE}/export/${id}/${fmt}`, "_blank");
 export const deleteDocument = (docId) => req(`/upload/${docId}`, { method: "DELETE" });
 
+// Prompt Templates
+export const getPromptTemplates      = ()     => req("/prompt-templates/");
+export const createPromptTemplate    = (b)    => req("/prompt-templates/", { method: "POST", body: JSON.stringify(b) });
+export const updatePromptTemplate    = (id,b) => req(`/prompt-templates/${id}`, { method: "PUT", body: JSON.stringify(b) });
+export const deletePromptTemplate    = (id)   => req(`/prompt-templates/${id}`, { method: "DELETE" });
+
 export async function uploadDocument(file, session_id) {
   const fd = new FormData();
   fd.append("file", file); fd.append("session_id", session_id);
