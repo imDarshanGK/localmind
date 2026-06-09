@@ -21,6 +21,7 @@ from routes.sessions import router as sessions_router
 from routes.plugins import router as plugins_router
 from routes.export import router as export_router
 from routes.settings import router as settings_router
+from middleware.csrf import OriginValidationMiddleware
 from services.db_service import init_db
 
 logging.basicConfig(
@@ -58,6 +59,7 @@ cors_origins = [
 ]
 
 app.add_middleware(GZipMiddleware, minimum_size=1000)
+app.add_middleware(OriginValidationMiddleware, allowed_origins=cors_origins)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
