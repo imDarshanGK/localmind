@@ -35,6 +35,13 @@ async def run_plugin(body: PluginRun):
     plugin = body.plugin.lower()
     inp    = body.input.strip()
 
+    # Reject empty inputs or pure whitespaces before processing plugins
+    if not inp:
+        raise HTTPException(
+            status_code=400,
+            detail="Plugin payload error: Input context cannot be empty or blank spaces."
+        )
+
     try:
         if plugin == "calculator":
             result = _calculator(inp)
@@ -86,7 +93,7 @@ def _wordcount(text: str) -> str:
     words     = len(text.split())
     chars     = len(text)
     chars_ns  = len(text.replace(" ", ""))
-    sentences = len(re.split(r'[.!?]+', text))
+    sentences = len(re.split(r"[.!?]+", text))
     paragraphs= len([p for p in text.split("\n\n") if p.strip()])
     lines     = len(text.splitlines())
     return (
@@ -105,8 +112,8 @@ def _summarizer(text: str) -> str:
     """Simple extractive summarizer — top sentences by word frequency."""
     if len(text) < 200:
         return text
-    sentences = re.split(r'(?<=[.!?])\s+', text)
-    words     = re.findall(r'\w+', text.lower())
+    sentences = re.split(r"(?<=[.!?])\s+", text)
+    words     = re.findall(r"\w+", text.lower())
     freq      = {}
     for w in words:
         if len(w) > 3:
@@ -135,19 +142,27 @@ def _jsonformat(text: str) -> str:
 
 def _coderunner(code: str) -> str:
     """Run Python code in a restricted subprocess with timeout."""
-    # Strip markdown code fences if present
-    code = re.sub(r'^```(?:python)?\n?', '', code.strip())
-    code = re.sub(r'\n?```$', '', code)
+    # Safe and clean manual string strip of markdown code fences
+    code_str = code.strip()
+    if code_str.lower().startswith("```python"):
+        code_str = code_str[9:]
+    elif code_str.startswith("```"):
+        code_str = code_str[3:]
+    
+    if code_str.endswith("```"):
+        code_str = code_str[:-3]
+        
+    code_cleaned = code_str.strip()
 
     # Basic safety: block dangerous imports
     BLOCKED = ["import os", "import sys", "import subprocess", "import socket",
                "__import__", "open(", "exec(", "eval(", "compile("]
     for b in BLOCKED:
-        if b in code:
+        if b in code_cleaned:
             return f"Blocked: '{b}' is not allowed in sandbox."
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
-        f.write(code)
+        f.write(code_cleaned)
         tmp = f.name
 
     try:
@@ -162,26 +177,28 @@ def _coderunner(code: str) -> str:
     except Exception as e:
         return f"Error: {e}"
     finally:
-        os.unlink(tmp)
-
+        try:
+            os.unlink(tmp)
+        except Exception:
+            pass
 
 def _translator(text: str) -> str:
     """Detect language and provide translation info (best-effort offline)."""
     # Simple heuristic language detection
     sample = text[:200]
-    if re.search(r'[\u0900-\u097F]', sample):
+    if re.search(r"[\u0900-\u097F]", sample):
         lang = "Hindi (Devanagari)"
-    elif re.search(r'[\u0B80-\u0BFF]', sample):
+    elif re.search(r"[\u0B80-\u0BFF]", sample):
         lang = "Tamil"
-    elif re.search(r'[\u0C00-\u0C7F]', sample):
+    elif re.search(r"[\u0C00-\u0C7F]", sample):
         lang = "Telugu"
-    elif re.search(r'[\u0C80-\u0CFF]', sample):
+    elif re.search(r"[\u0C80-\u0CFF]", sample):
         lang = "Kannada"
-    elif re.search(r'[\u0600-\u06FF]', sample):
+    elif re.search(r"[\u0600-\u06FF]", sample):
         lang = "Arabic"
-    elif re.search(r'[\u4E00-\u9FFF]', sample):
+    elif re.search(r"[\u4E00-\u9FFF]", sample):
         lang = "Chinese"
-    elif re.search(r'[\u3040-\u30FF]', sample):
+    elif re.search(r"[\u3040-\u30FF]", sample):
         lang = "Japanese"
     else:
         lang = "English / Latin script"
