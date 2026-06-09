@@ -72,10 +72,10 @@ async def export_messages(req: ExportMessagesRequest):
     if req.format == ExportFormat.json:
         content = json.dumps({"messages": messages, "exported_at": ts}, indent=2, ensure_ascii=False)
         media = "application/json"
-        filename = f"localmind_messages_{ts.replace(' ', '_')}.json"
+        filename = f"localmind_messages_{ts.replace(' ', '_').replace(':', '-')}.json"
 
     elif req.format == ExportFormat.markdown:
-        lines = [f"# LocalMind – Exported Messages\n", f"*Exported: {ts}*\n\n---\n"]
+        lines = ["# LocalMind – Exported Messages\n", f"*Exported: {ts}*\n\n---\n"]
         for m in messages:
             role_label = "**You**" if m["role"] == "user" else "**LocalMind**"
             lines.append(f"{role_label}\n\n{m['content']}\n")
@@ -84,16 +84,16 @@ async def export_messages(req: ExportMessagesRequest):
             lines.append("\n---\n")
         content = "\n".join(lines)
         media = "text/markdown"
-        filename = f"localmind_messages_{ts.replace(' ', '_')}.md"
+        filename = f"localmind_messages_{ts.replace(' ', '_').replace(':', '-')}.md"
 
     else:
-        lines = [f"LocalMind Export — Selected Messages", f"Exported: {ts}", "=" * 50, ""]
+        lines = ["LocalMind Export — Selected Messages", f"Exported: {ts}", "=" * 50, ""]
         for m in messages:
             role = "YOU" if m["role"] == "user" else "LOCALMIND"
             lines += [f"[{role}]", m["content"], ""]
         content = "\n".join(lines)
         media = "text/plain"
-        filename = f"localmind_messages_{ts.replace(' ', '_')}.txt"
+        filename = f"localmind_messages_{ts.replace(' ', '_').replace(':', '-')}.txt"
 
     return Response(
         content=content.encode("utf-8"),
