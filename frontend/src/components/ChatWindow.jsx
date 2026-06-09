@@ -6,6 +6,10 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
   const [input, setInput] = useState("");
   const bottomRef = useRef(null);
   const textareaRef = useRef(null);
+  
+  // NEW: state for selected messages and export format
+  const [selectedMessages, setSelectedMessages] = useState([]);
+  const [exportFormat, setExportFormat] = useState("markdown");
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
@@ -25,6 +29,60 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
     e.target.style.height = Math.min(e.target.scrollHeight, 160) + "px";
   }
 
+  // NEW: toggle message selection
+  const toggleSelectMessage = (msgId) => {
+    setSelectedMessages(prev =>
+      prev.includes(msgId) ? prev.filter(id => id !== msgId) : [...prev, msgId]
+    );
+  };
+
+  // NEW: export selected messages via backend POST /api/export/messages
+  const handleExportSelected = async () => {
+    if (selectedMessages.length === 0) return;
+    try {
+      const response = await fetch("/api/export/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message_ids: selectedMessages, format: exportFormat }),
+      });
+      if (!response.ok) throw new Error("Export failed");
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `localmind_export.${exportFormat === "markdown" ? "md" : exportFormat}`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to export messages");
+    }
+  };
+
+  // NEW: export a single message (just select it and call export)
+  const exportSingleMessage = async (msgId) => {
+    setSelectedMessages([msgId]);
+    // wait a tick for state update (or directly call export with array)
+    try {
+      const response = await fetch("/api/export/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message_ids: [msgId], format: exportFormat }),
+      });
+      if (!response.ok) throw new Error("Export failed");
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `localmind_message_${msgId}.${exportFormat === "markdown" ? "md" : exportFormat}`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to export message");
+    }
+  };
+
   const SUGGESTIONS = [
     "Summarize the uploaded document",
     "What are the key points?",
@@ -34,7 +92,7 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden bg-gray-950">
-      {/* Export bar */}
+      {/* Export bar – existing for whole session + new selection bar */}
       {messages.length > 0 && (
         <div className="flex justify-end gap-2 px-5 pt-2">
           {["markdown","json","txt"].map(f => (
@@ -43,6 +101,36 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
               ↓ .{f}
             </button>
           ))}
+        </div>
+      )}
+
+      {/* NEW: Export selection bar */}
+      {selectedMessages.length > 0 && (
+        <div className="flex justify-between items-center px-5 py-2 bg-gray-900 border-b border-gray-800">
+          <span className="text-sm text-gray-300">{selectedMessages.length} message(s) selected</span>
+          <div className="flex gap-2 items-center">
+            <select
+              value={exportFormat}
+              onChange={(e) => setExportFormat(e.target.value)}
+              className="text-xs bg-gray-800 text-gray-200 border border-gray-700 rounded px-2 py-1"
+            >
+              <option value="markdown">Markdown (.md)</option>
+              <option value="json">JSON (.json)</option>
+              <option value="txt">Text (.txt)</option>
+            </select>
+            <button
+              onClick={handleExportSelected}
+              className="text-xs bg-purple-600 hover:bg-purple-500 text-white px-3 py-1 rounded"
+            >
+              Export Selected
+            </button>
+            <button
+              onClick={() => setSelectedMessages([])}
+              className="text-xs text-gray-400 hover:text-gray-200 px-2 py-1"
+            >
+              Clear
+            </button>
+          </div>
         </div>
       )}
 
@@ -68,6 +156,15 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
 
         {messages.map((msg, i) => (
           <div key={msg.id || i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+            {/* NEW: checkbox for selection */}
+            <div className="mr-2 self-center">
+              <input
+                type="checkbox"
+                checked={selectedMessages.includes(msg.id)}
+                onChange={() => toggleSelectMessage(msg.id)}
+                className="w-4 h-4 rounded border-gray-600 bg-gray-800 text-purple-600 focus:ring-purple-500 focus:ring-1"
+              />
+            </div>
             <div className={`max-w-2xl ${msg.role === "user" ? "max-w-xl" : "max-w-2xl"}`}>
               {msg.role === "assistant" && (
                 <div className="flex items-center gap-1.5 mb-1.5 ml-1">
@@ -96,8 +193,27 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
                 </div>
               )}
               {msg.role === "user" && (
-                <div className="text-right mt-1 mr-1">
+                <div className="text-right mt-1 mr-1 flex justify-end items-center gap-2">
                   <span className="text-xs text-gray-600">You</span>
+                  {/* NEW: per-message export button */}
+                  <button
+                    onClick={() => exportSingleMessage(msg.id)}
+                    className="text-xs text-gray-500 hover:text-purple-400 transition"
+                    title="Export this message"
+                  >
+                    ↓
+                  </button>
+                </div>
+              )}
+              {msg.role === "assistant" && (
+                <div className="flex justify-end mt-1 mr-1">
+                  <button
+                    onClick={() => exportSingleMessage(msg.id)}
+                    className="text-xs text-gray-500 hover:text-purple-400 transition"
+                    title="Export this message"
+                  >
+                    ↓
+                  </button>
                 </div>
               )}
             </div>
