@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { exportSession } from "../utils/api";
 import { AppLogoIcon, FileIcon, LockIcon } from "./Icons";
+import CodeBlockWithCopy from "./CodeBlockWithCopy";
 
 export default function ChatWindow({ messages, loading, onSend, sessionId }) {
   const [input, setInput] = useState("");
@@ -12,6 +13,41 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
   const [exportFormat, setExportFormat] = useState("markdown");
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
+ 
+  function parseMessageWithCodeBlocks(content) {
+  if (!content) return [{ type: "text", content: "" }];
+  
+  const parts = [];
+  const regex = /```(\w*)\n([\s\S]*?)```/g;
+  let lastIndex = 0;
+  let match;
+  
+  while ((match = regex.exec(content)) !== null) {
+    // Text before code block
+    if (match.index > lastIndex) {
+      parts.push({ type: "text", content: content.slice(lastIndex, match.index) });
+    }
+    // Code block
+    parts.push({
+      type: "code",
+      language: match[1] || "text",
+      code: match[2].trim()
+    });
+    lastIndex = match.index + match[0].length;
+  }
+  
+  // Remaining text after last code block
+  if (lastIndex < content.length) {
+    parts.push({ type: "text", content: content.slice(lastIndex) });
+  }
+  
+  // If no code blocks found, return whole content as text
+  if (parts.length === 0) {
+    parts.push({ type: "text", content });
+  }
+  
+  return parts;
+} 
 
   function send() {
     if (!input.trim() || loading) return;
@@ -174,12 +210,27 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
                 </div>
               )}
               <div className={`px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words
-                ${msg.role === "user"
-                  ? "bg-purple-700 text-white rounded-br-sm"
-                  : "bg-gray-800 text-gray-100 rounded-bl-sm border border-gray-700"}`}>
-                {msg.content}
-                {msg.streaming && <span className="inline-block w-1.5 h-4 bg-purple-400 ml-1 animate-pulse rounded" />}
-              </div>
+  ${msg.role === "user"
+    ? "bg-purple-700 text-white rounded-br-sm"
+    : "bg-gray-800 text-gray-100 rounded-bl-sm border border-gray-700"}`}>
+  {msg.role === "user" ? (
+    <>
+      {msg.content}
+      {msg.streaming && <span className="inline-block w-1.5 h-4 bg-purple-400 ml-1 animate-pulse rounded" />}
+    </>
+  ) : (
+    <>
+      {parseMessageWithCodeBlocks(msg.content).map((part, idx) => (
+        part.type === "code" ? (
+          <CodeBlockWithCopy key={idx} code={part.code} language={part.language} />
+        ) : (
+          <div key={idx} className="whitespace-pre-wrap">{part.content}</div>
+        )
+      ))}
+      {msg.streaming && <span className="inline-block w-1.5 h-4 bg-purple-400 ml-1 animate-pulse rounded" />}
+    </>
+  )}
+</div>
               {msg.sources?.length > 0 && (
                 <div className="mt-1.5 ml-1 flex flex-wrap gap-1">
                   {msg.sources.map((s,i) => (
