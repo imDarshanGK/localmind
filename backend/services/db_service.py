@@ -265,3 +265,16 @@ def get_messages_by_ids(message_ids: list):
             WHERE id IN ({placeholders})
         """, message_ids).fetchall()
         return [dict(row) for row in rows]
+
+        def get_messages_by_ids(message_ids: list):
+    """Fetch messages by list of message IDs (used for batch export)."""
+    if not message_ids:
+        return []
+    placeholders = ','.join('?' for _ in message_ids)
+    with get_db() as conn:
+        rows = conn.execute(f"""
+            SELECT id, role, content, sources, created_at as timestamp
+            FROM messages
+            WHERE id IN ({placeholders})
+        """, message_ids).fetchall()
+        return [dict(row) for row in rows]
