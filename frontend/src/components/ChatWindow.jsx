@@ -1,18 +1,47 @@
 import { useState, useRef, useEffect } from "react";
 import { exportSession } from "../utils/api";
-import { AppLogoIcon, FileIcon, LockIcon } from "./Icons";
+import { AppLogoIcon, CloseIcon, FileIcon, LockIcon, PlusCircleIcon, TemplateIcon } from "./Icons";
+import PromptTemplateDialog from "./PromptTemplateDialog";
 
 export default function ChatWindow({ messages, loading, onSend, sessionId }) {
   const [input, setInput] = useState("");
+  const [showPlusMenu, setShowPlusMenu] = useState(false);
+  const [showTemplateDialog, setShowTemplateDialog] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState(null);
   const bottomRef = useRef(null);
   const textareaRef = useRef(null);
+  const plusMenuRef = useRef(null);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
+  // Close plus menu on outside click
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (plusMenuRef.current && !plusMenuRef.current.contains(e.target)) {
+        setShowPlusMenu(false);
+      }
+    }
+    if (showPlusMenu) document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showPlusMenu]);
+
+  function handleSelectTemplate(template) {
+    setSelectedTemplate(template);
+    setShowTemplateDialog(false);
+    setShowPlusMenu(false);
+    // Focus the textarea so user can start typing right away
+    setTimeout(() => textareaRef.current?.focus(), 0);
+  }
+
   function send() {
-    if (!input.trim() || loading) return;
-    onSend(input.trim());
+    if ((!input.trim() && !selectedTemplate) || loading) return;
+    // Prepend the template prompt to the user's input
+    const message = selectedTemplate
+      ? `${selectedTemplate.prompt}\n\n${input.trim()}`.trim()
+      : input.trim();
+    onSend(message);
     setInput("");
+    setSelectedTemplate(null);
     if (textareaRef.current) { textareaRef.current.style.height = "auto"; }
   }
 
@@ -125,22 +154,69 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
 
       {/* Input */}
       <div className="px-4 pb-4 pt-2 shrink-0">
-        <div className="flex items-end gap-2 bg-gray-900 border border-gray-700 rounded-2xl px-4 py-3 focus-within:border-purple-500 transition-colors">
-          <textarea
-            ref={textareaRef}
-            value={input}
-            onChange={(e) => { setInput(e.target.value); autoResize(e); }}
-            onKeyDown={handleKey}
-            placeholder="Ask anything... (Enter to send, Shift+Enter for new line)"
-            rows={1}
-            className="flex-1 bg-transparent text-sm text-gray-100 placeholder-gray-500 resize-none outline-none"
-            style={{ minHeight: "24px", maxHeight: "160px" }}
-          />
-          <button onClick={send} disabled={!input.trim() || loading}
-            className="shrink-0 text-sm bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white px-4 py-2 rounded-xl transition font-medium">
-            Send →
-          </button>
+        <div className="bg-gray-900 border border-gray-700 rounded-2xl px-4 py-3 focus-within:border-purple-500 transition-colors">
+          {/* Template chip */}
+          {selectedTemplate && (
+            <div className="flex items-center gap-1.5 mb-2">
+              <span className="inline-flex items-center gap-1.5 text-xs font-medium bg-gray-700/70 text-gray-300 px-2.5 py-1 rounded-lg border border-gray-600">
+                <TemplateIcon className="w-3.5 h-3.5 text-purple-400" />
+                {selectedTemplate.prompt_title}
+                <button
+                  onClick={() => setSelectedTemplate(null)}
+                  className="text-gray-500 hover:text-gray-200 transition ml-0.5"
+                  title="Remove template"
+                >
+                  <CloseIcon className="w-3 h-3" />
+                </button>
+              </span>
+            </div>
+          )}
+          <div className="flex items-end gap-2">
+            {/* Plus button */}
+            <div className="relative shrink-0" ref={plusMenuRef}>
+              <button
+                onClick={() => setShowPlusMenu(prev => !prev)}
+                className="text-gray-500 hover:text-purple-400 transition p-1 rounded-lg hover:bg-gray-800"
+                title="More options"
+              >
+                <PlusCircleIcon className="w-5 h-5" />
+              </button>
+              {showPlusMenu && (
+                <div className="absolute bottom-full left-0 mb-2 bg-gray-800 border border-gray-700 rounded-xl shadow-xl py-1 min-w-[200px] z-40">
+                  <button
+                    onClick={() => { setShowTemplateDialog(true); setShowPlusMenu(false); }}
+                    className="w-full text-left text-xs px-4 py-2.5 text-gray-300 hover:bg-gray-700 hover:text-purple-300 transition inline-flex items-center gap-2"
+                  >
+                    <TemplateIcon className="w-4 h-4" />
+                    Use Prompt Template
+                  </button>
+                </div>
+              )}
+            </div>
+            <textarea
+              ref={textareaRef}
+              value={input}
+              onChange={(e) => { setInput(e.target.value); autoResize(e); }}
+              onKeyDown={handleKey}
+              placeholder={selectedTemplate ? "Add additional context... (Enter to send)" : "Ask anything... (Enter to send, Shift+Enter for new line)"}
+              rows={1}
+              className="flex-1 bg-transparent text-sm text-gray-100 placeholder-gray-500 resize-none outline-none"
+              style={{ minHeight: "24px", maxHeight: "160px" }}
+            />
+            <button onClick={send} disabled={(!input.trim() && !selectedTemplate) || loading}
+              className="shrink-0 text-sm bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white px-4 py-2 rounded-xl transition font-medium">
+              Send →
+            </button>
+          </div>
         </div>
+
+        {/* Template picker dialog */}
+        {showTemplateDialog && (
+          <PromptTemplateDialog
+            onSelect={handleSelectTemplate}
+            onClose={() => setShowTemplateDialog(false)}
+          />
+        )}
         <p className="text-center text-xs text-gray-700 mt-2">
           <span className="inline-flex items-center gap-1">
             <LockIcon className="w-3.5 h-3.5" />

@@ -5,6 +5,7 @@ import ChatWindow from "./components/ChatWindow";
 import UploadPanel from "./components/UploadPanel";
 import PluginsPanel from "./components/PluginsPanel";
 import SettingsPanel from "./components/SettingsPanel";
+import PromptRegistryPage from "./components/PromptRegistryPage";
 import StatusBar from "./components/StatusBar";
 import * as api from "./utils/api";
 
@@ -18,12 +19,26 @@ export default function App() {
   const [loading,    setLoading]    = useState(false);
   const [streaming,  setStreaming]  = useState(false);
   const [panel,      setPanel]      = useState(null); // "upload"|"plugins"|"settings"|null
+  const [view,        setView]       = useState("chat"); // "chat"|"prompts"
   const [language,   setLanguage]   = useState("en");
   const [ollamaOk,   setOllamaOk]   = useState(null);
   const [settings,   setSettings]   = useState({});
   const [useStream,  setUseStream]  = useState(true);
 
   useEffect(() => { bootstrap(); }, []);
+
+  // ── Global keyboard shortcut: Ctrl+Shift+N (or Cmd+Shift+N on Mac) → New Chat ──
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      console.log("Key pressed:", e.key, "Ctrl:", e.ctrlKey, "Shift:", e.shiftKey); // ADD THIS
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "N") {
+        e.preventDefault();
+        newChat();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   async function bootstrap() {
     try {
@@ -83,14 +98,16 @@ export default function App() {
   }
 
   async function newChat() {
-    const sid = uuidv4();
-    await api.createSession({ title: "New Chat", model });
-    setSessionId(sid);
-    setMessages([]);
-    setDocuments([]);
-    setPanel(null);
-    refreshSessions();
-  }
+      const sid = uuidv4();
+      try {
+        await api.createSession({ title: "New Chat", model });
+      } catch {}
+      setSessionId(sid);
+      setMessages([]);
+      setDocuments([]);
+      setPanel(null);
+      refreshSessions();
+    }
 
   async function loadSession(sid) {
     setSessionId(sid);
@@ -134,6 +151,7 @@ export default function App() {
           model={model}
           docCount={documents.length}
           onUpload={() => setPanel(panel === "upload" ? null : "upload")}
+          onPrompts={() => { setView("prompts"); setPanel(null); }}
           onPlugins={() => setPanel(panel === "plugins" ? null : "plugins")}
           onSettings={() => setPanel(panel === "settings" ? null : "settings")}
           onClear={handleClearChat}
@@ -160,12 +178,16 @@ export default function App() {
           />
         )}
 
-        <ChatWindow
-          messages={messages}
-          loading={loading || streaming}
-          onSend={sendMessage}
-          sessionId={sessionId}
-        />
+        {view === "prompts" ? (
+          <PromptRegistryPage onBack={() => setView("chat")} />
+        ) : (
+          <ChatWindow
+            messages={messages}
+            loading={loading || streaming}
+            onSend={sendMessage}
+            sessionId={sessionId}
+          />
+        )}
       </div>
     </div>
   );
