@@ -75,7 +75,7 @@ async def export_messages(req: ExportMessagesRequest):
         filename = f"localmind_messages_{ts.replace(' ', '_')}.json"
 
     elif req.format == ExportFormat.markdown:
-        lines = [f"# LocalMind – Exported Messages\n", f"*Exported: {ts}*\n\n---\n"]
+        lines = ["# LocalMind – Exported Messages\n", f"*Exported: {ts}*\n\n---\n"]
         for m in messages:
             role_label = "**You**" if m["role"] == "user" else "**LocalMind**"
             lines.append(f"{role_label}\n\n{m['content']}\n")
@@ -87,7 +87,7 @@ async def export_messages(req: ExportMessagesRequest):
         filename = f"localmind_messages_{ts.replace(' ', '_')}.md"
 
     else:
-        lines = [f"LocalMind Export — Selected Messages", f"Exported: {ts}", "=" * 50, ""]
+        lines = ["LocalMind Export — Selected Messages", f"Exported: {ts}", "=" * 50, ""]
         for m in messages:
             role = "YOU" if m["role"] == "user" else "LOCALMIND"
             lines += [f"[{role}]", m["content"], ""]
