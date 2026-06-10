@@ -7,6 +7,8 @@ import sqlite3
 import json
 import os
 from contextlib import contextmanager
+import time
+from sqlite3 import OperationalError
 
 DB_PATH = os.getenv("DB_PATH", "./data/localmind.db")
 os.makedirs(os.path.dirname(DB_PATH) if os.path.dirname(DB_PATH) else ".", exist_ok=True)
@@ -14,19 +16,45 @@ os.makedirs(os.path.dirname(DB_PATH) if os.path.dirname(DB_PATH) else ".", exist
 
 @contextmanager
 def get_db():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA foreign_keys=ON")
+    retries = 3
+    delay = 0.2
+
+    conn = None
+
+    for attempt in range(retries):
+        try:
+            conn = sqlite3.connect(DB_PATH, timeout=5)
+            conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA foreign_keys=ON")
+            break
+
+        except OperationalError as e:
+            if "locked" in str(e).lower() and attempt < retries - 1:
+                time.sleep(delay)
+                continue
+            raise
+
     try:
         yield conn
         conn.commit()
+
+    except OperationalError as e:
+        if "locked" in str(e).lower():
+            conn.rollback()
+            raise RuntimeError(
+                "Database is busy. Please try again in a moment."
+            ) from e
+        conn.rollback()
+        raise
+
     except Exception:
         conn.rollback()
         raise
-    finally:
-        conn.close()
 
+    finally:
+        if conn:
+            conn.close()
 
 def init_db():
     """Create all tables on startup."""
@@ -85,6 +113,14 @@ def init_db():
                 ('max_history_turns', '10'),
                 ('rag_top_k', '4'),
                 ('theme', '"dark"');
+
+            CREATE TABLE IF NOT EXISTS prompt_templates(
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                prompt_title TEXT NOT NULL,
+                prompt TEXT NOT NULL,
+                created_at TEXT DEFAULT (datetime('now'))
+            );
+
         """)
 
 
@@ -224,3 +260,55 @@ def log_plugin(session_id: str, plugin: str, inp: str, out: str, success: bool =
             "INSERT INTO plugin_logs (session_id, plugin, input, output, success) VALUES (?,?,?,?,?)",
             (session_id, plugin, inp, out, int(success)),
         )
+
+# ─── Prompt Template Registry ───────────────────────────────────────────────
+def create_prompt_template(prompt_title: str, prompt: str) -> dict:
+    """Create a new prompt template."""
+    with get_db() as conn:
+        conn.execute(
+            "INSERT INTO prompt_templates (prompt_title, prompt) VALUES (?, ?)",
+            (prompt_title, prompt),
+        )
+        row = conn.execute(
+            "SELECT * FROM prompt_templates WHERE id = last_insert_rowid()"
+        ).fetchone()
+        return dict(row)
+
+
+def get_all_prompt_templates() -> list[dict]:
+    """Fetch all prompt templates."""
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT * FROM prompt_templates ORDER BY created_at DESC"
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def get_prompt_template(template_id: int) -> dict | None:
+    """Fetch a single prompt template by ID."""
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT * FROM prompt_templates WHERE id = ?", (template_id,)
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def update_prompt_template(template_id: int, prompt_title: str = None, prompt: str = None):
+    """Update an existing prompt template."""
+    with get_db() as conn:
+        if prompt_title:
+            conn.execute(
+                "UPDATE prompt_templates SET prompt_title = ? WHERE id = ?",
+                (prompt_title, template_id),
+            )
+        if prompt:
+            conn.execute(
+                "UPDATE prompt_templates SET prompt = ? WHERE id = ?",
+                (prompt, template_id),
+            )
+
+
+def delete_prompt_template(template_id: int):
+    """Delete a prompt template by ID."""
+    with get_db() as conn:
+        conn.execute("DELETE FROM prompt_templates WHERE id = ?", (template_id,))
