@@ -1,49 +1,18 @@
 import { useState, useRef, useEffect } from "react";
 import { exportSession } from "../utils/api";
-import { AppLogoIcon, CloseIcon, FileIcon, LockIcon, PlusCircleIcon, TemplateIcon } from "./Icons";
-import PromptTemplateDialog from "./PromptTemplateDialog";
+import { AppLogoIcon, FileIcon, LockIcon } from "./Icons";
 
 export default function ChatWindow({ messages, loading, onSend, sessionId }) {
   const [input, setInput] = useState("");
-  const [showPlusMenu, setShowPlusMenu] = useState(false);
-  const [showTemplateDialog, setShowTemplateDialog] = useState(false);
-  const [selectedTemplate, setSelectedTemplate] = useState(null);
   const bottomRef = useRef(null);
   const textareaRef = useRef(null);
-  const plusMenuRef = useRef(null);
-
-  // NEW: state for selected messages and export format
-  const [selectedMessages, setSelectedMessages] = useState([]);
-  const [exportFormat, setExportFormat] = useState("markdown");
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
-  // Close plus menu on outside click
-  useEffect(() => {
-    function handleClickOutside(e) {
-      if (plusMenuRef.current && !plusMenuRef.current.contains(e.target)) {
-        setShowPlusMenu(false);
-      }
-    }
-    if (showPlusMenu) document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [showPlusMenu]);
-
-  function handleSelectTemplate(template) {
-    setSelectedTemplate(template);
-    setShowTemplateDialog(false);
-    setShowPlusMenu(false);
-    setTimeout(() => textareaRef.current?.focus(), 0);
-  }
-
   function send() {
-    if ((!input.trim() && !selectedTemplate) || loading) return;
-    const message = selectedTemplate
-      ? `${selectedTemplate.prompt}\n\n${input.trim()}`.trim()
-      : input.trim();
-    onSend(message);
+    if (!input.trim() || loading) return;
+    onSend(input.trim());
     setInput("");
-    setSelectedTemplate(null);
     if (textareaRef.current) { textareaRef.current.style.height = "auto"; }
   }
 
@@ -56,56 +25,6 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
     e.target.style.height = Math.min(e.target.scrollHeight, 160) + "px";
   }
 
-  // Message selection and export
-  const toggleSelectMessage = (msgId) => {
-    setSelectedMessages(prev =>
-      prev.includes(msgId) ? prev.filter(id => id !== msgId) : [...prev, msgId]
-    );
-  };
-
-  const handleExportSelected = async () => {
-    if (selectedMessages.length === 0) return;
-    try {
-      const response = await fetch("/api/export/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message_ids: selectedMessages, format: exportFormat }),
-      });
-      if (!response.ok) throw new Error("Export failed");
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `localmind_export.${exportFormat === "markdown" ? "md" : exportFormat}`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error(err);
-      alert("Failed to export messages");
-    }
-  };
-
-  const exportSingleMessage = async (msgId) => {
-    try {
-      const response = await fetch("/api/export/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message_ids: [msgId], format: exportFormat }),
-      });
-      if (!response.ok) throw new Error("Export failed");
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `localmind_message_${msgId}.${exportFormat === "markdown" ? "md" : exportFormat}`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error(err);
-      alert("Failed to export message");
-    }
-  };
-
   const SUGGESTIONS = [
     "Summarize the uploaded document",
     "What are the key points?",
@@ -115,7 +34,7 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden bg-gray-950">
-      {/* Export bar – existing for whole session + new selection bar */}
+      {/* Export bar */}
       {messages.length > 0 && (
         <div className="flex justify-end gap-2 px-5 pt-2">
           {["markdown","json","txt"].map(f => (
@@ -124,36 +43,6 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
               ↓ .{f}
             </button>
           ))}
-        </div>
-      )}
-
-      {/* Export selection bar */}
-      {selectedMessages.length > 0 && (
-        <div className="flex justify-between items-center px-5 py-2 bg-gray-900 border-b border-gray-800">
-          <span className="text-sm text-gray-300">{selectedMessages.length} message(s) selected</span>
-          <div className="flex gap-2 items-center">
-            <select
-              value={exportFormat}
-              onChange={(e) => setExportFormat(e.target.value)}
-              className="text-xs bg-gray-800 text-gray-200 border border-gray-700 rounded px-2 py-1"
-            >
-              <option value="markdown">Markdown (.md)</option>
-              <option value="json">JSON (.json)</option>
-              <option value="txt">Text (.txt)</option>
-            </select>
-            <button
-              onClick={handleExportSelected}
-              className="text-xs bg-purple-600 hover:bg-purple-500 text-white px-3 py-1 rounded"
-            >
-              Export Selected
-            </button>
-            <button
-              onClick={() => setSelectedMessages([])}
-              className="text-xs text-gray-400 hover:text-gray-200 px-2 py-1"
-            >
-              Clear
-            </button>
-          </div>
         </div>
       )}
 
@@ -179,15 +68,6 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
 
         {messages.map((msg, i) => (
           <div key={msg.id || i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-            {/* Checkbox for selection */}
-            <div className="mr-2 self-center">
-              <input
-                type="checkbox"
-                checked={selectedMessages.includes(msg.id)}
-                onChange={() => toggleSelectMessage(msg.id)}
-                className="w-4 h-4 rounded border-gray-600 bg-gray-800 text-purple-600 focus:ring-purple-500 focus:ring-1"
-              />
-            </div>
             <div className={`max-w-2xl ${msg.role === "user" ? "max-w-xl" : "max-w-2xl"}`}>
               {msg.role === "assistant" && (
                 <div className="flex items-center gap-1.5 mb-1.5 ml-1">
@@ -216,27 +96,8 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
                 </div>
               )}
               {msg.role === "user" && (
-                <div className="text-right mt-1 mr-1 flex justify-end items-center gap-2">
+                <div className="text-right mt-1 mr-1">
                   <span className="text-xs text-gray-600">You</span>
-                  {/* Per-message export button */}
-                  <button
-                    onClick={() => exportSingleMessage(msg.id)}
-                    className="text-xs text-gray-500 hover:text-purple-400 transition"
-                    title="Export this message"
-                  >
-                    ↓
-                  </button>
-                </div>
-              )}
-              {msg.role === "assistant" && (
-                <div className="flex justify-end mt-1 mr-1">
-                  <button
-                    onClick={() => exportSingleMessage(msg.id)}
-                    className="text-xs text-gray-500 hover:text-purple-400 transition"
-                    title="Export this message"
-                  >
-                    ↓
-                  </button>
                 </div>
               )}
             </div>
@@ -264,69 +125,22 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
 
       {/* Input */}
       <div className="px-4 pb-4 pt-2 shrink-0">
-        <div className="bg-gray-900 border border-gray-700 rounded-2xl px-4 py-3 focus-within:border-purple-500 transition-colors">
-          {/* Template chip */}
-          {selectedTemplate && (
-            <div className="flex items-center gap-1.5 mb-2">
-              <span className="inline-flex items-center gap-1.5 text-xs font-medium bg-gray-700/70 text-gray-300 px-2.5 py-1 rounded-lg border border-gray-600">
-                <TemplateIcon className="w-3.5 h-3.5 text-purple-400" />
-                {selectedTemplate.prompt_title}
-                <button
-                  onClick={() => setSelectedTemplate(null)}
-                  className="text-gray-500 hover:text-gray-200 transition ml-0.5"
-                  title="Remove template"
-                >
-                  <CloseIcon className="w-3 h-3" />
-                </button>
-              </span>
-            </div>
-          )}
-          <div className="flex items-end gap-2">
-            {/* Plus button */}
-            <div className="relative shrink-0" ref={plusMenuRef}>
-              <button
-                onClick={() => setShowPlusMenu(prev => !prev)}
-                className="text-gray-500 hover:text-purple-400 transition p-1 rounded-lg hover:bg-gray-800"
-                title="More options"
-              >
-                <PlusCircleIcon className="w-5 h-5" />
-              </button>
-              {showPlusMenu && (
-                <div className="absolute bottom-full left-0 mb-2 bg-gray-800 border border-gray-700 rounded-xl shadow-xl py-1 min-w-[200px] z-40">
-                  <button
-                    onClick={() => { setShowTemplateDialog(true); setShowPlusMenu(false); }}
-                    className="w-full text-left text-xs px-4 py-2.5 text-gray-300 hover:bg-gray-700 hover:text-purple-300 transition inline-flex items-center gap-2"
-                  >
-                    <TemplateIcon className="w-4 h-4" />
-                    Use Prompt Template
-                  </button>
-                </div>
-              )}
-            </div>
-            <textarea
-              ref={textareaRef}
-              value={input}
-              onChange={(e) => { setInput(e.target.value); autoResize(e); }}
-              onKeyDown={handleKey}
-              placeholder={selectedTemplate ? "Add additional context... (Enter to send)" : "Ask anything... (Enter to send, Shift+Enter for new line)"}
-              rows={1}
-              className="flex-1 bg-transparent text-sm text-gray-100 placeholder-gray-500 resize-none outline-none"
-              style={{ minHeight: "24px", maxHeight: "160px" }}
-            />
-            <button onClick={send} disabled={(!input.trim() && !selectedTemplate) || loading}
-              className="shrink-0 text-sm bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white px-4 py-2 rounded-xl transition font-medium">
-              Send →
-            </button>
-          </div>
-        </div>
-
-        {/* Template picker dialog */}
-        {showTemplateDialog && (
-          <PromptTemplateDialog
-            onSelect={handleSelectTemplate}
-            onClose={() => setShowTemplateDialog(false)}
+        <div className="flex items-end gap-2 bg-gray-900 border border-gray-700 rounded-2xl px-4 py-3 focus-within:border-purple-500 transition-colors">
+          <textarea
+            ref={textareaRef}
+            value={input}
+            onChange={(e) => { setInput(e.target.value); autoResize(e); }}
+            onKeyDown={handleKey}
+            placeholder="Ask anything... (Enter to send, Shift+Enter for new line)"
+            rows={1}
+            className="flex-1 bg-transparent text-sm text-gray-100 placeholder-gray-500 resize-none outline-none"
+            style={{ minHeight: "24px", maxHeight: "160px" }}
           />
-        )}
+          <button onClick={send} disabled={!input.trim() || loading}
+            className="shrink-0 text-sm bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white px-4 py-2 rounded-xl transition font-medium">
+            Send →
+          </button>
+        </div>
         <p className="text-center text-xs text-gray-700 mt-2">
           <span className="inline-flex items-center gap-1">
             <LockIcon className="w-3.5 h-3.5" />
