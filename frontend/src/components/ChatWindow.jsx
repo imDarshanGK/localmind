@@ -2,6 +2,46 @@ import { useState, useRef, useEffect } from "react";
 import { exportSession } from "../utils/api";
 import { AppLogoIcon, FileIcon, LockIcon } from "./Icons";
 
+// Light-weight sub-component to handle copy animation tracking on a single code block
+function CodeBlockContainer({ language, code }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy code: ", err);
+    }
+  };
+
+  return (
+    <div className="relative my-3 border border-gray-700/60 rounded-xl overflow-hidden bg-gray-900/90 text-left font-mono">
+      {/* Code Header Control Panel */}
+      <div className="flex items-center justify-between px-4 py-2 bg-gray-800/80 border-b border-gray-700/50 select-none">
+        <span className="text-xs font-semibold text-purple-400 lowercase tracking-wide">
+          {language || "code"}
+        </span>
+        <button
+          onClick={handleCopy}
+          className={`text-xs px-2.5 py-1 rounded-md font-medium transition-all duration-200 cursor-pointer
+            ${copied 
+              ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" 
+              : "bg-gray-700/50 text-gray-400 hover:text-white hover:bg-gray-700"}`}
+        >
+          {copied ? "✓ Copied!" : "Copy"}
+        </button>
+      </div>
+
+      {/* Code Content Area */}
+      <pre className="p-4 overflow-x-auto text-xs leading-relaxed text-gray-200 whitespace-pre scrollbar-thin">
+        <code>{code}</code>
+      </pre>
+    </div>
+  );
+}
+
 export default function ChatWindow({ messages, loading, onSend, sessionId }) {
   const [input, setInput] = useState("");
   const bottomRef = useRef(null);
@@ -24,6 +64,36 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
     e.target.style.height = "auto";
     e.target.style.height = Math.min(e.target.scrollHeight, 160) + "px";
   }
+
+  // Custom regex block segment chunker to split text content and map isolated blocks cleanly
+  const renderMessageContent = (content) => {
+    if (!content) return null;
+    
+    // Splits input by code block boundaries: ```[language]\n[code]```
+    const parts = content.split(/(```[\s\S]*?```)/g);
+    
+    return parts.map((part, index) => {
+      if (part.startsWith("```") && part.endsWith("```")) {
+        // Remove outer triple backticks and isolate contents
+        const cleanedPart = part.slice(3, -3);
+        const firstNewLineIndex = cleanedPart.indexOf("\n");
+        
+        let language = "";
+        let code = cleanedPart;
+        
+        if (firstNewLineIndex !== -1) {
+          language = cleanedPart.substring(0, firstNewLineIndex).trim();
+          code = cleanedPart.substring(firstNewLineIndex + 1);
+        }
+        
+        // Return a stateless sandbox item containing our localized copy control button
+        return <CodeBlockContainer key={index} language={language} code={code.trimEnd()} />;
+      }
+      
+      // Standard regular prose string output segment
+      return <span key={index} className="whitespace-pre-wrap">{part}</span>;
+    });
+  };
 
   const SUGGESTIONS = [
     "Summarize the uploaded document",
@@ -50,7 +120,7 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5">
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center gap-4">
-              <AppLogoIcon className="w-14 h-14 text-purple-400 opacity-70" />
+            <AppLogoIcon className="w-14 h-14 text-purple-400 opacity-70" />
             <div>
               <p className="text-xl font-semibold text-gray-200 mb-1">LocalMind is ready</p>
               <p className="text-sm text-gray-500">100% private · runs offline · no cloud</p>
@@ -68,7 +138,7 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
 
         {messages.map((msg, i) => (
           <div key={msg.id || i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-            <div className={`max-w-2xl ${msg.role === "user" ? "max-w-xl" : "max-w-2xl"}`}>
+            <div className={msg.role === "user" ? "max-w-xl" : "max-w-2xl w-full"}>
               {msg.role === "assistant" && (
                 <div className="flex items-center gap-1.5 mb-1.5 ml-1">
                   <AppLogoIcon className="w-4 h-4 text-purple-400" />
@@ -76,12 +146,12 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
                   {msg.streaming && <span className="text-xs text-gray-500 animate-pulse">typing...</span>}
                 </div>
               )}
-              <div className={`px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words
+              <div className={`px-4 py-3 rounded-2xl text-sm leading-relaxed break-words
                 ${msg.role === "user"
-                  ? "bg-purple-700 text-white rounded-br-sm"
+                  ? "bg-purple-700 text-white rounded-br-sm whitespace-pre-wrap"
                   : "bg-gray-800 text-gray-100 rounded-bl-sm border border-gray-700"}`}>
-                {msg.content}
-                {msg.streaming && <span className="inline-block w-1.5 h-4 bg-purple-400 ml-1 animate-pulse rounded" />}
+                {msg.role === "user" ? msg.content : renderMessageContent(msg.content)}
+                {msg.streaming && <span className="inline-block w-1.5 h-4 bg-purple-400 ml-1 animate-pulse rounded align-middle" />}
               </div>
               {msg.sources?.length > 0 && (
                 <div className="mt-1.5 ml-1 flex flex-wrap gap-1">
@@ -141,12 +211,12 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
             Send →
           </button>
         </div>
-        <p className="text-center text-xs text-gray-700 mt-2">
+        <div className="text-center text-xs text-gray-700 mt-2">
           <span className="inline-flex items-center gap-1">
             <LockIcon className="w-3.5 h-3.5" />
             <span>Everything is processed locally. No data leaves your machine.</span>
           </span>
-        </p>
+        </div>
       </div>
     </div>
   );
