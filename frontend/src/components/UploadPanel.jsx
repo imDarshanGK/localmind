@@ -26,7 +26,7 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose 
   }
 
   return (
-    <div className="border-b border-gray-800 bg-gray-900 px-5 py-4 shrink-0">
+    <div data-testid="upload-panel" className="border-b border-gray-800 bg-gray-900 px-5 py-4 shrink-0">
       <div className="flex items-center justify-between mb-3">
         <p className="text-sm font-semibold text-white inline-flex items-center gap-1.5"><DocumentsIcon className="w-4 h-4" />Documents</p>
         <button onClick={onClose} className="text-gray-500 hover:text-gray-300 text-lg leading-none">×</button>
