@@ -10,6 +10,7 @@ const LANGUAGES = [
 
 export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSession, onDeleteSession, model, models, onModelChange, language, onLanguageChange }) {
   const [search, setSearch] = useState("");
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
   const modelList = models.length > 0 ? models.map(m=>m.name) : ["llama3","mistral","phi3","gemma2"];
   const filtered  = sessions.filter(s => s.title?.toLowerCase().includes(search.toLowerCase()));
 
@@ -75,13 +76,38 @@ export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSes
                 <span className="ml-1 text-gray-600">{s.message_count}</span>
               )}
             </button>
-            <button onClick={()=>onDeleteSession(s.id)}
+            <button onClick={()=>setDeleteConfirm(s.id)}
               className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 px-2 py-2 transition text-xs">
               ×
             </button>
           </div>
         ))}
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && (() => {
+        const sessionTitle = sessions.find(s => s.id === deleteConfirm)?.title || 'this chat';
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setDeleteConfirm(null)}>
+            <div className="bg-gray-800 border border-gray-700 rounded-xl p-6 max-w-sm mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+              <h3 className="text-sm font-semibold text-white mb-2">Delete session?</h3>
+              <p className="text-xs text-gray-400 mb-4">
+                Are you sure you want to delete <span className="text-gray-300 font-medium">"{sessionTitle}"</span>? This action cannot be undone.
+              </p>
+              <div className="flex justify-end gap-2">
+                <button onClick={() => setDeleteConfirm(null)}
+                  className="px-4 py-1.5 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg transition">
+                  Cancel
+                </button>
+                <button onClick={() => { onDeleteSession(deleteConfirm); setDeleteConfirm(null); }}
+                  className="px-4 py-1.5 text-xs bg-red-600 hover:bg-red-500 text-white rounded-lg transition">
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Footer */}
       <div className="px-4 py-3 border-t border-gray-800">
