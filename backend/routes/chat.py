@@ -84,5 +84,6 @@ async def chat_stream(req: ChatRequest):
         complete = "".join(full_reply)
         db_service.save_message(req.session_id, "assistant", complete, sources)
         yield f"data: {json.dumps({'done': True, 'sources': sources})}\n\n"
+        
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
