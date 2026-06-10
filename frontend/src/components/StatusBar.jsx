@@ -1,6 +1,6 @@
-import { AppLogoIcon, BatchIcon, DocumentsIcon, LightningIcon, OfflineIcon, OnlineIcon, PlugIcon, SettingsIcon, TrashIcon } from "./Icons";
+import { AppLogoIcon, BatchIcon, DocumentsIcon, LightningIcon, OfflineIcon, OnlineIcon, PlugIcon, SettingsIcon, TemplateIcon, TrashIcon } from "./Icons";
 
-export default function StatusBar({ ollamaOk, model, docCount, onUpload, onPlugins, onSettings, onClear, useStream, onToggleStream }) {
+export default function StatusBar({ ollamaOk, model, docCount, onUpload, onPrompts, onPlugins, onSettings, onClear, useStream, onToggleStream }) {
   return (
     <header className="flex items-center justify-between px-5 py-2.5 border-b border-gray-800 bg-gray-900 shrink-0">
       <div className="flex items-center gap-3">
@@ -15,6 +15,7 @@ export default function StatusBar({ ollamaOk, model, docCount, onUpload, onPlugi
         <Btn onClick={onToggleStream} title={useStream ? "Streaming ON" : "Streaming OFF"}
           active={useStream} icon={useStream ? <LightningIcon className="w-3.5 h-3.5" /> : <BatchIcon className="w-3.5 h-3.5" />} label={useStream ? "Stream" : "Batch"} />
         <Btn onClick={onUpload}   icon={<DocumentsIcon className="w-3.5 h-3.5" />} label="Docs"     />
+        <Btn onClick={onPrompts}  icon={<TemplateIcon className="w-3.5 h-3.5" />} label="Prompts"  />
         <Btn onClick={onPlugins}  icon={<PlugIcon className="w-3.5 h-3.5" />} label="Plugins"  />
         <Btn onClick={onClear}    icon={<TrashIcon className="w-3.5 h-3.5" />} label="Clear"    />
         <Btn onClick={onSettings} icon={<SettingsIcon className="w-3.5 h-3.5" />} label="Settings" />
