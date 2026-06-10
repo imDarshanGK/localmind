@@ -326,3 +326,16 @@ MIT © 2026
 If LocalMind helped you, please star the repo. ⭐✨🚀
 
 </div>
+
+---
+
+## ?? Community Showcase
+
+Projects and tools built by the LocalMind community:
+
+| Project | Author | Description |
+|---------|--------|-------------|
+| *Your project here!* | *You* | *Share what you built with LocalMind* |
+
+> Have you built something using LocalMind? Open a PR to add your project to this showcase!
+

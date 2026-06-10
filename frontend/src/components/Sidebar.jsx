@@ -75,7 +75,7 @@ export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSes
                 <span className="ml-1 text-gray-600">{s.message_count}</span>
               )}
             </button>
-            <button onClick={()=>onDeleteSession(s.id)}
+            <button onClick={()=>{if(window.confirm("Delete this chat session? This cannot be undone."))onDeleteSession(s.id)}}
               className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 px-2 py-2 transition text-xs">
               ×
             </button>
@@ -98,3 +98,4 @@ export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSes
     </div>
   );
 }
+
