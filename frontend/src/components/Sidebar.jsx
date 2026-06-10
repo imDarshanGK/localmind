@@ -9,11 +9,26 @@ const LANGUAGES = [
 
 export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSession, onDeleteSession, model, models, onModelChange, language, onLanguageChange }) {
   const [search, setSearch] = useState("");
+  const [sessionToDelete, setSessionToDelete] = useState(null); // Tracks target session ID
+
   const modelList = models.length > 0 ? models.map(m=>m.name) : ["llama3","mistral","phi3","gemma2"];
   const filtered  = sessions.filter(s => s.title?.toLowerCase().includes(search.toLowerCase()));
 
+  // Triggered when clicking the 'x' button next to a session item
+  const handleDeleteClick = (sessionId) => {
+    setSessionToDelete(sessionId);
+  };
+
+  // Triggered when confirming deletion inside the pop-up modal
+  const handleConfirmDelete = () => {
+    if (sessionToDelete) {
+      onDeleteSession(sessionToDelete);
+      setSessionToDelete(null);
+    }
+  };
+
   return (
-    <div className="w-64 flex flex-col bg-gray-900 border-r border-gray-800 shrink-0">
+    <div className="w-64 flex flex-col bg-gray-900 border-r border-gray-800 shrink-0 relative">
       {/* Logo */}
       <div className="px-4 pt-5 pb-4 border-b border-gray-800">
         <div className="flex items-center gap-2 mb-4">
@@ -72,7 +87,7 @@ export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSes
                 <span className="ml-1 text-gray-600">{s.message_count}</span>
               )}
             </button>
-            <button onClick={()=>onDeleteSession(s.id)}
+            <button onClick={()=>handleDeleteClick(s.id)}
               className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 px-2 py-2 transition text-xs">
               ×
             </button>
@@ -92,6 +107,30 @@ export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSes
           <span>Star on GitHub</span>
         </a>
       </div>
+
+      {/* Confirmation Modal Overlay */}
+      {sessionToDelete !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fadeIn">
+          <div className="bg-gray-800 border border-gray-700 w-full max-w-xs rounded-xl p-4 shadow-xl">
+            <h3 className="text-sm font-semibold text-white mb-1">Delete Chat Session?</h3>
+            <p className="text-xs text-gray-400 mb-4">
+              This action cannot be undone. All conversation records will be deleted from your database.
+            </p>
+            <div className="flex justify-end gap-2 text-xs">
+              <button 
+                onClick={() => setSessionToDelete(null)}
+                className="px-3 py-1.5 rounded-lg bg-gray-700 hover:bg-gray-600 active:bg-gray-800 text-gray-300 font-medium transition">
+                Cancel
+              </button>
+              <button 
+                onClick={handleConfirmDelete}
+                className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 active:bg-red-700 text-white font-medium transition">
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
