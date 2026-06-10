@@ -1,6 +1,6 @@
 """Sessions routes — /api/sessions — full CRUD"""
 
-import uuid
+import uuid, shutil, os
 from fastapi import APIRouter, HTTPException
 from models.schemas import SessionCreate, SessionUpdate, BulkSessionRenameRequest
 from services import db_service
@@ -85,6 +85,13 @@ async def delete_session(session_id: str):
         from services import rag_service
 
         rag_service.delete_session_index(session_id)
+    except Exception:
+        pass
+    # Delete uploaded files from disk
+    try:
+        upload_dir = os.path.join("data", "uploads", session_id)
+        if os.path.isdir(upload_dir):
+            shutil.rmtree(upload_dir)
     except Exception:
         pass
     return {"status": "deleted", "session_id": session_id}

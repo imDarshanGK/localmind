@@ -11,6 +11,7 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
   const bottomRef = useRef(null);
   const textareaRef = useRef(null);
   const plusMenuRef = useRef(null);
+  const sendingRef = useRef(false);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
@@ -34,7 +35,8 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
   }
 
   function send() {
-    if ((!input.trim() && !selectedTemplate) || loading) return;
+    if ((!input.trim() && !selectedTemplate) || loading || sendingRef.current) return;
+    sendingRef.current = true;
     // Prepend the template prompt to the user's input
     const message = selectedTemplate
       ? `${selectedTemplate.prompt}\n\n${input.trim()}`.trim()
@@ -43,6 +45,7 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
     setInput("");
     setSelectedTemplate(null);
     if (textareaRef.current) { textareaRef.current.style.height = "auto"; }
+    setTimeout(() => { sendingRef.current = false; }, 300);
   }
 
   function handleKey(e) {

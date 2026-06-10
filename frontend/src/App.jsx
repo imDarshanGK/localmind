@@ -53,6 +53,7 @@ export default function App() {
         if (settRes.value.default_language) setLanguage(settRes.value.default_language);
       }
       if (stRes.status === "fulfilled") setOllamaOk(stRes.value.ollama_running);
+      else setOllamaOk(false);
     } catch {}
   }
 
