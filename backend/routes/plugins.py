@@ -9,6 +9,7 @@ import re
 import subprocess
 import tempfile
 import os
+import sys
 from fastapi import APIRouter, HTTPException
 from models.schemas import PluginRun, PluginResult
 from services import db_service
@@ -167,7 +168,7 @@ def _coderunner(code: str) -> str:
 
     try:
         result = subprocess.run(
-            ["python3", tmp],
+            [sys.executable, tmp],
             capture_output=True, text=True, timeout=5
         )
         output = result.stdout or result.stderr or "(no output)"
