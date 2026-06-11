@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { AppLogoIcon, ChatIcon, LockIcon, StarIcon } from "./Icons";
+import { normalizeText } from "../utils/search";
 
 const LANGUAGES = [
   {code:"en",label:"English"},{code:"hi",label:"हिन्दी"},{code:"ta",label:"தமிழ்"},
@@ -10,7 +11,11 @@ const LANGUAGES = [
 export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSession, onDeleteSession, model, models, onModelChange, language, onLanguageChange }) {
   const [search, setSearch] = useState("");
   const modelList = models.length > 0 ? models.map(m=>m.name) : ["llama3","mistral","phi3","gemma2"];
-  const filtered  = sessions.filter(s => s.title?.toLowerCase().includes(search.toLowerCase()));
+  const filtered  = sessions.filter(s => {
+    const normalizedTitle = normalizeText(s.title);
+    const normalizedSearch = normalizeText(search);
+    return normalizedTitle.includes(normalizedSearch);
+  });
 
   return (
     <div className="w-64 flex flex-col bg-gray-900 border-r border-gray-800 shrink-0">
