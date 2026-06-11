@@ -71,7 +71,6 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
     }
     return parts;
   }
-
   function send() {
     if ((!input.trim() && !selectedTemplate) || loading) return;
     const message = selectedTemplate
@@ -79,72 +78,18 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
       : input.trim();
     onSend(message);
     setInput("");
-    if (textareaRef.current) { 
-      textareaRef.current.style.height = "auto"; 
-    }
+    setSelectedTemplate(null);
+    if (textareaRef.current) { textareaRef.current.style.height = "auto"; }
   }
 
   function handleKey(e) {
-    if (e.key === "Enter" && !e.shiftKey) { 
-      e.preventDefault(); 
-      send(); 
-    }
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
   }
 
   function autoResize(e) {
     e.target.style.height = "auto";
     e.target.style.height = Math.min(e.target.scrollHeight, 160) + "px";
   }
-
-  // Message selection and export
-  const toggleSelectMessage = (msgId) => {
-    setSelectedMessages(prev =>
-      prev.includes(msgId) ? prev.filter(id => id !== msgId) : [...prev, msgId]
-    );
-  };
-
-  const handleExportSelected = async () => {
-    if (selectedMessages.length === 0) return;
-    try {
-      const response = await fetch("/api/export/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message_ids: selectedMessages, format: exportFormat }),
-      });
-      if (!response.ok) throw new Error("Export failed");
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `localmind_export.${exportFormat === "markdown" ? "md" : exportFormat}`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error(err);
-      alert("Failed to export messages");
-    }
-  };
-
-  const exportSingleMessage = async (msgId) => {
-    try {
-      const response = await fetch("/api/export/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message_ids: [msgId], format: exportFormat }),
-      });
-      if (!response.ok) throw new Error("Export failed");
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `localmind_message_${msgId}.${exportFormat === "markdown" ? "md" : exportFormat}`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error(err);
-      alert("Failed to export message");
-    }
-  };
 
   const SUGGESTIONS = [
     "Summarize the uploaded document",
@@ -155,48 +100,15 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden bg-gray-950">
-      {/* Export bar – existing for whole session + new selection bar */}
+      {/* Export bar */}
       {messages.length > 0 && (
         <div className="flex justify-end gap-2 px-5 pt-2">
-          {["markdown", "json", "txt"].map(f => (
-            <button 
-              key={f} 
-              onClick={() => exportSession(sessionId, f)}
-              className="text-xs text-gray-500 hover:text-purple-400 transition px-2 py-1 rounded hover:bg-gray-800"
-            >
+          {["markdown","json","txt"].map(f => (
+            <button key={f} onClick={() => exportSession(sessionId, f)}
+              className="text-xs text-gray-500 hover:text-purple-400 transition px-2 py-1 rounded hover:bg-gray-800">
               ↓ .{f}
             </button>
           ))}
-        </div>
-      )}
-
-      {/* Export selection bar */}
-      {selectedMessages.length > 0 && (
-        <div className="flex justify-between items-center px-5 py-2 bg-gray-900 border-b border-gray-800">
-          <span className="text-sm text-gray-300">{selectedMessages.length} message(s) selected</span>
-          <div className="flex gap-2 items-center">
-            <select
-              value={exportFormat}
-              onChange={(e) => setExportFormat(e.target.value)}
-              className="text-xs bg-gray-800 text-gray-200 border border-gray-700 rounded px-2 py-1"
-            >
-              <option value="markdown">Markdown (.md)</option>
-              <option value="json">JSON (.json)</option>
-              <option value="txt">Text (.txt)</option>
-            </select>
-            <button
-              onClick={handleExportSelected}
-              className="text-xs bg-purple-600 hover:bg-purple-500 text-white px-3 py-1 rounded"
-            >
-              Export Selected
-            </button>
-            <button
-              onClick={() => setSelectedMessages([])}
-              className="text-xs text-gray-400 hover:text-gray-200 px-2 py-1"
-            >
-              Clear
-            </button>
-          </div>
         </div>
       )}
 
@@ -204,18 +116,15 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5">
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center gap-4">
-            <AppLogoIcon className="w-14 h-14 text-purple-400 opacity-70" />
+              <AppLogoIcon className="w-14 h-14 text-purple-400 opacity-70" />
             <div>
               <p className="text-xl font-semibold text-gray-200 mb-1">LocalMind is ready</p>
               <p className="text-sm text-gray-500">100% private · runs offline · no cloud</p>
             </div>
             <div className="grid grid-cols-2 gap-2 mt-4 max-w-lg w-full">
               {SUGGESTIONS.map(s => (
-                <button 
-                  key={s} 
-                  onClick={() => onSend(s)}
-                  className="text-xs text-left border border-gray-800 rounded-xl px-3 py-2.5 text-gray-400 hover:border-purple-600 hover:text-purple-300 hover:bg-purple-900/20 transition"
-                >
+                <button key={s} onClick={() => onSend(s)}
+                  className="text-xs text-left border border-gray-800 rounded-xl px-3 py-2.5 text-gray-400 hover:border-purple-600 hover:text-purple-300 hover:bg-purple-900/20 transition">
                   {s}
                 </button>
               ))}
@@ -225,15 +134,6 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
 
         {messages.map((msg, i) => (
           <div key={msg.id || i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-            {/* Checkbox for selection */}
-            <div className="mr-2 self-center">
-              <input
-                type="checkbox"
-                checked={selectedMessages.includes(msg.id)}
-                onChange={() => toggleSelectMessage(msg.id)}
-                className="w-4 h-4 rounded border-gray-600 bg-gray-800 text-purple-600 focus:ring-purple-500 focus:ring-1"
-              />
-            </div>
             <div className={`max-w-2xl ${msg.role === "user" ? "max-w-xl" : "max-w-2xl"}`}>
               {msg.role === "assistant" && (
                 <div className="flex items-center gap-1.5 mb-1.5 ml-1">
@@ -242,34 +142,17 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
                   {msg.streaming && <span className="text-xs text-gray-500 animate-pulse">typing...</span>}
                 </div>
               )}
-              
               <div className={`px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words
-  ${msg.role === "user"
-    ? "bg-purple-700 text-white rounded-br-sm"
-    : "bg-gray-800 text-gray-100 rounded-bl-sm border border-gray-700"}`}>
-                {msg.role === "user" ? (
-                  <>
-                    {msg.content}
-                    {msg.streaming && <span className="inline-block w-1.5 h-4 bg-purple-400 ml-1 animate-pulse rounded" />}
-                  </>
-                ) : (
-                  <>
-                    {parseMessageWithCodeBlocks(msg.content).map((part, idx) => (
-                      part.type === "code" ? (
-                        <CodeBlockWithCopy key={idx} code={part.code} language={part.language} />
-                      ) : (
-                        <div key={idx} className="whitespace-pre-wrap">{part.content}</div>
-                      )
-                    ))}
-                    {msg.streaming && <span className="inline-block w-1.5 h-4 bg-purple-400 ml-1 animate-pulse rounded" />}
-                  </>
-                )}
+                ${msg.role === "user"
+                  ? "bg-purple-700 text-white rounded-br-sm"
+                  : "bg-gray-800 text-gray-100 rounded-bl-sm border border-gray-700"}`}>
+                {msg.content}
+                {msg.streaming && <span className="inline-block w-1.5 h-4 bg-purple-400 ml-1 animate-pulse rounded" />}
               </div>
-
               {msg.sources?.length > 0 && (
                 <div className="mt-1.5 ml-1 flex flex-wrap gap-1">
-                  {msg.sources.map((s, idx) => (
-                    <span key={idx} className="text-xs bg-gray-800 text-blue-400 px-2 py-0.5 rounded-full border border-gray-700">
+                  {msg.sources.map((s,i) => (
+                    <span key={i} className="text-xs bg-gray-800 text-blue-400 px-2 py-0.5 rounded-full border border-gray-700">
                       <span className="inline-flex items-center gap-1">
                         <FileIcon className="w-3 h-3" />
                         <span>{s}</span>
@@ -279,16 +162,8 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
                 </div>
               )}
               {msg.role === "user" && (
-                <div className="text-right mt-1 mr-1 flex justify-end items-center gap-2">
+                <div className="text-right mt-1 mr-1">
                   <span className="text-xs text-gray-600">You</span>
-                  {/* Per-message export button */}
-                  <button
-                    onClick={() => exportSingleMessage(msg.id)}
-                    className="text-xs text-gray-500 hover:text-purple-400 transition"
-                    title="Export this message"
-                  >
-                    ↓
-                  </button>
                 </div>
               )}
               {msg.role === "assistant" && !msg.streaming && (
@@ -371,12 +246,9 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
                 <span className="text-xs font-semibold text-purple-400">LocalMind</span>
               </div>
               <div className="flex gap-1">
-                {[0, 1, 2].map(i => (
-                  <div 
-                    key={i} 
-                    className="w-2 h-2 bg-purple-400 rounded-full animate-bounce"
-                    style={{ animationDelay: `${i * 0.15}s` }} 
-                  />
+                {[0,1,2].map(i => (
+                  <div key={i} className="w-2 h-2 bg-purple-400 rounded-full animate-bounce"
+                    style={{ animationDelay: `${i*0.15}s` }} />
                 ))}
               </div>
             </div>
