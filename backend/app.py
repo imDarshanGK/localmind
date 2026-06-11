@@ -31,6 +31,8 @@ logger = logging.getLogger(__name__)
 FRONTEND_DIST = Path(os.getenv("FRONTEND_DIST", "/app/frontend/dist"))
 
 
+import asyncio
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting LocalMind v2.0...")
@@ -38,9 +40,18 @@ async def lifespan(app: FastAPI):
     os.makedirs("./data/chromadb", exist_ok=True)
     os.makedirs("./data/exports", exist_ok=True)
     init_db()
+    
+    # Start stream cleanup task
+    from routes.chat import clean_expired_streams
+    cleanup_task = asyncio.create_task(clean_expired_streams())
+    
     logger.info("LocalMind v2.0 ready!")
     yield
     logger.info("👋 Shutting down...")
+    
+    # Cancel stream cleanup task
+    cleanup_task.cancel()
+    await asyncio.gather(cleanup_task, return_exceptions=True)
 
 
 app = FastAPI(

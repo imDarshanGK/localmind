@@ -38,22 +38,72 @@ export async function uploadDocument(file, session_id) {
 }
 
 export function streamMessage(body, onToken, onDone) {
-  return fetch(`${BASE}/chat/stream`, {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  }).then(res => {
-    const reader = res.body.getReader(); const decoder = new TextDecoder();
-    function pump() {
-      return reader.read().then(({ done, value }) => {
-        if (done) return;
-        decoder.decode(value).split("\n").forEach(line => {
-          if (line.startsWith("data: ")) {
-            try { const d = JSON.parse(line.slice(6)); if (d.token) onToken(d.token); if (d.done) onDone(d.sources||[]); } catch {}
+  let accumulatedText = "";
+  let sourcesList = [];
+  let doneReceived = false;
+  let retriesLeft = 3;
+
+  function runStream(offset = 0) {
+    const requestBody = { ...body, resume_offset: offset };
+    
+    return fetch(`${BASE}/chat/stream`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(requestBody),
+    })
+    .then(res => {
+      if (!res.ok) {
+        throw new Error(`HTTP error ${res.status}`);
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      
+      function pump() {
+        return reader.read().then(({ done, value }) => {
+          if (done) {
+            if (doneReceived) {
+              return;
+            }
+            throw new Error("Stream closed prematurely");
           }
+          
+          const text = decoder.decode(value, { stream: true });
+          text.split("\n").forEach(line => {
+            if (line.startsWith("data: ")) {
+              try {
+                const d = JSON.parse(line.slice(6));
+                if (d.token) {
+                  accumulatedText += d.token;
+                  onToken(d.token);
+                }
+                if (d.done) {
+                  doneReceived = true;
+                  sourcesList = d.sources || [];
+                  onDone(sourcesList);
+                }
+              } catch (e) {
+                // Ignore parse errors
+              }
+            }
+          });
+          return pump();
         });
-        return pump();
-      });
-    }
-    return pump();
-  });
+      }
+      return pump();
+    })
+    .catch(err => {
+      if (doneReceived) {
+        return;
+      }
+      if (retriesLeft > 0) {
+        retriesLeft--;
+        // Wait 1 second before retrying
+        return new Promise(resolve => setTimeout(resolve, 1000))
+          .then(() => runStream(accumulatedText.length));
+      }
+      throw err;
+    });
+  }
+
+  return runStream(0);
 }

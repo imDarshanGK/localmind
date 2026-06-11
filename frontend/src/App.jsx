@@ -68,7 +68,7 @@ export default function App() {
           }
         );
       } catch (e) {
-        setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, content: e.message, streaming: false } : m));
+        setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, content: m.content + `\n\n[Connection lost: ${e.message}]`, streaming: false } : m));
       } finally { setStreaming(false); }
     } else {
       setLoading(true);
