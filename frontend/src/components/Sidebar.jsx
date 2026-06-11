@@ -9,7 +9,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { AppLogoIcon, ChatIcon, LockIcon, StarIcon } from "./Icons";
 import { highlightText } from "../utils/search";
-import { api } from "../utils/api";
+import * as api from "../utils/api";   // ✅ FIXED – use namespace import
 
 const LANGUAGES = [
   { code: "en", label: "English" }, { code: "hi", label: "हिन्दी" }, { code: "ta", label: "தமிழ்" },
@@ -73,7 +73,7 @@ export default function Sidebar({
   onModelChange,
   language,
   onLanguageChange,
-  refreshSessions, // optional: function to refresh sessions after reorder
+  refreshSessions,
 }) {
   const [search, setSearch] = useState("");
   const [items, setItems] = useState([]);
@@ -81,7 +81,6 @@ export default function Sidebar({
   const modelList = models.length > 0 ? models.map((m) => m.name) : ["llama3", "mistral", "phi3", "gemma2"];
   const filtered = sessions.filter((s) => s.title?.toLowerCase().includes(search.toLowerCase()));
 
-  // Sync items with session IDs when sessions change
   useEffect(() => {
     setItems(sessions.map((s) => s.id));
   }, [sessions]);
@@ -96,18 +95,16 @@ export default function Sidebar({
       setLoadingReorder(true);
       try {
         await api.reorderSessions(newItems);
-        // Optionally refresh sessions from backend
         if (refreshSessions) refreshSessions();
       } catch (err) {
         console.error("Reorder failed:", err);
-        setItems(sessions.map((s) => s.id)); // revert
+        setItems(sessions.map((s) => s.id));
       } finally {
         setLoadingReorder(false);
       }
     }
   };
 
-  // Map items to session objects in the new order
   const orderedSessions = items
     .map((id) => sessions.find((s) => s.id === id))
     .filter(Boolean);
