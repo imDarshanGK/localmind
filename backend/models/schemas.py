@@ -95,3 +95,19 @@ class ExportFormat(str, Enum):
     markdown = "markdown"
     json = "json"
     txt = "txt"
+
+
+class SessionRenameItem(BaseModel):
+    session_id: str
+    new_title: str
+
+class BulkSessionRenameRequest(BaseModel):
+    sessions: List[SessionRenameItem]
+
+class PromptTemplateCreate(BaseModel):
+    prompt_title: str = Field(..., min_length=1, max_length=200)
+    prompt: str = Field(..., min_length=1)
+
+class PromptTemplateUpdate(BaseModel):
+    prompt_title: Optional[str] = None
+    prompt: Optional[str] = None

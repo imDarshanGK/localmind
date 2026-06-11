@@ -21,6 +21,7 @@ from routes.sessions import router as sessions_router
 from routes.plugins import router as plugins_router
 from routes.export import router as export_router
 from routes.settings import router as settings_router
+from routes.prompt_templates import router as prompt_templates_router
 from middleware.csrf import OriginValidationMiddleware
 from services.db_service import init_db
 
@@ -51,7 +52,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-default_cors_origins = "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173"
+default_cors_origins = "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://localhost:8000" 
 cors_origins = [
     origin.strip()
     for origin in os.getenv("CORS_ORIGINS", default_cors_origins).split(",")
@@ -75,7 +76,7 @@ app.include_router(sessions_router, prefix="/api/sessions", tags=["Sessions"])
 app.include_router(plugins_router,  prefix="/api/plugins",  tags=["Plugins"])
 app.include_router(export_router,   prefix="/api/export",   tags=["Export"])
 app.include_router(settings_router, prefix="/api/settings", tags=["Settings"])
-
+app.include_router(prompt_templates_router, prefix="/api/prompt-templates", tags=["Prompt Templates"])
 
 if (FRONTEND_DIST / "assets").exists():
     app.mount("/assets", StaticFiles(directory=str(FRONTEND_DIST / "assets")), name="assets")
