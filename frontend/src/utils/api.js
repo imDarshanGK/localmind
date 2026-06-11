@@ -35,6 +35,14 @@ export const createPromptTemplate    = (b)    => req("/prompt-templates/", { met
 export const updatePromptTemplate    = (id,b) => req(`/prompt-templates/${id}`, { method: "PUT", body: JSON.stringify(b) });
 export const deletePromptTemplate    = (id)   => req(`/prompt-templates/${id}`, { method: "DELETE" });
 
+// ✨ Drag‑and‑drop reordering (issue #361)
+export const reorderSessions = async (sessionIds) => {
+  return req("/sessions/reorder", {
+    method: "PATCH",
+    body: JSON.stringify({ session_ids: sessionIds }),
+  });
+};
+
 export async function uploadDocument(file, session_id) {
   const fd = new FormData();
   fd.append("file", file); fd.append("session_id", session_id);

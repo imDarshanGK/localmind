@@ -1,12 +1,18 @@
-"""Sessions routes — /api/sessions — full CRUD"""
+"""Sessions routes — /api/sessions — full CRUD + reorder"""
 
 import uuid
+from typing import List
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 from models.schemas import SessionCreate, SessionUpdate, BulkSessionRenameRequest
 from services import db_service
-# from backend.models.schemas import BulkSessionRenameRequest  # Adjust if other items are imported from here
 
 router = APIRouter()
+
+
+# ─── Request models for reorder ─────────────────────────────
+class ReorderSessionsRequest(BaseModel):
+    session_ids: List[str]
 
 
 @router.get("/")
@@ -19,6 +25,7 @@ async def create_session(body: SessionCreate):
     sid = str(uuid.uuid4())
     session = db_service.create_session(sid, title=body.title, model=body.model)
     return session
+
 
 @router.patch("/bulk-rename")
 async def bulk_rename_sessions(body: BulkSessionRenameRequest):
@@ -62,8 +69,21 @@ async def bulk_rename_sessions(body: BulkSessionRenameRequest):
             status_code=500, 
             detail=f"Bulk rename failed: {str(e)}"
         )
-    
-    
+
+
+@router.patch("/reorder")
+async def reorder_sessions(req: ReorderSessionsRequest):
+    """
+    Update the order of sessions for drag‑and‑drop.
+    Expects a list of session IDs in the desired order (top to bottom).
+    """
+    try:
+        db_service.update_sessions_order(req.session_ids)
+        return {"success": True, "message": "Session order updated"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Reorder failed: {str(e)}")
+
+
 @router.get("/{session_id}")
 async def get_session(session_id: str):
     s = db_service.get_session(session_id)
@@ -83,7 +103,6 @@ async def delete_session(session_id: str):
     db_service.delete_session(session_id)
     try:
         from services import rag_service
-
         rag_service.delete_session_index(session_id)
     except Exception:
         pass
@@ -112,9 +131,7 @@ async def get_documents(session_id: str):
 async def rag_stats(session_id: str):
     try:
         from services import rag_service
-
         count = rag_service.get_indexed_count(session_id)
     except Exception:
         count = 0
     return {"session_id": session_id, "indexed_chunks": count}
-
