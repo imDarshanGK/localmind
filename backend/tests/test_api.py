@@ -130,6 +130,22 @@ def test_unknown_plugin():
     assert r.status_code == 400
 
 
+def test_coderunner_success():
+    r = client.post("/api/plugins/run", json={"plugin": "coderunner", "input": "print('hello world')"})
+    assert r.status_code == 200
+    assert r.json()["success"]
+    assert "hello world" in r.json()["output"]
+
+
+def test_coderunner_timeout():
+    r = client.post("/api/plugins/run", json={
+        "plugin": "coderunner",
+        "input": "import time\ntime.sleep(6)"
+    })
+    assert r.status_code == 200
+    assert r.json()["success"]
+    assert "Timeout" in r.json()["output"]
+
 # ─── Settings ────────────────────────────────────────────
 def test_get_settings():
     r = client.get("/api/settings/")
