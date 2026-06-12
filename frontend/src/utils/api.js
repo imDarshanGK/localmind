@@ -56,7 +56,7 @@ export function streamMessage(body, onToken, onDone, signal) {
         if (done) return;
         decoder.decode(value).split("\n").forEach(line => {
           if (line.startsWith("data: ")) {
-            try { const d = JSON.parse(line.slice(6)); if (d.token) onToken(d.token); if (d.done) onDone(d.sources || []); } catch { }
+            try { const d = JSON.parse(line.slice(6)); if (d.token) onToken(d.token); if (d.done) onDone(d.sources || [], d.benchmarks || null); } catch { }
           }
         });
         return pump();
