@@ -4,7 +4,7 @@ import { AppLogoIcon, ChartIcon, CloseIcon, CopyIcon, FileIcon, LockIcon, PlusCi
 import CodeBlockWithCopy from "./CodeBlockWithCopy";
 import PromptTemplateDialog from "./PromptTemplateDialog";
 
-export default function ChatWindow({ messages, loading, onSend, sessionId }) {
+export default function ChatWindow({ messages, loading, onSend, sessionId, onCancel }) {
   const [input, setInput] = useState("");
   const [showPlusMenu, setShowPlusMenu] = useState(false);
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
@@ -316,13 +316,20 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
             />
           </div>
 
-          <button 
-            onClick={send} 
-            disabled={(!input.trim() && !selectedTemplate) || loading}
-            className="shrink-0 text-sm bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white px-4 py-2 rounded-xl transition font-medium"
-          >
-            Send →
-          </button>
+          {loading || messages.some(m => m.streaming) ? (
+            <button onClick={onCancel}
+              className="shrink-0 text-sm bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-xl transition font-medium">
+              Stop ⏹
+            </button>
+          ) : (
+            <button 
+              onClick={send} 
+              disabled={(!input.trim() && !selectedTemplate) || loading}
+              className="shrink-0 text-sm bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white px-4 py-2 rounded-xl transition font-medium"
+            >
+              Send →
+            </button>
+          )}
         </div>
         <p className="text-center text-xs text-gray-700 mt-2">
           <span className="inline-flex items-center gap-1">

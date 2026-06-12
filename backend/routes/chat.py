@@ -1,10 +1,12 @@
 """Chat routes — /api/chat — supports normal + streaming"""
 
 import json
+import asyncio
 from types import SimpleNamespace
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 
 from models.schemas import ChatRequest, ChatResponse
 from services import ollama_service, db_service
@@ -81,37 +83,59 @@ async def chat_stream(req: ChatRequest):
     async def event_stream():
         nonlocal first_token_time
         token_count = 0
-        async for token in ollama_service.chat_stream(
-            message=req.message,
-            model=req.model,
-            context=context,
-            history=history,
-            language=req.language,
-            temperature=req.temperature,
-        ):
-            if first_token_time is None:
-                first_token_time = time.perf_counter()
-            full_reply.append(token)
-            token_count += 1
-            yield f"data: {json.dumps({'token': token})}\n\n"
+        is_completed = False
+        try:
+            async for token in ollama_service.chat_stream(
+                message=req.message,
+                model=req.model,
+                context=context,
+                history=history,
+                language=req.language,
+                temperature=req.temperature,
+            ):
+                if first_token_time is None:
+                    first_token_time = time.perf_counter()
+                full_reply.append(token)
+                token_count += 1
+                yield f"data: {json.dumps({'token': token})}\n\n"
 
-        end_time = time.perf_counter()
+            end_time = time.perf_counter()
 
-        complete = "".join(full_reply)
-        ttft_ms = round((first_token_time - start_time) * 1000) if first_token_time else 0
-        total_duration_ms = round((end_time - start_time) * 1000)
-        memory_used_gb, memory_total_gb = _get_memory_usage()
+            complete = "".join(full_reply)
+            ttft_ms = round((first_token_time - start_time) * 1000) if first_token_time else 0
+            total_duration_ms = round((end_time - start_time) * 1000)
+            memory_used_gb, memory_total_gb = _get_memory_usage()
 
-        benchmarks = {
-            "ttft_ms": ttft_ms,
-            "total_duration_ms": total_duration_ms,
-            "token_count": token_count,
-            "memory_used_gb": memory_used_gb,
-            "memory_total_gb": memory_total_gb,
-        }
+            benchmarks = {
+                "ttft_ms": ttft_ms,
+                "total_duration_ms": total_duration_ms,
+                "token_count": token_count,
+                "memory_used_gb": memory_used_gb,
+                "memory_total_gb": memory_total_gb,
+            }
 
-        db_service.save_message(req.session_id, "assistant", complete, sources, benchmarks)
-        yield f"data: {json.dumps({'done': True, 'sources': sources, 'benchmarks': benchmarks})}\n\n"
-        
+            db_service.save_message(req.session_id, "assistant", complete, sources, benchmarks)
+            is_completed = True
+            yield f"data: {json.dumps({'done': True, 'sources': sources, 'benchmarks': benchmarks})}\n\n"
+        except BaseException as e:
+            # Partial save is handled by the frontend via /save-partial
+            raise
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+class SavePartialRequest(BaseModel):
+    session_id: str
+    content: str
+    sources: list = []
+    benchmarks: dict | None = None
+
+
+@router.post("/save-partial")
+async def save_partial(req: SavePartialRequest):
+    """Save a partially-generated (cancelled) assistant message to the DB."""
+    if req.content.strip():
+        db_service.save_message(
+            req.session_id, "assistant", req.content, req.sources, req.benchmarks
+        )
+    return {"status": "ok"}
