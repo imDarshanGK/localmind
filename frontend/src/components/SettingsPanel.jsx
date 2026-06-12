@@ -12,6 +12,8 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
     max_history_turns:settings.max_history_turns|| 10,
     rag_top_k:        settings.rag_top_k        || 4,
     theme:            settings.theme            || "dark",
+    embedding_provider: settings.embedding_provider || "sentence-transformers",
+    embedding_model:  settings.embedding_model  || "all-MiniLM-L6-v2",
   });
 
   function set(key, val) { setForm(p => ({...p, [key]: val})); }
@@ -54,6 +56,17 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
             <option value="dark">Dark</option>
             <option value="light">Light</option>
           </select>
+        </Field>
+        <Field label="Embedding Provider">
+          <select value={form.embedding_provider} onChange={e=>set("embedding_provider",e.target.value)} className="sel">
+            <option value="sentence-transformers">Sentence Transformers (Local)</option>
+            <option value="ollama">Ollama (Local API)</option>
+          </select>
+        </Field>
+        <Field label="Embedding Model">
+          <input type="text" value={form.embedding_model}
+            onChange={e=>set("embedding_model",e.target.value)}
+            className="sel" />
         </Field>
       </div>
 

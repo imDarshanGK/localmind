@@ -89,6 +89,8 @@ class AppSettings(BaseModel):
     max_history_turns: int = 10
     rag_top_k: int = 4
     theme: str = "dark"
+    embedding_provider: str = "sentence-transformers"
+    embedding_model: str = "all-MiniLM-L6-v2"
 
 
 class ExportFormat(str, Enum):

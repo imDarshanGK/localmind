@@ -12,12 +12,11 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import (
     PyPDFLoader, TextLoader, CSVLoader, Docx2txtLoader, UnstructuredHTMLLoader,
 )
-from sentence_transformers import SentenceTransformer
+from services.embeddings import get_embedding_provider
 
 logger = logging.getLogger(__name__)
 
 CHROMA_PATH = os.getenv("CHROMADB_DIR", "./data/chromadb")
-EMBED_MODEL  = "all-MiniLM-L6-v2"
 
 os.makedirs(CHROMA_PATH, exist_ok=True)
 
@@ -25,7 +24,6 @@ chroma_client = chromadb.PersistentClient(
     path=CHROMA_PATH,
     settings=Settings(anonymized_telemetry=False),
 )
-embedder = SentenceTransformer(EMBED_MODEL)
 
 LOADERS = {
     ".pdf":  PyPDFLoader,
@@ -62,7 +60,8 @@ def index_document(file_path: str, session_id: str) -> int:
         return 0
 
     texts      = [c.page_content for c in chunks]
-    embeddings = embedder.encode(texts, show_progress_bar=False).tolist()
+    provider   = get_embedding_provider()
+    embeddings = provider.embed_documents(texts)
     ids        = [f"{session_id}_{i}" for i in range(len(texts))]
     metadatas  = [{"source": Path(file_path).name, "chunk": i} for i in range(len(texts))]
 
@@ -77,7 +76,8 @@ def retrieve_context(query: str, session_id: str, top_k: int = 4) -> tuple[str, 
     if col.count() == 0:
         return "", []
 
-    q_emb   = embedder.encode([query]).tolist()
+    provider = get_embedding_provider()
+    q_emb    = [provider.embed_query(query)]
     results = col.query(
         query_embeddings=q_emb,
         n_results=min(top_k, col.count()),

@@ -112,7 +112,9 @@ def init_db():
                 ('temperature', '0.7'),
                 ('max_history_turns', '10'),
                 ('rag_top_k', '4'),
-                ('theme', '"dark"');
+                ('theme', '"dark"'),
+                ('embedding_provider', '"sentence-transformers"'),
+                ('embedding_model', '"all-MiniLM-L6-v2"');
 
             CREATE TABLE IF NOT EXISTS prompt_templates(
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
