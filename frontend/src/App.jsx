@@ -19,18 +19,21 @@ export default function App() {
   const [loading,    setLoading]    = useState(false);
   const [streaming,  setStreaming]  = useState(false);
   const [panel,      setPanel]      = useState(null); // "upload"|"plugins"|"settings"|null
-  const [view,        setView]       = useState("chat"); // "chat"|"prompts"
+  const [view,       setView]       = useState("chat"); // "chat"|"prompts"
   const [language,   setLanguage]   = useState("en");
   const [ollamaOk,   setOllamaOk]   = useState(null);
   const [settings,   setSettings]   = useState({});
   const [useStream,  setUseStream]  = useState(true);
 
+  // NEW: stop generation state
+  const [abortController, setAbortController] = useState(null);
+  const [isStreaming, setIsStreaming] = useState(false);
+
   useEffect(() => { bootstrap(); }, []);
 
-  // ── Global keyboard shortcut: Ctrl+Shift+N (or Cmd+Shift+N on Mac) → New Chat ──
+  // Global keyboard shortcut: Ctrl+Shift+N (or Cmd+Shift+N on Mac) → New Chat
   useEffect(() => {
     const handleKeyDown = (e) => {
-      console.log("Key pressed:", e.key, "Ctrl:", e.ctrlKey, "Shift:", e.shiftKey); // ADD THIS
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "N") {
         e.preventDefault();
         newChat();
@@ -57,12 +60,33 @@ export default function App() {
   }
 
   const refreshSessions = useCallback(async () => {
+    try {
+      const s = await api.getSessions();
+      setSessions(s || []);
+    } catch {}
+  }, []);
+
+  const refreshDocuments = useCallback(async (sid) => {
+    try {
+      const d = await api.getDocuments(sid);
+      setDocuments(d.documents || []);
+    } catch {}
+
     try { const s = await api.getSessions(); setSessions(s || []); } catch { }
   }, []);
 
   const refreshDocuments = useCallback(async (sid) => {
     try { const d = await api.getDocuments(sid); setDocuments(d.documents || []); } catch { }
   }, []);
+
+  const stopGeneration = useCallback(() => {
+    if (abortController) {
+      abortController.abort();
+      setAbortController(null);
+      setIsStreaming(false);
+      setStreaming(false);
+    }
+  }, [abortController]);
 
   async function sendMessage(text) {
     if (!text.trim() || loading || streaming) return;
@@ -76,8 +100,11 @@ export default function App() {
 
     if (useStream) {
       setStreaming(true);
+      setIsStreaming(true);
       const aiMsg = { role: "assistant", content: "", sources: [], id: Date.now() + 1, streaming: true };
       setMessages(prev => [...prev, aiMsg]);
+      const controller = new AbortController();
+      setAbortController(controller);
       try {
         await api.streamMessage(
           { message: text, session_id: activeSid, model, use_documents: documents.length > 0, language },
@@ -85,11 +112,20 @@ export default function App() {
           (sources, benchmarks) => {
             setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, sources, benchmarks, streaming: false } : m));
             refreshSessions();
-          }
+          },
+          controller.signal
         );
       } catch (e) {
-        setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, content: e.message, streaming: false } : m));
-      } finally { setStreaming(false); }
+        if (e.name === 'AbortError') {
+          setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, content: m.content + "\n\n[Stopped by user]", streaming: false } : m));
+        } else {
+          setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, content: e.message, streaming: false } : m));
+        }
+      } finally {
+        setStreaming(false);
+        setIsStreaming(false);
+        setAbortController(null);
+      }
     } else {
       setLoading(true);
       try {
@@ -103,16 +139,16 @@ export default function App() {
   }
 
   async function newChat() {
-      const sid = uuidv4();
-      try {
-        await api.createSession({ title: "New Chat", model });
-      } catch {}
-      setSessionId(sid);
-      setMessages([]);
-      setDocuments([]);
-      setPanel(null);
-      refreshSessions();
-    }
+    const sid = uuidv4();
+    try {
+      await api.createSession({ title: "New Chat", model });
+    } catch {}
+    setSessionId(sid);
+    setMessages([]);
+    setDocuments([]);
+    setPanel(null);
+    refreshSessions();
+  }
 
   async function loadSession(sid) {
     setSessionId(sid);
@@ -126,7 +162,11 @@ export default function App() {
 
   async function handleDeleteSession(sid) {
     await api.deleteSession(sid);
-    if (sid === sessionId) { setSessionId(uuidv4()); setMessages([]); setDocuments([]); }
+    if (sid === sessionId) {
+      setSessionId(uuidv4());
+      setMessages([]);
+      setDocuments([]);
+    }
     refreshSessions();
   }
 
@@ -154,6 +194,7 @@ export default function App() {
         onNewChat={newChat}
         onLoadSession={loadSession}
         onDeleteSession={handleDeleteSession}
+        refreshSessions={refreshSessions}
         onClearAllSessions={handleClearAllSessions}
         model={model}
         models={models}
@@ -203,6 +244,8 @@ export default function App() {
             loading={loading || streaming}
             onSend={sendMessage}
             sessionId={sessionId}
+            isStreaming={isStreaming}
+            onStop={stopGeneration}
           />
         )}
       </div>

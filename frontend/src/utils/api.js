@@ -36,6 +36,15 @@ export const createPromptTemplate    = (b)    => req("/prompt-templates/", { met
 export const updatePromptTemplate    = (id,b) => req(`/prompt-templates/${id}`, { method: "PUT", body: JSON.stringify(b) });
 export const deletePromptTemplate    = (id)   => req(`/prompt-templates/${id}`, { method: "DELETE" });
 
+// Reorder sessions
+export const reorderSessions = async (sessionIds) => {
+  return req("/sessions/reorder", {
+    method: "PATCH",
+    body: JSON.stringify({ session_ids: sessionIds }),
+  });
+};
+
+// Upload document
 export async function uploadDocument(file, session_id) {
   const fd = new FormData();
   fd.append("file", file); fd.append("session_id", session_id);
@@ -44,17 +53,26 @@ export async function uploadDocument(file, session_id) {
   return res.json();
 }
 
-export function streamMessage(body, onToken, onDone) {
+// Streaming with AbortSignal support (for Stop button)
+export function streamMessage(body, onToken, onDone, signal) {
   return fetch(`${BASE}/chat/stream`, {
-    method: "POST", headers: { "Content-Type": "application/json" },
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+    signal,   // ✅ allows aborting
   }).then(res => {
-    const reader = res.body.getReader(); const decoder = new TextDecoder();
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
     function pump() {
       return reader.read().then(({ done, value }) => {
         if (done) return;
         decoder.decode(value).split("\n").forEach(line => {
           if (line.startsWith("data: ")) {
+            try {
+              const d = JSON.parse(line.slice(6));
+              if (d.token) onToken(d.token);
+              if (d.done) onDone(d.sources||[]);
+            } catch {}
             try { const d = JSON.parse(line.slice(6)); if (d.token) onToken(d.token); if (d.done) onDone(d.sources || [], d.benchmarks || null); } catch { }
           }
         });

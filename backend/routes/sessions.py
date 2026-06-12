@@ -1,12 +1,18 @@
-"""Sessions routes — /api/sessions — full CRUD"""
+"""Sessions routes — /api/sessions — full CRUD + reorder + clear all"""
 
 import uuid
+from typing import List
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 from models.schemas import SessionCreate, SessionUpdate, BulkSessionRenameRequest
 from services import db_service
-# from backend.models.schemas import BulkSessionRenameRequest  # Adjust if other items are imported from here
 
 router = APIRouter()
+
+
+# ─── Request models for reorder ─────────────────────────────
+class ReorderSessionsRequest(BaseModel):
+    session_ids: List[str]
 
 
 @router.get("/")
@@ -19,6 +25,7 @@ async def create_session(body: SessionCreate):
     sid = str(uuid.uuid4())
     session = db_service.create_session(sid, title=body.title, model=body.model)
     return session
+
 
 @router.patch("/bulk-rename")
 async def bulk_rename_sessions(body: BulkSessionRenameRequest):
@@ -41,10 +48,8 @@ async def bulk_rename_sessions(body: BulkSessionRenameRequest):
                 title=item.new_title, 
                 model=current_session.get("model")
             )
-            # 3. Correct Success Count: Only increment if the database update actually fired
             updated_count += 1
             
-        # If some requested sessions weren't found, alert the client transparently
         if missing_sessions:
             return {
                 "status": "partial_success",
@@ -62,8 +67,17 @@ async def bulk_rename_sessions(body: BulkSessionRenameRequest):
             status_code=500, 
             detail=f"Bulk rename failed: {str(e)}"
         )
-    
-    
+
+
+@router.patch("/reorder")
+async def reorder_sessions(req: ReorderSessionsRequest):
+    try:
+        db_service.update_sessions_order(req.session_ids)
+        return {"success": True, "message": "Session order updated"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Reorder failed: {str(e)}")
+
+
 @router.get("/{session_id}")
 async def get_session(session_id: str):
     s = db_service.get_session(session_id)
@@ -83,11 +97,18 @@ async def delete_session(session_id: str):
     db_service.delete_session(session_id)
     try:
         from services import rag_service
-
         rag_service.delete_session_index(session_id)
     except Exception:
         pass
     return {"status": "deleted", "session_id": session_id}
+
+
+# ─── Clear all sessions (for testing / admin) ──────────────────────────────
+@router.delete("/")
+async def clear_all_sessions():
+    """Delete ALL sessions and their associated messages/documents."""
+    db_service.clear_all_sessions()
+    return {"message": "All sessions cleared"}
 
 
 @router.get("/{session_id}/messages")
@@ -112,10 +133,10 @@ async def get_documents(session_id: str):
 async def rag_stats(session_id: str):
     try:
         from services import rag_service
-
         count = rag_service.get_indexed_count(session_id)
     except Exception:
         count = 0
+    return {"session_id": session_id, "indexed_chunks": count}
     return {"session_id": session_id, "indexed_chunks": count}
 
 
@@ -123,4 +144,3 @@ async def rag_stats(session_id: str):
 async def clear_all_sessions():
     db_service.clear_all_sessions()
     return {"message": "All sessions cleared"}
-

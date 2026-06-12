@@ -4,7 +4,7 @@ import { AppLogoIcon, ChartIcon, CloseIcon, CopyIcon, FileIcon, LockIcon, PlusCi
 import CodeBlockWithCopy from "./CodeBlockWithCopy";
 import PromptTemplateDialog from "./PromptTemplateDialog";
 
-export default function ChatWindow({ messages, loading, onSend, sessionId }) {
+export default function ChatWindow({ messages, loading, onSend, sessionId, isStreaming, onStop }) {
   const [input, setInput] = useState("");
   const [showPlusMenu, setShowPlusMenu] = useState(false);
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
@@ -13,7 +13,7 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
   const textareaRef = useRef(null);
   const plusMenuRef = useRef(null);
 
-  // NEW: state for selected messages and export format
+  // State for export selection and copy
   const [selectedMessages, setSelectedMessages] = useState([]);
   const [exportFormat, setExportFormat] = useState("markdown");
   const [copiedMsgId, setCopiedMsgId] = useState(null);
@@ -71,6 +71,7 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
     }
     return parts;
   }
+
   function send() {
     if ((!input.trim() && !selectedTemplate) || loading) return;
     const message = selectedTemplate
@@ -79,7 +80,7 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
     onSend(message);
     setInput("");
     setSelectedTemplate(null);
-    if (textareaRef.current) { textareaRef.current.style.height = "auto"; }
+    if (textareaRef.current) textareaRef.current.style.height = "auto";
   }
 
   function handleKey(e) {
@@ -91,6 +92,56 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
     e.target.style.height = Math.min(e.target.scrollHeight, 160) + "px";
   }
 
+  // Message selection & export
+  const toggleSelectMessage = (msgId) => {
+    setSelectedMessages(prev =>
+      prev.includes(msgId) ? prev.filter(id => id !== msgId) : [...prev, msgId]
+    );
+  };
+
+  const handleExportSelected = async () => {
+    if (selectedMessages.length === 0) return;
+    try {
+      const response = await fetch("/api/export/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message_ids: selectedMessages, format: exportFormat }),
+      });
+      if (!response.ok) throw new Error("Export failed");
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `localmind_export.${exportFormat === "markdown" ? "md" : exportFormat}`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to export messages");
+    }
+  };
+
+  const exportSingleMessage = async (msgId) => {
+    try {
+      const response = await fetch("/api/export/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message_ids: [msgId], format: exportFormat }),
+      });
+      if (!response.ok) throw new Error("Export failed");
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `localmind_message_${msgId}.${exportFormat === "markdown" ? "md" : exportFormat}`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to export message");
+    }
+  };
+
   const SUGGESTIONS = [
     "Summarize the uploaded document",
     "What are the key points?",
@@ -100,7 +151,7 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden bg-gray-950">
-      {/* Export bar */}
+      {/* Export bar (session export) */}
       {messages.length > 0 && (
         <div className="flex justify-end gap-2 px-5 pt-2">
           {["markdown","json","txt"].map(f => (
@@ -112,11 +163,41 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
         </div>
       )}
 
+      {/* Export selection bar */}
+      {selectedMessages.length > 0 && (
+        <div className="flex justify-between items-center px-5 py-2 bg-gray-900 border-b border-gray-800">
+          <span className="text-sm text-gray-300">{selectedMessages.length} message(s) selected</span>
+          <div className="flex gap-2 items-center">
+            <select
+              value={exportFormat}
+              onChange={(e) => setExportFormat(e.target.value)}
+              className="text-xs bg-gray-800 text-gray-200 border border-gray-700 rounded px-2 py-1"
+            >
+              <option value="markdown">Markdown (.md)</option>
+              <option value="json">JSON (.json)</option>
+              <option value="txt">Text (.txt)</option>
+            </select>
+            <button
+              onClick={handleExportSelected}
+              className="text-xs bg-purple-600 hover:bg-purple-500 text-white px-3 py-1 rounded"
+            >
+              Export Selected
+            </button>
+            <button
+              onClick={() => setSelectedMessages([])}
+              className="text-xs text-gray-400 hover:text-gray-200 px-2 py-1"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5">
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center gap-4">
-              <AppLogoIcon className="w-14 h-14 text-purple-400 opacity-70" />
+            <AppLogoIcon className="w-14 h-14 text-purple-400 opacity-70" />
             <div>
               <p className="text-xl font-semibold text-gray-200 mb-1">LocalMind is ready</p>
               <p className="text-sm text-gray-500">100% private · runs offline · no cloud</p>
@@ -134,6 +215,15 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
 
         {messages.map((msg, i) => (
           <div key={msg.id || i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+            {/* Checkbox for selection */}
+            <div className="mr-2 self-center">
+              <input
+                type="checkbox"
+                checked={selectedMessages.includes(msg.id)}
+                onChange={() => toggleSelectMessage(msg.id)}
+                className="w-4 h-4 rounded border-gray-600 bg-gray-800 text-purple-600 focus:ring-purple-500 focus:ring-1"
+              />
+            </div>
             <div className={`max-w-2xl ${msg.role === "user" ? "max-w-xl" : "max-w-2xl"}`}>
               {msg.role === "assistant" && (
                 <div className="flex items-center gap-1.5 mb-1.5 ml-1">
@@ -146,8 +236,23 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
                 ${msg.role === "user"
                   ? "bg-purple-700 text-white rounded-br-sm"
                   : "bg-gray-800 text-gray-100 rounded-bl-sm border border-gray-700"}`}>
-                {msg.content}
-                {msg.streaming && <span className="inline-block w-1.5 h-4 bg-purple-400 ml-1 animate-pulse rounded" />}
+                {msg.role === "user" ? (
+                  <>
+                    {msg.content}
+                    {msg.streaming && <span className="inline-block w-1.5 h-4 bg-purple-400 ml-1 animate-pulse rounded" />}
+                  </>
+                ) : (
+                  <>
+                    {parseMessageWithCodeBlocks(msg.content).map((part, idx) => (
+                      part.type === "code" ? (
+                        <CodeBlockWithCopy key={idx} code={part.code} language={part.language} />
+                      ) : (
+                        <div key={idx} className="whitespace-pre-wrap">{part.content}</div>
+                      )
+                    ))}
+                    {msg.streaming && <span className="inline-block w-1.5 h-4 bg-purple-400 ml-1 animate-pulse rounded" />}
+                  </>
+                )}
               </div>
               {msg.sources?.length > 0 && (
                 <div className="mt-1.5 ml-1 flex flex-wrap gap-1">
@@ -162,8 +267,16 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
                 </div>
               )}
               {msg.role === "user" && (
-                <div className="text-right mt-1 mr-1">
+                <div className="text-right mt-1 mr-1 flex justify-end items-center gap-2">
                   <span className="text-xs text-gray-600">You</span>
+                  {/* Per-message export button */}
+                  <button
+                    onClick={() => exportSingleMessage(msg.id)}
+                    className="text-xs text-gray-500 hover:text-purple-400 transition"
+                    title="Export this message"
+                  >
+                    ↓
+                  </button>
                 </div>
               )}
               {msg.role === "assistant" && !msg.streaming && (
@@ -180,7 +293,6 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
                       <CopyIcon className="w-4 h-4" />
                     )}
                   </button>
-
                   {/* Stats hover button */}
                   <div
                     className="relative"
@@ -193,41 +305,40 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
                     >
                       <ChartIcon className="w-4 h-4" />
                     </button>
-
                     {hoveredStatsId === msg.id && msg.benchmarks && Object.keys(msg.benchmarks).length > 0 && (
                       <div className="absolute right-0 bottom-0 translate-x-full pl-2 z-50">
                         <div className="bg-gray-900 border border-gray-700 rounded-lg p-3 shadow-xl min-w-[220px]">
-                        <p className="text-xs font-semibold text-gray-300 mb-2">Performance</p>
-                        <div className="space-y-1.5 text-xs text-gray-400">
-                          <div className="flex justify-between">
-                            <span>Time to first token</span>
-                            <span className="text-gray-300">{(msg.benchmarks.ttft_ms / 1000).toFixed(2)}s</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Total duration</span>
-                            <span className="text-gray-300">{(msg.benchmarks.total_duration_ms / 1000).toFixed(2)}s</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Tokens generated</span>
-                            <span className="text-gray-300">{msg.benchmarks.token_count}</span>
-                          </div>
-                          {msg.benchmarks.memory_used_gb && (
-                            <div>
-                              <div className="flex justify-between items-center">
-                                <span>RAM usage</span>
-                                <span className="inline-flex items-center gap-1 text-gray-300">
-                                  {msg.benchmarks.memory_used_gb} / {msg.benchmarks.memory_total_gb} GB
-                                  <span className="group relative">
-                                    <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full border border-gray-600 text-gray-500 text-[9px] font-bold cursor-help leading-none">i</span>
-                                    <span className="hidden group-hover:block absolute right-0 top-full mt-1 bg-gray-800 border border-gray-600 rounded-md px-2 py-1.5 text-[10px] text-gray-400 w-[180px] leading-tight z-50 shadow-lg">
-                                      Total system memory in use across all processes, not just the LLM.
+                          <p className="text-xs font-semibold text-gray-300 mb-2">Performance</p>
+                          <div className="space-y-1.5 text-xs text-gray-400">
+                            <div className="flex justify-between">
+                              <span>Time to first token</span>
+                              <span className="text-gray-300">{(msg.benchmarks.ttft_ms / 1000).toFixed(2)}s</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Total duration</span>
+                              <span className="text-gray-300">{(msg.benchmarks.total_duration_ms / 1000).toFixed(2)}s</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Tokens generated</span>
+                              <span className="text-gray-300">{msg.benchmarks.token_count}</span>
+                            </div>
+                            {msg.benchmarks.memory_used_gb && (
+                              <div>
+                                <div className="flex justify-between items-center">
+                                  <span>RAM usage</span>
+                                  <span className="inline-flex items-center gap-1 text-gray-300">
+                                    {msg.benchmarks.memory_used_gb} / {msg.benchmarks.memory_total_gb} GB
+                                    <span className="group relative">
+                                      <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full border border-gray-600 text-gray-500 text-[9px] font-bold cursor-help leading-none">i</span>
+                                      <span className="hidden group-hover:block absolute right-0 top-full mt-1 bg-gray-800 border border-gray-600 rounded-md px-2 py-1.5 text-[10px] text-gray-400 w-[180px] leading-tight z-50 shadow-lg">
+                                        Total system memory in use across all processes, not just the LLM.
+                                      </span>
                                     </span>
                                   </span>
-                                </span>
+                                </div>
                               </div>
-                            </div>
-                          )}
-                        </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     )}
@@ -257,15 +368,7 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
         <div ref={bottomRef} />
       </div>
 
-      {/* Prompt Template Dialog */}
-      {showTemplateDialog && (
-        <PromptTemplateDialog
-          onSelect={handleSelectTemplate}
-          onClose={() => { setShowTemplateDialog(false); setShowPlusMenu(false); }}
-        />
-      )}
-
-      {/* Input Form Footer */}
+      {/* Input Form Footer with Stop button */}
       <div className="px-4 pb-4 pt-2 shrink-0">
         <div className="flex items-end gap-2 bg-gray-900 border border-gray-700 rounded-2xl px-4 py-3 focus-within:border-purple-500 transition-colors">
           {/* Plus button for prompt templates */}
@@ -290,7 +393,7 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
             )}
           </div>
 
-          {/* Selected template chip */}
+          {/* Selected template chip + textarea */}
           <div className="flex-1 flex flex-col gap-1">
             {selectedTemplate && (
               <div className="flex items-center gap-1.5 bg-gray-800 rounded-lg px-2.5 py-1 w-fit">
@@ -316,14 +419,33 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
             />
           </div>
 
-          <button 
-            onClick={send} 
-            disabled={(!input.trim() && !selectedTemplate) || loading}
-            className="shrink-0 text-sm bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white px-4 py-2 rounded-xl transition font-medium"
-          >
-            Send →
-          </button>
+          {/* Send or Stop button */}
+          {isStreaming ? (
+            <button
+              onClick={onStop}
+              className="shrink-0 text-sm bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-xl transition font-medium"
+            >
+              ■ Stop
+            </button>
+          ) : (
+            <button
+              onClick={send}
+              disabled={(!input.trim() && !selectedTemplate) || loading}
+              className="shrink-0 text-sm bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white px-4 py-2 rounded-xl transition font-medium"
+            >
+              Send →
+            </button>
+          )}
         </div>
+
+        {/* Template picker dialog */}
+        {showTemplateDialog && (
+          <PromptTemplateDialog
+            onSelect={handleSelectTemplate}
+            onClose={() => setShowTemplateDialog(false)}
+          />
+        )}
+
         <p className="text-center text-xs text-gray-700 mt-2">
           <span className="inline-flex items-center gap-1">
             <LockIcon className="w-3.5 h-3.5" />

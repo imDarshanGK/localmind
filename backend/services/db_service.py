@@ -56,6 +56,16 @@ def get_db():
         if conn:
             conn.close()
 
+
+def ensure_order_index_column():
+    """Add order_index column to sessions table if not exists (for drag‑and‑drop reordering)."""
+    with get_db() as conn:
+        try:
+            conn.execute("ALTER TABLE sessions ADD COLUMN order_index INTEGER DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass  # column already exists
+
+
 def init_db():
     """Create all tables on startup."""
     with get_db() as conn:
@@ -122,8 +132,8 @@ def init_db():
                 prompt TEXT NOT NULL,
                 created_at TEXT DEFAULT (datetime('now'))
             );
-
         """)
+        ensure_order_index_column()
         try:
             conn.execute("ALTER TABLE documents ADD COLUMN status TEXT DEFAULT 'completed'")
         except sqlite3.OperationalError:
@@ -162,15 +172,18 @@ def delete_session(session_id: str):
 
 
 def clear_all_sessions():
+    """Delete ALL sessions and their associated messages/documents (cascade)."""
+    with get_db() as conn:
     with get_db() as conn:
         conn.execute("DELETE FROM messages")
         conn.execute("DELETE FROM sessions")
 
 
 def get_all_sessions() -> list[dict]:
+    """Fetch sessions sorted by manual order (order_index) then by last updated."""
     with get_db() as conn:
         rows = conn.execute(
-            "SELECT * FROM sessions ORDER BY updated_at DESC"
+            "SELECT * FROM sessions ORDER BY order_index ASC, updated_at DESC"
         ).fetchall()
         return [dict(r) for r in rows]
 
@@ -350,3 +363,14 @@ def delete_prompt_template(template_id: int):
     """Delete a prompt template by ID."""
     with get_db() as conn:
         conn.execute("DELETE FROM prompt_templates WHERE id = ?", (template_id,))
+
+
+# ─── Drag‑and‑drop reordering ──────────────────────────────────────────────
+def update_sessions_order(session_ids: list):
+    """Update order_index for each session based on its position in the list (0,1,2...)."""
+    with get_db() as conn:
+        for idx, session_id in enumerate(session_ids):
+            conn.execute(
+                "UPDATE sessions SET order_index = ? WHERE id = ?",
+                (idx, session_id)
+            )
