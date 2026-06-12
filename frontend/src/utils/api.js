@@ -1,9 +1,11 @@
 const BASE = (import.meta.env.VITE_API_BASE_URL || "/api").replace(/\/$/, "");
 
 async function req(path, opts = {}) {
+  const { signal, ...fetchOpts } = opts;
   const res = await fetch(`${BASE}${path}`, {
-    headers: { "Content-Type": "application/json", ...opts.headers },
-    ...opts,
+    headers: { "Content-Type": "application/json", ...fetchOpts.headers },
+    signal,
+    ...fetchOpts,
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
@@ -12,7 +14,7 @@ async function req(path, opts = {}) {
   return res.json();
 }
 
-export const sendMessage = (b) => req("/chat/", { method: "POST", body: JSON.stringify(b) });
+export const sendMessage = (b, signal) => req("/chat/", { method: "POST", body: JSON.stringify(b), signal });
 export const getSessions = () => req("/sessions/");
 export const createSession = (b) => req("/sessions/", { method: "POST", body: JSON.stringify(b) });
 export const updateSession = (id, b) => req(`/sessions/${id}`, { method: "PATCH", body: JSON.stringify(b) });
@@ -29,6 +31,7 @@ export const getSettings = () => req("/settings/");
 export const saveSettings = (b) => req("/settings/", { method: "PUT", body: JSON.stringify(b) });
 export const exportSession = (id, fmt) => window.open(`${BASE}/export/${id}/${fmt}`, "_blank");
 export const deleteDocument = (docId) => req(`/upload/${docId}`, { method: "DELETE" });
+export const savePartialMessage = (b) => req("/chat/save-partial", { method: "POST", body: JSON.stringify(b) });
 
 // Prompt Templates
 export const getPromptTemplates      = ()     => req("/prompt-templates/");

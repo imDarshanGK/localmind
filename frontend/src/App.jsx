@@ -86,12 +86,16 @@ export default function App() {
     if (useStream) {
       setStreaming(true);
       const aiMsg = { role: "assistant", content: "", sources: [], id: Date.now() + 1, streaming: true };
+      let accumulatedContent = "";
       setMessages(prev => [...prev, aiMsg]);
       try {
         abortControllerRef.current = new AbortController();
         await api.streamMessage(
           { message: text, session_id: activeSid, model, use_documents: documents.length > 0, language },
-          (token) => setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, content: m.content + token } : m)),
+          (token) => {
+            accumulatedContent += token;
+            setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, content: m.content + token } : m));
+          },
           (sources, benchmarks) => {
             setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, sources, benchmarks, streaming: false } : m));
             refreshSessions();
@@ -99,8 +103,17 @@ export default function App() {
           abortControllerRef.current.signal
         );
       } catch (e) {
-        if (e.name === 'AbortError') {
+        if (e.name === 'AbortError' || e.message?.includes('aborted')) {
           setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, content: m.content + "\n\n[Cancelled]", streaming: false } : m));
+          // Persist the cancelled partial message to the database
+          try {
+            await api.savePartialMessage({
+              session_id: activeSid,
+              content: accumulatedContent + "\n\n[Cancelled]",
+              sources: [],
+            });
+            refreshSessions();
+          } catch { /* best-effort save */ }
         } else {
           setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, content: e.message, streaming: false } : m));
         }
@@ -108,11 +121,25 @@ export default function App() {
     } else {
       setLoading(true);
       try {
-        const data = await api.sendMessage({ message: text, session_id: activeSid, model, use_documents: documents.length > 0, language });
+        abortControllerRef.current = new AbortController();
+        const data = await api.sendMessage(
+          { message: text, session_id: activeSid, model, use_documents: documents.length > 0, language },
+          abortControllerRef.current.signal
+        );
         setMessages(prev => [...prev, { role: "assistant", content: data.reply, sources: data.sources || [], id: Date.now() + 1 }]);
         refreshSessions();
       } catch (e) {
-        setMessages(prev => [...prev, { role: "assistant", content: e.message, id: Date.now() + 1 }]);
+        if (e.name === 'AbortError') {
+          // If aborted, show cancelled message and persist
+          const finalContent = "[Cancelled]";
+          setMessages(prev => [...prev, { role: "assistant", content: finalContent, id: Date.now() + 1 }]);
+          try {
+            await api.savePartialMessage({ session_id: activeSid, content: finalContent, sources: [] });
+            refreshSessions();
+          } catch { /* best effort */ }
+        } else {
+          setMessages(prev => [...prev, { role: "assistant", content: e.message, id: Date.now() + 1 }]);
+        }
       } finally { setLoading(false); }
     }
   }
