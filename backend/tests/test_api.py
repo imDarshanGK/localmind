@@ -222,6 +222,7 @@ def test_export_txt():
     assert r2.status_code == 200
     assert b"Plain text export" in r2.content
 
+
 # ─── Prompt Templates ────────────────────────────────────────
 def test_create_prompt_template():
     r = client.post("/api/prompt-templates/", json={
@@ -281,3 +282,19 @@ def test_create_prompt_template_empty_title():
         "prompt": "Some prompt"
     })
     assert r.status_code == 422
+
+def test_clear_all_sessions():
+    r1 = client.post("/api/sessions/", json={"title": "Session 1"})
+    r2 = client.post("/api/sessions/", json={"title": "Session 2"})
+    assert r1.status_code == 200
+    assert r2.status_code == 200
+
+    r_delete = client.delete("/api/sessions/")
+    assert r_delete.status_code == 200
+    assert r_delete.json() == {"message": "All sessions cleared"}
+
+    r_list = client.get("/api/sessions/")
+    assert r_list.status_code == 200
+    assert len(r_list.json()) == 0
+
+
