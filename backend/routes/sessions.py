@@ -118,3 +118,9 @@ async def rag_stats(session_id: str):
         count = 0
     return {"session_id": session_id, "indexed_chunks": count}
 
+
+@router.delete("/")
+async def clear_all_sessions():
+    db_service.clear_all_sessions()
+    return {"message": "All sessions cleared"}
+
