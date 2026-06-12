@@ -17,6 +17,7 @@ const LANGUAGES = [
   { code: "de", label: "Deutsch" }, { code: "es", label: "Español" },
 ];
 
+<<<<<<< HEAD
 // Individual sortable session item
 function SortableSessionItem({ session, isActive, search, onLoad, onDelete, messageCount }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -75,6 +76,9 @@ export default function Sidebar({
   onLanguageChange,
   refreshSessions,
 }) {
+=======
+export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSession, onDeleteSession, onClearAllSessions, model, models, onModelChange, language, onLanguageChange }) {
+>>>>>>> upstream/main
   const [search, setSearch] = useState("");
   const [items, setItems] = useState([]);
   const [loadingReorder, setLoadingReorder] = useState(false);
@@ -175,6 +179,7 @@ export default function Sidebar({
             {sessions.length === 0 ? "No chats yet. Start one!" : "No results."}
           </p>
         )}
+<<<<<<< HEAD
         <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={items} strategy={verticalListSortingStrategy}>
             {orderedSessions.map((session) => (
@@ -193,7 +198,55 @@ export default function Sidebar({
         {loadingReorder && (
           <div className="text-xs text-gray-500 text-center mt-2">Saving order...</div>
         )}
+=======
+        {filtered.map(s => {
+          const isActive = currentSession === s.id;
+          return (
+          <div key={s.id} className={`relative group flex items-center rounded-lg mb-0.5 transition
+            ${isActive ? "bg-gray-700" : "hover:bg-gray-800"}`}>
+            {/* Activity indicator: always rendered, transparent when inactive */}
+            <span
+              aria-hidden="true"
+              className={`absolute left-2.5 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-purple-400 transition-opacity duration-300
+                ${isActive ? "opacity-100 animate-pulse" : "opacity-0"}`}
+            />
+            <button onClick={()=>onLoadSession(s.id)}
+              className="flex-1 text-left text-xs pl-6 pr-3 py-2 truncate text-gray-400 group-hover:text-gray-200">
+              <span className={isActive ? "text-white" : ""}>
+                <span className="inline-flex items-center gap-1.5">
+                  <ChatIcon className="w-3.5 h-3.5 text-gray-500" />
+                  <span>{highlightText(s.title || "New Chat", search)}</span>
+                </span>
+              </span>
+              {s.message_count > 0 && (
+                <span className="ml-1 text-gray-600">{s.message_count}</span>
+              )}
+            </button>
+            <button onClick={()=>onDeleteSession(s.id)}
+              className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 px-2 py-2 transition text-xs">
+              ×
+            </button>
+          </div>
+          );
+        })}
+>>>>>>> upstream/main
       </div>
+
+      {sessions.length > 0 && (
+        <div className="px-3 py-2 border-t border-gray-800 shrink-0">
+          <button
+            onClick={() => {
+              if (window.confirm("Delete all sessions? This cannot be undone.")) {
+                onClearAllSessions();
+              }
+            }}
+            className="w-full text-left text-xs text-gray-500 hover:text-red-400 hover:bg-red-950/20 px-3 py-2 rounded-lg transition inline-flex items-center gap-2 font-medium"
+          >
+            <span>🗑</span>
+            <span>Clear all sessions</span>
+          </button>
+        </div>
+      )}
 
       {/* Footer */}
       <div className="px-4 py-3 border-t border-gray-800">
