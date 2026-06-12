@@ -8,7 +8,7 @@ const LANGUAGES = [
   {code:"de",label:"Deutsch"},{code:"es",label:"Español"},
 ];
 
-export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSession, onDeleteSession, model, models, onModelChange, language, onLanguageChange }) {
+export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSession, onDeleteSession, onClearAllSessions, model, models, onModelChange, language, onLanguageChange }) {
   const [search, setSearch] = useState("");
   const modelList = models.length > 0 ? models.map(m=>m.name) : ["llama3","mistral","phi3","gemma2"];
   const filtered  = sessions.filter(s => s.title?.toLowerCase().includes(search.toLowerCase()));
@@ -60,12 +60,20 @@ export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSes
             {sessions.length === 0 ? "No chats yet. Start one!" : "No results."}
           </p>
         )}
-        {filtered.map(s => (
-          <div key={s.id} className={`group flex items-center gap-1 rounded-lg mb-0.5 transition
-            ${currentSession === s.id ? "bg-gray-700" : "hover:bg-gray-800"}`}>
+        {filtered.map(s => {
+          const isActive = currentSession === s.id;
+          return (
+          <div key={s.id} className={`relative group flex items-center rounded-lg mb-0.5 transition
+            ${isActive ? "bg-gray-700" : "hover:bg-gray-800"}`}>
+            {/* Activity indicator: always rendered, transparent when inactive */}
+            <span
+              aria-hidden="true"
+              className={`absolute left-2.5 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-purple-400 transition-opacity duration-300
+                ${isActive ? "opacity-100 animate-pulse" : "opacity-0"}`}
+            />
             <button onClick={()=>onLoadSession(s.id)}
-              className="flex-1 text-left text-xs px-3 py-2 truncate text-gray-400 group-hover:text-gray-200">
-              <span className={currentSession === s.id ? "text-white" : ""}>
+              className="flex-1 text-left text-xs pl-6 pr-3 py-2 truncate text-gray-400 group-hover:text-gray-200">
+              <span className={isActive ? "text-white" : ""}>
                 <span className="inline-flex items-center gap-1.5">
                   <ChatIcon className="w-3.5 h-3.5 text-gray-500" />
                   <span>{highlightText(s.title || "New Chat", search)}</span>
@@ -80,8 +88,25 @@ export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSes
               ×
             </button>
           </div>
-        ))}
+          );
+        })}
       </div>
+
+      {sessions.length > 0 && (
+        <div className="px-3 py-2 border-t border-gray-800 shrink-0">
+          <button
+            onClick={() => {
+              if (window.confirm("Delete all sessions? This cannot be undone.")) {
+                onClearAllSessions();
+              }
+            }}
+            className="w-full text-left text-xs text-gray-500 hover:text-red-400 hover:bg-red-950/20 px-3 py-2 rounded-lg transition inline-flex items-center gap-2 font-medium"
+          >
+            <span>🗑</span>
+            <span>Clear all sessions</span>
+          </button>
+        </div>
+      )}
 
       {/* Footer */}
       <div className="px-4 py-3 border-t border-gray-800">

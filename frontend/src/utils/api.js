@@ -12,21 +12,22 @@ async function req(path, opts = {}) {
   return res.json();
 }
 
-export const sendMessage    = (b)    => req("/chat/",    { method: "POST", body: JSON.stringify(b) });
-export const getSessions    = ()     => req("/sessions/");
-export const createSession  = (b)    => req("/sessions/", { method: "POST", body: JSON.stringify(b) });
-export const updateSession  = (id,b) => req(`/sessions/${id}`, { method: "PATCH", body: JSON.stringify(b) });
-export const deleteSession  = (id)   => req(`/sessions/${id}`, { method: "DELETE" });
-export const getMessages    = (id)   => req(`/sessions/${id}/messages`);
-export const clearMessages  = (id)   => req(`/sessions/${id}/messages`, { method: "DELETE" });
-export const getDocuments   = (id)   => req(`/sessions/${id}/documents`);
-export const getModels      = ()     => req("/models/");
-export const getOllamaStatus= ()     => req("/models/status");
-export const getPlugins     = ()     => req("/plugins/");
-export const runPlugin      = (b)    => req("/plugins/run", { method: "POST", body: JSON.stringify(b) });
-export const getSettings    = ()     => req("/settings/");
-export const saveSettings   = (b)    => req("/settings/", { method: "PUT", body: JSON.stringify(b) });
-export const exportSession  = (id, fmt) => window.open(`${BASE}/export/${id}/${fmt}`, "_blank");
+export const sendMessage = (b) => req("/chat/", { method: "POST", body: JSON.stringify(b) });
+export const getSessions = () => req("/sessions/");
+export const createSession = (b) => req("/sessions/", { method: "POST", body: JSON.stringify(b) });
+export const updateSession = (id, b) => req(`/sessions/${id}`, { method: "PATCH", body: JSON.stringify(b) });
+export const deleteSession = (id) => req(`/sessions/${id}`, { method: "DELETE" });
+export const clearAllSessions = () => req("/sessions/", { method: "DELETE" });
+export const getMessages = (id) => req(`/sessions/${id}/messages`);
+export const clearMessages = (id) => req(`/sessions/${id}/messages`, { method: "DELETE" });
+export const getDocuments = (id) => req(`/sessions/${id}/documents`);
+export const getModels = () => req("/models/");
+export const getOllamaStatus = () => req("/models/status");
+export const getPlugins = () => req("/plugins/");
+export const runPlugin = (b) => req("/plugins/run", { method: "POST", body: JSON.stringify(b) });
+export const getSettings = () => req("/settings/");
+export const saveSettings = (b) => req("/settings/", { method: "PUT", body: JSON.stringify(b) });
+export const exportSession = (id, fmt) => window.open(`${BASE}/export/${id}/${fmt}`, "_blank");
 export const deleteDocument = (docId) => req(`/upload/${docId}`, { method: "DELETE" });
 
 // Prompt Templates
@@ -39,7 +40,7 @@ export async function uploadDocument(file, session_id) {
   const fd = new FormData();
   fd.append("file", file); fd.append("session_id", session_id);
   const res = await fetch(`${BASE}/upload/`, { method: "POST", body: fd });
-  if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e.detail||"Upload failed"); }
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || "Upload failed"); }
   return res.json();
 }
 
@@ -54,7 +55,7 @@ export function streamMessage(body, onToken, onDone) {
         if (done) return;
         decoder.decode(value).split("\n").forEach(line => {
           if (line.startsWith("data: ")) {
-            try { const d = JSON.parse(line.slice(6)); if (d.token) onToken(d.token); if (d.done) onDone(d.sources||[]); } catch {}
+            try { const d = JSON.parse(line.slice(6)); if (d.token) onToken(d.token); if (d.done) onDone(d.sources || []); } catch { }
           }
         });
         return pump();
