@@ -17,6 +17,7 @@ class ChatMessage(BaseModel):
     content: str
     timestamp: Optional[datetime] = None
     sources: List[str] = []
+    benchmarks: Optional[dict] = None
 
 
 class ChatRequest(BaseModel):

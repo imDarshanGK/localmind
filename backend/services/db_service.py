@@ -76,6 +76,7 @@ def init_db():
                 content TEXT NOT NULL,
                 sources TEXT DEFAULT '[]',
                 created_at TEXT DEFAULT (datetime('now')),
+                benchmarks TEXT DEFAULT '{}',
                 FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
             );
 
@@ -86,6 +87,7 @@ def init_db():
                 file_path TEXT NOT NULL,
                 file_size_kb REAL DEFAULT 0,
                 chunks_indexed INTEGER DEFAULT 0,
+                status TEXT DEFAULT 'completed',
                 uploaded_at TEXT DEFAULT (datetime('now')),
                 FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
             );
@@ -122,8 +124,14 @@ def init_db():
             );
 
         """)
+        try:
+            conn.execute("ALTER TABLE documents ADD COLUMN status TEXT DEFAULT 'completed'")
+        except sqlite3.OperationalError:
+            pass  # column already exists
 
-
+        cols = [row[1] for row in conn.execute("PRAGMA table_info(messages)").fetchall()]
+        if "benchmarks" not in cols:
+            conn.execute("ALTER TABLE messages ADD COLUMN benchmarks TEXT DEFAULT '{}'")
 # ─── Sessions ────────────────────────────────────────────────
 def create_session(session_id: str, title: str = "New Chat", model: str = "llama3") -> dict:
     with get_db() as conn:
@@ -168,12 +176,12 @@ def get_all_sessions() -> list[dict]:
 
 
 # ─── Messages ────────────────────────────────────────────────
-def save_message(session_id: str, role: str, content: str, sources: list = None):
+def save_message(session_id: str, role: str, content: str, sources: list = None, benchmarks: dict = None):
     sources = sources or []
     with get_db() as conn:
         conn.execute(
-            "INSERT INTO messages (session_id, role, content, sources) VALUES (?,?,?,?)",
-            (session_id, role, content, json.dumps(sources)),
+            "INSERT INTO messages (session_id, role, content, sources, benchmarks) VALUES (?,?,?,?,?)",
+            (session_id, role, content, json.dumps(sources), json.dumps(benchmarks)),
         )
         conn.execute(
             "UPDATE sessions SET updated_at=datetime('now'), message_count=message_count+1 WHERE id=?",
@@ -201,7 +209,7 @@ def get_history(session_id: str, limit: int = 20) -> list[dict]:
 def get_messages_full(session_id: str) -> list[dict]:
     with get_db() as conn:
         rows = conn.execute(
-            "SELECT role, content, sources, created_at FROM messages WHERE session_id=? ORDER BY created_at ASC",
+            "SELECT role, content, sources, created_at, benchmarks FROM messages WHERE session_id=? ORDER BY created_at ASC",
             (session_id,),
         ).fetchall()
         return [
@@ -210,6 +218,7 @@ def get_messages_full(session_id: str) -> list[dict]:
                 "content": r["content"],
                 "sources": json.loads(r["sources"] or "[]"),
                 "created_at": r["created_at"],
+                "benchmarks": json.loads(r["benchmarks"] or {})
             }
             for r in rows
         ]
@@ -222,12 +231,20 @@ def clear_messages(session_id: str):
 
 
 # ─── Documents ───────────────────────────────────────────────
-def save_document(session_id: str, filename: str, file_path: str, chunks: int, size_kb: float):
+def save_document(session_id: str, filename: str, file_path: str, chunks: int, size_kb: float, status: str = "completed") -> int:
     with get_db() as conn:
-        conn.execute(
-            "INSERT INTO documents (session_id, filename, file_path, chunks_indexed, file_size_kb) VALUES (?,?,?,?,?)",
-            (session_id, filename, file_path, chunks, size_kb),
+        cursor = conn.execute(
+            "INSERT INTO documents (session_id, filename, file_path, chunks_indexed, file_size_kb, status) VALUES (?,?,?,?,?,?)",
+            (session_id, filename, file_path, chunks, size_kb, status),
         )
+        return cursor.lastrowid
+
+def update_document_status(doc_id: int, status: str, chunks_indexed: int = None):
+    with get_db() as conn:
+        if chunks_indexed is not None:
+            conn.execute("UPDATE documents SET status=?, chunks_indexed=? WHERE id=?", (status, chunks_indexed, doc_id))
+        else:
+            conn.execute("UPDATE documents SET status=? WHERE id=?", (status, doc_id))
 
 
 def get_documents(session_id: str) -> list[dict]:
