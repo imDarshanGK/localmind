@@ -56,7 +56,7 @@ export default function App() {
         if (settRes.value.default_language) setLanguage(settRes.value.default_language);
       }
       if (stRes.status === "fulfilled") setOllamaOk(stRes.value.ollama_running);
-    } catch {}
+    } catch { }
   }
 
   const refreshSessions = useCallback(async () => {
@@ -71,6 +71,12 @@ export default function App() {
       const d = await api.getDocuments(sid);
       setDocuments(d.documents || []);
     } catch {}
+
+    try { const s = await api.getSessions(); setSessions(s || []); } catch { }
+  }, []);
+
+  const refreshDocuments = useCallback(async (sid) => {
+    try { const d = await api.getDocuments(sid); setDocuments(d.documents || []); } catch { }
   }, []);
 
   const stopGeneration = useCallback(() => {
@@ -84,6 +90,11 @@ export default function App() {
 
   async function sendMessage(text) {
     if (!text.trim() || loading || streaming) return;
+    let activeSid = sessionId;
+    if (!activeSid) {
+      activeSid = uuidv4();
+      setSessionId(activeSid);
+    }
     const userMsg = { role: "user", content: text, id: Date.now() };
     setMessages(prev => [...prev, userMsg]);
 
@@ -96,10 +107,10 @@ export default function App() {
       setAbortController(controller);
       try {
         await api.streamMessage(
-          { message: text, session_id: sessionId, model, use_documents: documents.length > 0, language },
+          { message: text, session_id: activeSid, model, use_documents: documents.length > 0, language },
           (token) => setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, content: m.content + token } : m)),
-          (sources) => {
-            setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, sources, streaming: false } : m));
+          (sources, benchmarks) => {
+            setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, sources, benchmarks, streaming: false } : m));
             refreshSessions();
           },
           controller.signal
@@ -118,7 +129,7 @@ export default function App() {
     } else {
       setLoading(true);
       try {
-        const data = await api.sendMessage({ message: text, session_id: sessionId, model, use_documents: documents.length > 0, language });
+        const data = await api.sendMessage({ message: text, session_id: activeSid, model, use_documents: documents.length > 0, language });
         setMessages(prev => [...prev, { role: "assistant", content: data.reply, sources: data.sources || [], id: Date.now() + 1 }]);
         refreshSessions();
       } catch (e) {
@@ -146,7 +157,7 @@ export default function App() {
       const [msgRes, docRes] = await Promise.all([api.getMessages(sid), api.getDocuments(sid)]);
       setMessages((msgRes.messages || []).map((m, i) => ({ ...m, id: i })));
       setDocuments(docRes.documents || []);
-    } catch {}
+    } catch { }
   }
 
   async function handleDeleteSession(sid) {
@@ -157,6 +168,17 @@ export default function App() {
       setDocuments([]);
     }
     refreshSessions();
+  }
+
+  async function handleClearAllSessions() {
+    try {
+      await api.clearAllSessions();
+      setSessions([]);
+      setSessionId(null);
+      setMessages([]);
+      setDocuments([]);
+      setPanel(null);
+    } catch { }
   }
 
   async function handleClearChat() {
@@ -173,6 +195,7 @@ export default function App() {
         onLoadSession={loadSession}
         onDeleteSession={handleDeleteSession}
         refreshSessions={refreshSessions}
+        onClearAllSessions={handleClearAllSessions}
         model={model}
         models={models}
         onModelChange={setModel}
