@@ -153,6 +153,12 @@ def delete_session(session_id: str):
         conn.execute("DELETE FROM sessions WHERE id=?", (session_id,))
 
 
+def clear_all_sessions():
+    with get_db() as conn:
+        conn.execute("DELETE FROM messages")
+        conn.execute("DELETE FROM sessions")
+
+
 def get_all_sessions() -> list[dict]:
     with get_db() as conn:
         rows = conn.execute(
