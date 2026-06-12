@@ -103,3 +103,11 @@ class SessionRenameItem(BaseModel):
 
 class BulkSessionRenameRequest(BaseModel):
     sessions: List[SessionRenameItem]
+
+class PromptTemplateCreate(BaseModel):
+    prompt_title: str = Field(..., min_length=1, max_length=200)
+    prompt: str = Field(..., min_length=1)
+
+class PromptTemplateUpdate(BaseModel):
+    prompt_title: Optional[str] = None
+    prompt: Optional[str] = None
