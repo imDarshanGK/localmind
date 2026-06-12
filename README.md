@@ -332,7 +332,7 @@ If LocalMind helped you, please star the repo. ⭐✨🚀
 Built something cool with LocalMind? We'd love to see it! Open a Pull Request to add your project, tutorial, or integration to this list.
 
 ### 🛠️ Projects & Integrations
-* **[Your Project Name]** - A brief 1-2 sentence description of what your integration does. (By [@yourusername](https://github.com/yourusername))
+* **[Community projects will appear here.]** - A brief 1-2 sentence description of what your integration does. (By [@yourusername](https://github.com/yourusername))
 * *Contributions welcome! Add your tool here.*
 
 ### 📚 Community Articles & Tutorials
