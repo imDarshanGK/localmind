@@ -108,7 +108,7 @@ async def delete_session(session_id: str):
 async def clear_all_sessions():
     """Delete ALL sessions and their associated messages/documents."""
     db_service.clear_all_sessions()
-    return {"status": "cleared", "message": "All sessions deleted"}
+    return {"message": "All sessions cleared"}
 
 
 @router.get("/{session_id}/messages")
