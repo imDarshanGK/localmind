@@ -87,6 +87,7 @@ def init_db():
                 file_path TEXT NOT NULL,
                 file_size_kb REAL DEFAULT 0,
                 chunks_indexed INTEGER DEFAULT 0,
+                status TEXT DEFAULT 'completed',
                 uploaded_at TEXT DEFAULT (datetime('now')),
                 FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
             );
@@ -123,6 +124,10 @@ def init_db():
             );
 
         """)
+        try:
+            conn.execute("ALTER TABLE documents ADD COLUMN status TEXT DEFAULT 'completed'")
+        except sqlite3.OperationalError:
+            pass  # column already exists
 
         cols = [row[1] for row in conn.execute("PRAGMA table_info(messages)").fetchall()]
         if "benchmarks" not in cols:
@@ -226,12 +231,20 @@ def clear_messages(session_id: str):
 
 
 # ─── Documents ───────────────────────────────────────────────
-def save_document(session_id: str, filename: str, file_path: str, chunks: int, size_kb: float):
+def save_document(session_id: str, filename: str, file_path: str, chunks: int, size_kb: float, status: str = "completed") -> int:
     with get_db() as conn:
-        conn.execute(
-            "INSERT INTO documents (session_id, filename, file_path, chunks_indexed, file_size_kb) VALUES (?,?,?,?,?)",
-            (session_id, filename, file_path, chunks, size_kb),
+        cursor = conn.execute(
+            "INSERT INTO documents (session_id, filename, file_path, chunks_indexed, file_size_kb, status) VALUES (?,?,?,?,?,?)",
+            (session_id, filename, file_path, chunks, size_kb, status),
         )
+        return cursor.lastrowid
+
+def update_document_status(doc_id: int, status: str, chunks_indexed: int = None):
+    with get_db() as conn:
+        if chunks_indexed is not None:
+            conn.execute("UPDATE documents SET status=?, chunks_indexed=? WHERE id=?", (status, chunks_indexed, doc_id))
+        else:
+            conn.execute("UPDATE documents SET status=? WHERE id=?", (status, doc_id))
 
 
 def get_documents(session_id: str) -> list[dict]:
