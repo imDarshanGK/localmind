@@ -1,4 +1,4 @@
-"""Sessions routes — /api/sessions — full CRUD + reorder"""
+"""Sessions routes — /api/sessions — full CRUD + reorder + clear all"""
 
 import uuid
 from typing import List
@@ -48,10 +48,8 @@ async def bulk_rename_sessions(body: BulkSessionRenameRequest):
                 title=item.new_title, 
                 model=current_session.get("model")
             )
-            # 3. Correct Success Count: Only increment if the database update actually fired
             updated_count += 1
             
-        # If some requested sessions weren't found, alert the client transparently
         if missing_sessions:
             return {
                 "status": "partial_success",
@@ -73,10 +71,6 @@ async def bulk_rename_sessions(body: BulkSessionRenameRequest):
 
 @router.patch("/reorder")
 async def reorder_sessions(req: ReorderSessionsRequest):
-    """
-    Update the order of sessions for drag‑and‑drop.
-    Expects a list of session IDs in the desired order (top to bottom).
-    """
     try:
         db_service.update_sessions_order(req.session_ids)
         return {"success": True, "message": "Session order updated"}
@@ -107,6 +101,14 @@ async def delete_session(session_id: str):
     except Exception:
         pass
     return {"status": "deleted", "session_id": session_id}
+
+
+# ─── Clear all sessions (for testing / admin) ──────────────────────────────
+@router.delete("/")
+async def clear_all_sessions():
+    """Delete ALL sessions and their associated messages/documents."""
+    db_service.clear_all_sessions()
+    return {"status": "cleared", "message": "All sessions deleted"}
 
 
 @router.get("/{session_id}/messages")

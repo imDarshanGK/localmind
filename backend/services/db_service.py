@@ -131,7 +131,7 @@ def init_db():
                 created_at TEXT DEFAULT (datetime('now'))
             );
         """)
-        ensure_order_index_column()   # <-- add order_index column
+        ensure_order_index_column()
 
 
 # ─── Sessions ────────────────────────────────────────────────
@@ -161,6 +161,12 @@ def update_session(session_id: str, title: str = None, model: str = None):
 def delete_session(session_id: str):
     with get_db() as conn:
         conn.execute("DELETE FROM sessions WHERE id=?", (session_id,))
+
+
+def clear_all_sessions():
+    """Delete ALL sessions and their associated messages/documents (cascade)."""
+    with get_db() as conn:
+        conn.execute("DELETE FROM sessions")
 
 
 def get_all_sessions() -> list[dict]:
@@ -340,7 +346,7 @@ def delete_prompt_template(template_id: int):
         conn.execute("DELETE FROM prompt_templates WHERE id = ?", (template_id,))
 
 
-# ─── Drag‑and‑drop reordering───────────
+# ─── Drag‑and‑drop reordering ──────────────────────────────────────────────
 def update_sessions_order(session_ids: list):
     """Update order_index for each session based on its position in the list (0,1,2...)."""
     with get_db() as conn:
