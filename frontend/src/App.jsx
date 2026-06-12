@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { v4 as uuidv4 } from "uuid";
 import Sidebar from "./components/Sidebar";
 import ChatWindow from "./components/ChatWindow";
@@ -24,6 +24,15 @@ export default function App() {
   const [ollamaOk,   setOllamaOk]   = useState(null);
   const [settings,   setSettings]   = useState({});
   const [useStream,  setUseStream]  = useState(true);
+
+  const abortControllerRef = useRef(null);
+
+  const handleCancelStream = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+  }, []);
 
   useEffect(() => { bootstrap(); }, []);
 
@@ -79,16 +88,22 @@ export default function App() {
       const aiMsg = { role: "assistant", content: "", sources: [], id: Date.now() + 1, streaming: true };
       setMessages(prev => [...prev, aiMsg]);
       try {
+        abortControllerRef.current = new AbortController();
         await api.streamMessage(
           { message: text, session_id: activeSid, model, use_documents: documents.length > 0, language },
           (token) => setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, content: m.content + token } : m)),
           (sources) => {
             setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, sources, streaming: false } : m));
             refreshSessions();
-          }
+          },
+          abortControllerRef.current.signal
         );
       } catch (e) {
-        setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, content: e.message, streaming: false } : m));
+        if (e.name === 'AbortError') {
+          setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, content: m.content + "\n\n[Cancelled]", streaming: false } : m));
+        } else {
+          setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, content: e.message, streaming: false } : m));
+        }
       } finally { setStreaming(false); }
     } else {
       setLoading(true);
@@ -203,6 +218,7 @@ export default function App() {
             loading={loading || streaming}
             onSend={sendMessage}
             sessionId={sessionId}
+            onCancel={handleCancelStream}
           />
         )}
       </div>

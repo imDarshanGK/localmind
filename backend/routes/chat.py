@@ -1,6 +1,7 @@
 """Chat routes — /api/chat — supports normal + streaming"""
 
 import json
+import asyncio
 from types import SimpleNamespace
 
 from fastapi import APIRouter, HTTPException
@@ -70,20 +71,25 @@ async def chat_stream(req: ChatRequest):
     full_reply = []
 
     async def event_stream():
-        async for token in ollama_service.chat_stream(
-            message=req.message,
-            model=req.model,
-            context=context,
-            history=history,
-            language=req.language,
-            temperature=req.temperature,
-        ):
-            full_reply.append(token)
-            yield f"data: {json.dumps({'token': token})}\n\n"
+        try:
+            async for token in ollama_service.chat_stream(
+                message=req.message,
+                model=req.model,
+                context=context,
+                history=history,
+                language=req.language,
+                temperature=req.temperature,
+            ):
+                full_reply.append(token)
+                yield f"data: {json.dumps({'token': token})}\n\n"
 
-        complete = "".join(full_reply)
-        db_service.save_message(req.session_id, "assistant", complete, sources)
-        yield f"data: {json.dumps({'done': True, 'sources': sources})}\n\n"
-        
+            complete = "".join(full_reply)
+            db_service.save_message(req.session_id, "assistant", complete, sources)
+            yield f"data: {json.dumps({'done': True, 'sources': sources})}\n\n"
+        except asyncio.CancelledError:
+            complete = "".join(full_reply)
+            if complete:
+                db_service.save_message(req.session_id, "assistant", complete + "\n\n[Cancelled]", sources)
+            raise
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")

@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { exportSession } from "../utils/api";
 import { AppLogoIcon, FileIcon, LockIcon } from "./Icons";
 
-export default function ChatWindow({ messages, loading, onSend, sessionId }) {
+export default function ChatWindow({ messages, loading, onSend, sessionId, onCancel }) {
   const [input, setInput] = useState("");
   const bottomRef = useRef(null);
   const textareaRef = useRef(null);
@@ -136,10 +136,17 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
             className="flex-1 bg-transparent text-sm text-gray-100 placeholder-gray-500 resize-none outline-none"
             style={{ minHeight: "24px", maxHeight: "160px" }}
           />
-          <button onClick={send} disabled={!input.trim() || loading}
-            className="shrink-0 text-sm bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white px-4 py-2 rounded-xl transition font-medium">
-            Send →
-          </button>
+          {loading || messages.some(m => m.streaming) ? (
+            <button onClick={onCancel}
+              className="shrink-0 text-sm bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-xl transition font-medium">
+              Stop ⏹
+            </button>
+          ) : (
+            <button onClick={send} disabled={!input.trim() || loading}
+              className="shrink-0 text-sm bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white px-4 py-2 rounded-xl transition font-medium">
+              Send →
+            </button>
+          )}
         </div>
         <p className="text-center text-xs text-gray-700 mt-2">
           <span className="inline-flex items-center gap-1">

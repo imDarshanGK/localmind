@@ -44,10 +44,11 @@ export async function uploadDocument(file, session_id) {
   return res.json();
 }
 
-export function streamMessage(body, onToken, onDone) {
+export function streamMessage(body, onToken, onDone, signal) {
   return fetch(`${BASE}/chat/stream`, {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+    signal,
   }).then(res => {
     const reader = res.body.getReader(); const decoder = new TextDecoder();
     function pump() {
