@@ -227,7 +227,7 @@ MIT © 2026
 
 If LocalMind helped you, please star the repo. ⭐✨🚀
 
-<<<<<<< Updated upstream
+
 </div>
 =======
 </div>
@@ -244,4 +244,3 @@ pip install pip-audit
 
 # Run the vulnerability audit against your requirements file
 pip-audit -r requirements.txt
->>>>>>> Stashed changes
