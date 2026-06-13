@@ -223,6 +223,7 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide.
 ## License
 
 MIT © 2026
+
 <div align="center">
 
 If LocalMind helped you, please star the repo. ⭐✨🚀
