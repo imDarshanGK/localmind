@@ -22,6 +22,6 @@ jobs:
           cache: 'pip'
 
       - name: Run pip-audit Scanner
-        uses: pypa/pip-audit-action@v1.0.8
+        uses: pypa/pip-audit@v1.0.8
         with:
           inputs: backend/requirements.txt
