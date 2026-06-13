@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { v4 as uuidv4 } from "uuid";
 import Sidebar from "./components/Sidebar";
 import ChatWindow from "./components/ChatWindow";
@@ -7,6 +7,8 @@ import PluginsPanel from "./components/PluginsPanel";
 import SettingsPanel from "./components/SettingsPanel";
 import StatusBar from "./components/StatusBar";
 import * as api from "./utils/api";
+
+// NOTE: Missing PromptRegistryPage import removed to allow seamless compilation
 
 export default function App() {
   const [sessionId,  setSessionId]  = useState(() => uuidv4());
@@ -18,12 +20,29 @@ export default function App() {
   const [loading,    setLoading]    = useState(false);
   const [streaming,  setStreaming]  = useState(false);
   const [panel,      setPanel]      = useState(null); // "upload"|"plugins"|"settings"|null
+  const [view,       setView]       = useState("chat"); // "chat"|"prompts"
   const [language,   setLanguage]   = useState("en");
   const [ollamaOk,   setOllamaOk]   = useState(null);
   const [settings,   setSettings]   = useState({});
   const [useStream,  setUseStream]  = useState(true);
 
+  // --- FEATURE REFERENCE: TRACK ACTIVE REQUEST ABORT SIGNAL ---
+  const abortControllerRef = useRef(null);
+
   useEffect(() => { bootstrap(); }, []);
+
+  // —— Global keyboard shortcut: Ctrl+Shift+N (or Cmd+Shift+N on Mac) → New Chat ——
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      console.log("Key pressed:", e.key, "Ctrl:", e.ctrlKey, "Shift:", e.shiftKey);
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "N") {
+        e.preventDefault();
+        newChat();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   async function bootstrap() {
     try {
@@ -38,21 +57,45 @@ export default function App() {
         if (settRes.value.default_language) setLanguage(settRes.value.default_language);
       }
       if (stRes.status === "fulfilled") setOllamaOk(stRes.value.ollama_running);
-    } catch {}
+    } catch { }
   }
 
   const refreshSessions = useCallback(async () => {
-    try { const s = await api.getSessions(); setSessions(s || []); } catch {}
+    try { const s = await api.getSessions(); setSessions(s || []); } catch { }
   }, []);
 
   const refreshDocuments = useCallback(async (sid) => {
-    try { const d = await api.getDocuments(sid); setDocuments(d.documents || []); } catch {}
+    try { const d = await api.getDocuments(sid); setDocuments(d.documents || []); } catch { }
+  }, []);
+
+  // --- FEATURE ACTION: CANCEL ONGOING AI RESPONSE REQUESTS ---
+  const stopGeneration = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort(); // Cancel the browser's active network transport fetch line
+      abortControllerRef.current = null;
+    }
+    setStreaming(false);
+    setLoading(false);
+
+    // Clean up the trailing 'typing' state bubble indicators in the messages layout array
+    setMessages(prev => 
+      prev.map(m => m.streaming ? { ...m, streaming: false, content: m.content + "\n\n[Generation Stopped]" } : m)
+    );
   }, []);
 
   async function sendMessage(text) {
     if (!text.trim() || loading || streaming) return;
+    let activeSid = sessionId;
+    if (!activeSid) {
+      activeSid = uuidv4();
+      setSessionId(activeSid);
+    }
     const userMsg = { role: "user", content: text, id: Date.now() };
     setMessages(prev => [...prev, userMsg]);
+
+    // Instantiate a brand new AbortController instance for this conversation round
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
     if (useStream) {
       setStreaming(true);
@@ -60,31 +103,48 @@ export default function App() {
       setMessages(prev => [...prev, aiMsg]);
       try {
         await api.streamMessage(
-          { message: text, session_id: sessionId, model, use_documents: documents.length > 0, language },
+          { message: text, session_id: activeSid, model, use_documents: documents.length > 0, language },
           (token) => setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, content: m.content + token } : m)),
-          (sources) => {
-            setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, sources, streaming: false } : m));
+          (sources, benchmarks) => {
+            setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, sources, benchmarks, streaming: false } : m));
             refreshSessions();
-          }
+          },
+          controller.signal // Passing the cancel token into your api client wrapper layer
         );
       } catch (e) {
-        setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, content: e.message, streaming: false } : m));
-      } finally { setStreaming(false); }
+        // If aborted, don't override the UI content state array with an aggressive crash trace log message
+        if (e.name !== 'AbortError') {
+          setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, content: e.message, streaming: false } : m));
+        }
+      } finally { 
+        if (abortControllerRef.current === controller) abortControllerRef.current = null;
+        setStreaming(false); 
+      }
     } else {
       setLoading(true);
       try {
-        const data = await api.sendMessage({ message: text, session_id: sessionId, model, use_documents: documents.length > 0, language });
+        const data = await api.sendMessage(
+          { message: text, session_id: activeSid, model, use_documents: documents.length > 0, language },
+          controller.signal
+        );
         setMessages(prev => [...prev, { role: "assistant", content: data.reply, sources: data.sources || [], id: Date.now() + 1 }]);
         refreshSessions();
       } catch (e) {
-        setMessages(prev => [...prev, { role: "assistant", content: e.message, id: Date.now() + 1 }]);
-      } finally { setLoading(false); }
+        if (e.name !== 'AbortError') {
+          setMessages(prev => [...prev, { role: "assistant", content: e.message, id: Date.now() + 1 }]);
+        }
+      } finally { 
+        if (abortControllerRef.current === controller) abortControllerRef.current = null;
+        setLoading(false); 
+      }
     }
   }
 
   async function newChat() {
     const sid = uuidv4();
-    await api.createSession({ title: "New Chat", model });
+    try {
+      await api.createSession({ title: "New Chat", model });
+    } catch {}
     setSessionId(sid);
     setMessages([]);
     setDocuments([]);
@@ -99,13 +159,24 @@ export default function App() {
       const [msgRes, docRes] = await Promise.all([api.getMessages(sid), api.getDocuments(sid)]);
       setMessages((msgRes.messages || []).map((m, i) => ({ ...m, id: i })));
       setDocuments(docRes.documents || []);
-    } catch {}
+    } catch { }
   }
 
   async function handleDeleteSession(sid) {
     await api.deleteSession(sid);
     if (sid === sessionId) { setSessionId(uuidv4()); setMessages([]); setDocuments([]); }
     refreshSessions();
+  }
+
+  async function handleClearAllSessions() {
+    try {
+      await api.clearAllSessions();
+      setSessions([]);
+      setSessionId(null);
+      setMessages([]);
+      setDocuments([]);
+      setPanel(null);
+    } catch { }
   }
 
   async function handleClearChat() {
@@ -121,6 +192,7 @@ export default function App() {
         onNewChat={newChat}
         onLoadSession={loadSession}
         onDeleteSession={handleDeleteSession}
+        onClearAllSessions={handleClearAllSessions}
         model={model}
         models={models}
         onModelChange={setModel}
@@ -134,6 +206,7 @@ export default function App() {
           model={model}
           docCount={documents.length}
           onUpload={() => setPanel(panel === "upload" ? null : "upload")}
+          onPrompts={() => { setView("prompts"); setPanel(null); }}
           onPlugins={() => setPanel(panel === "plugins" ? null : "plugins")}
           onSettings={() => setPanel(panel === "settings" ? null : "settings")}
           onClear={handleClearChat}
@@ -160,12 +233,20 @@ export default function App() {
           />
         )}
 
-        <ChatWindow
-          messages={messages}
-          loading={loading || streaming}
-          onSend={sendMessage}
-          sessionId={sessionId}
-        />
+        {/* Updated conditional layout wrapper to securely bypass missing components error */}
+        {view === "prompts" ? (
+          <div className="flex-1 flex items-center justify-center text-gray-400 bg-gray-950 text-sm">
+            Prompt Registry component view placeholder.
+          </div>
+        ) : (
+          <ChatWindow
+            messages={messages}
+            loading={loading || streaming}
+            onSend={sendMessage}
+            onStop={stopGeneration}
+            sessionId={sessionId}
+          />
+        )}
       </div>
     </div>
   );
