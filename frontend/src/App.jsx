@@ -5,6 +5,7 @@ import ChatWindow from "./components/ChatWindow";
 import UploadPanel from "./components/UploadPanel";
 import PluginsPanel from "./components/PluginsPanel";
 import SettingsPanel from "./components/SettingsPanel";
+import PromptRegistryPage from "./components/PromptRegistryPage";
 import StatusBar from "./components/StatusBar";
 import * as api from "./utils/api";
 
@@ -31,10 +32,10 @@ export default function App() {
 
   useEffect(() => { bootstrap(); }, []);
 
-  // —— Global keyboard shortcut: Ctrl+Shift+N (or Cmd+Shift+N on Mac) → New Chat ——
+  // ── Global keyboard shortcut: Ctrl+Shift+N (or Cmd+Shift+N on Mac) → New Chat ──
   useEffect(() => {
     const handleKeyDown = (e) => {
-      console.log("Key pressed:", e.key, "Ctrl:", e.ctrlKey, "Shift:", e.shiftKey);
+      console.log("Key pressed:", e.key, "Ctrl:", e.ctrlKey, "Shift:", e.shiftKey); // ADD THIS
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "N") {
         e.preventDefault();
         newChat();
