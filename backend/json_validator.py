@@ -5,7 +5,7 @@ Provides safe validation of plugin output against predefined schemas.
 
 import json
 from jsonschema import validate, ValidationError, SchemaError
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 
 # Predefined schemas for different plugin types
 PLUGIN_SCHEMAS = {

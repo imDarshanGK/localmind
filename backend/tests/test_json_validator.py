@@ -1,4 +1,3 @@
-import pytest
 from backend.json_validator import JSONValidator, PluginResponseValidator
 
 def test_valid_response():
