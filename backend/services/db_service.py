@@ -209,11 +209,12 @@ def get_history(session_id: str, limit: int = 20) -> list[dict]:
 def get_messages_full(session_id: str) -> list[dict]:
     with get_db() as conn:
         rows = conn.execute(
-            "SELECT role, content, sources, created_at, benchmarks FROM messages WHERE session_id=? ORDER BY created_at ASC",
+            "SELECT id, role, content, sources, created_at, benchmarks FROM messages WHERE session_id=? ORDER BY created_at ASC",
             (session_id,),
         ).fetchall()
         return [
             {
+                "id": r["id"],
                 "role": r["role"],
                 "content": r["content"],
                 "sources": json.loads(r["sources"] or "[]"),
@@ -228,6 +229,27 @@ def clear_messages(session_id: str):
     with get_db() as conn:
         conn.execute("DELETE FROM messages WHERE session_id=?", (session_id,))
         conn.execute("UPDATE sessions SET message_count=0 WHERE id=?", (session_id,))
+
+
+def delete_message(session_id: str, message_id: int) -> int:
+    """Delete a single message from a session.
+
+    Returns the number of rows deleted (0 if the message does not exist in this
+    session). The delete is scoped by session_id so a message can only be
+    removed from its own thread.
+    """
+    with get_db() as conn:
+        cur = conn.execute(
+            "DELETE FROM messages WHERE id=? AND session_id=?",
+            (message_id, session_id),
+        )
+        deleted = cur.rowcount
+        if deleted:
+            conn.execute(
+                "UPDATE sessions SET message_count=MAX(message_count - ?, 0), updated_at=datetime('now') WHERE id=?",
+                (deleted, session_id),
+            )
+        return deleted
 
 
 # ─── Documents ───────────────────────────────────────────────

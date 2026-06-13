@@ -119,9 +119,21 @@ export default function App() {
     setPanel(null);
     try {
       const [msgRes, docRes] = await Promise.all([api.getMessages(sid), api.getDocuments(sid)]);
-      setMessages((msgRes.messages || []).map((m, i) => ({ ...m, id: i })));
+      setMessages((msgRes.messages || []).map((m, i) => ({ ...m, id: m.id ?? i })));
       setDocuments(docRes.documents || []);
     } catch { }
+  }
+
+  async function handleDeleteMessage(messageId) {
+    // Optimistically remove from the thread for instant feedback.
+    setMessages(prev => prev.filter(m => m.id !== messageId));
+    try {
+      await api.deleteMessage(sessionId, messageId);
+      refreshSessions(); // keep the sidebar message count in sync
+    } catch {
+      // The message may have been local-only (not yet persisted); it is already
+      // removed from the UI, so nothing more to do.
+    }
   }
 
   async function handleDeleteSession(sid) {
@@ -202,6 +214,7 @@ export default function App() {
             messages={messages}
             loading={loading || streaming}
             onSend={sendMessage}
+            onDeleteMessage={handleDeleteMessage}
             sessionId={sessionId}
           />
         )}
