@@ -2,9 +2,12 @@
 
 import os
 from pathlib import Path
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks
 from models.schemas import UploadResponse
+import logging
 from services import db_service
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -20,7 +23,9 @@ MAX_BYTES = 50 * 1024 * 1024  # 50 MB
 
 
 @router.post("/", response_model=UploadResponse)
-async def upload(file: UploadFile = File(...), session_id: str = Form(...)):
+async def upload(file: UploadFile = File(...), session_id: str = Form(...), background_tasks: BackgroundTasks = None):
+    # FastAPI dependency injection handles background_tasks automatically when type hinted
+    # We use None default for test compatibility if needed, but FastAPI injects it properly.
     content_type = file.content_type or ""
     # Be lenient — also allow by extension
     ext = Path(file.filename).suffix.lower()
@@ -40,20 +45,33 @@ async def upload(file: UploadFile = File(...), session_id: str = Form(...)):
 
     size_kb = round(len(content) / 1024, 1)
 
-    from services import rag_service
-
-    chunks  = rag_service.index_document(file_path, session_id)
-
     db_service.create_session(session_id)
-    db_service.save_document(session_id, file.filename, file_path, chunks, size_kb)
+    doc_id = db_service.save_document(session_id, file.filename, file_path, 0, size_kb, status="queued")
+
+    if background_tasks:
+        background_tasks.add_task(process_document_task, doc_id, file_path, session_id)
+    else:
+        # Fallback if somehow not injected
+        process_document_task(doc_id, file_path, session_id)
 
     return UploadResponse(
         filename=file.filename,
-        status="success",
-        chunks_indexed=chunks,
-        message=f"'{file.filename}' indexed — {chunks} chunks ready for Q&A.",
+        status="queued",
+        chunks_indexed=0,
+        message=f"'{file.filename}' queued for background indexing.",
         file_size_kb=size_kb,
     )
+
+def process_document_task(doc_id: int, file_path: str, session_id: str):
+    try:
+        from services import rag_service
+        db_service.update_document_status(doc_id, "processing")
+        chunks = rag_service.index_document(file_path, session_id, doc_id=doc_id)
+        db_service.update_document_status(doc_id, "completed", chunks_indexed=chunks)
+    except Exception as e:
+        logger.error(f"Error processing document {doc_id}: {e}")
+        db_service.update_document_status(doc_id, "failed")
+
 
 
 @router.delete("/{doc_id}")
