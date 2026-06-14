@@ -1,0 +1,52 @@
+# Integration-test Docker Compose override
+# =========================================
+# Extends the root docker-compose.yml with:
+#   1. A lightweight mock-ollama service (no GPU, no model downloads)
+#   2. Backend build override — uses test Dockerfile with upgraded pip
+#      and requirements_fixed.txt to avoid pip 24.0 hash-check bugs
+#   3. Backend env override to point at the mock
+#   4. No frontend service (not needed for API integration tests)
+#
+# Usage (from repo root):
+#   docker compose -f docker-compose.yml \
+#                  -f tests/integration/docker-compose.test.yml \
+#                  up --build
+
+version: "3.9"
+
+services:
+  # ── Mock Ollama ──────────────────────────────────────────────────────────── #
+  mock-ollama:
+    build:
+      context: .
+      dockerfile: tests/integration/mock_ollama/Dockerfile
+    ports:
+      - "11434:11434"
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:11434/api/tags')"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    restart: "no"
+
+  # ── Backend (override build + env to use mock Ollama) ─────────────────────── #
+  backend:
+    build:
+      context: .
+      dockerfile: tests/integration/backend.test.Dockerfile
+    environment:
+      - OLLAMA_HOST=http://mock-ollama:11434
+      - DB_PATH=/tmp/test_localmind.db
+      - CHROMADB_DIR=/tmp/test_chromadb
+      - CORS_ORIGINS=http://localhost:3000,http://localhost:8000
+    depends_on:
+      mock-ollama:
+        condition: service_healthy
+    restart: "no"
+
+  # ── Disable frontend for test runs (saves build time) ────────────────────── #
+  frontend:
+    profiles:
+      - full   # only starts when `--profile full` is passed

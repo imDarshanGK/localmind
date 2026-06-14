@@ -297,6 +297,8 @@ localmind/
 
 ## Running Tests
 
+### Unit Tests (no Docker required)
+
 ```bash
 cd backend
 pip install pytest pytest-asyncio
@@ -304,7 +306,35 @@ pytest tests/ -v
 # 30+ tests covering: sessions, chat, plugins, upload, export, settings
 ```
 
----
+### Integration Tests (full Docker stack)
+
+Integration tests spin up the **real backend + a mock Ollama container** and
+test complete end-to-end flows: upload a PDF → RAG index → chat → verify answer.
+
+```bash
+# 1. Install integration test runner dependencies (host-side)
+pip install -r tests/integration/requirements.txt
+
+# 2. Generate the sample PDF fixture (one-time)
+python tests/integration/fixtures/generate_pdf.py
+
+# 3. Run all integration tests
+pytest tests/integration/ -v --tb=short
+```
+
+> **Prerequisites:** Docker and Docker Compose must be running.
+> The test stack builds `backend` and `mock-ollama` images automatically.
+
+#### What the integration tests cover
+
+| Test Module | Flow |
+|---|---|
+| `test_health.py` | `/health`, `/`, `/openapi.json` |
+| `test_sessions.py` | Full CRUD lifecycle for sessions |
+| `test_upload_and_rag.py` | **Upload PDF → index → chat → assert answer** |
+| `test_chat.py` | Standard + streaming (SSE) chat endpoints |
+| `test_export.py` | JSON / Markdown / TXT export formats |
+| `test_plugins.py` | Calculator, WordCount, JSONFormat, Summarizer, CodeRunner |
 
 ## 🤝 Contributing
 

@@ -1,0 +1,110 @@
+name: Integration Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+  # Allow manual triggering from the Actions tab
+  workflow_dispatch:
+
+concurrency:
+  group: integration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  integration:
+    name: Docker Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      # ── Checkout ──────────────────────────────────────────────────────── #
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── Set up Docker Buildx ─────────────────────────────────────────── #
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # ── Set up Python (for running pytest on the host) ───────────────── #
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: tests/integration/requirements.txt
+
+      # ── Install integration test runner dependencies ─────────────────── #
+      - name: Install integration test dependencies
+        run: pip install -r tests/integration/requirements.txt
+
+      # ── Generate sample PDF fixture ──────────────────────────────────── #
+      - name: Generate sample PDF fixture
+        run: python tests/integration/fixtures/generate_pdf.py
+
+      # ── Cache Docker layers ──────────────────────────────────────────── #
+      - name: Cache Docker layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ hashFiles('backend/Dockerfile', 'tests/integration/mock_ollama/Dockerfile', 'backend/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+
+      # ── Pre-build images to surface errors early ─────────────────────── #
+      - name: Build Docker images
+        run: |
+          docker compose \
+            -f docker-compose.yml \
+            -f tests/integration/docker-compose.test.yml \
+            build --parallel
+
+      # ── Run integration tests ────────────────────────────────────────── #
+      - name: Run integration tests
+        env:
+          # Ensure pytest-docker can find docker compose
+          COMPOSE_PROJECT_NAME: localmind_ci
+        run: |
+          pytest tests/integration/ \
+            -v \
+            --tb=short \
+            --timeout=120 \
+            -p no:warnings \
+            --junitxml=test-results/integration.xml
+
+      # ── Upload test results ──────────────────────────────────────────── #
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-results
+          path: test-results/
+          retention-days: 14
+
+      # ── Collect container logs on failure ────────────────────────────── #
+      - name: Collect container logs (on failure)
+        if: failure()
+        run: |
+          docker compose \
+            -f docker-compose.yml \
+            -f tests/integration/docker-compose.test.yml \
+            logs --no-color > container-logs.txt 2>&1 || true
+
+      - name: Upload container logs (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: container-logs
+          path: container-logs.txt
+          retention-days: 7
+
+      # ── Always tear down containers ──────────────────────────────────── #
+      - name: Tear down Docker stack
+        if: always()
+        run: |
+          docker compose \
+            -f docker-compose.yml \
+            -f tests/integration/docker-compose.test.yml \
+            down --volumes --remove-orphans || true
