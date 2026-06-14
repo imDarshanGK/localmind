@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { exportSession } from "../utils/api";
+import { AppLogoIcon, FileIcon, LockIcon } from "./Icons";
 import { AppLogoIcon, ChartIcon, CloseIcon, CopyIcon, FileIcon, LockIcon, PlusCircleIcon, TemplateIcon } from "./Icons";
 import CodeBlockWithCopy from "./CodeBlockWithCopy";
 import PromptTemplateDialog from "./PromptTemplateDialog";
@@ -12,6 +13,8 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
   const bottomRef = useRef(null);
   const textareaRef = useRef(null);
   const plusMenuRef = useRef(null);
+
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
   // NEW: state for selected messages and export format
   const [selectedMessages, setSelectedMessages] = useState([]);
@@ -72,11 +75,8 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
     return parts;
   }
   function send() {
-    if ((!input.trim() && !selectedTemplate) || loading) return;
-    const message = selectedTemplate
-      ? `${selectedTemplate.prompt}\n\n${input.trim()}`.trim()
-      : input.trim();
-    onSend(message);
+    if (!input.trim() || loading) return;
+    onSend(input.trim());
     setInput("");
     setSelectedTemplate(null);
     if (textareaRef.current) { textareaRef.current.style.height = "auto"; }
@@ -257,6 +257,21 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
         <div ref={bottomRef} />
       </div>
 
+      {/* Input */}
+      <div className="px-4 pb-4 pt-2 shrink-0">
+        <div className="flex items-end gap-2 bg-gray-900 border border-gray-700 rounded-2xl px-4 py-3 focus-within:border-purple-500 transition-colors">
+          <textarea
+            ref={textareaRef}
+            value={input}
+            onChange={(e) => { setInput(e.target.value); autoResize(e); }}
+            onKeyDown={handleKey}
+            placeholder="Ask anything... (Enter to send, Shift+Enter for new line)"
+            rows={1}
+            className="flex-1 bg-transparent text-sm text-gray-100 placeholder-gray-500 resize-none outline-none"
+            style={{ minHeight: "24px", maxHeight: "160px" }}
+          />
+          <button onClick={send} disabled={!input.trim() || loading}
+            className="shrink-0 text-sm bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white px-4 py-2 rounded-xl transition font-medium">
       {/* Prompt Template Dialog */}
       {showTemplateDialog && (
         <PromptTemplateDialog

@@ -19,7 +19,7 @@ export default function App() {
   const [loading,    setLoading]    = useState(false);
   const [streaming,  setStreaming]  = useState(false);
   const [panel,      setPanel]      = useState(null); // "upload"|"plugins"|"settings"|null
-  const [view,        setView]       = useState("chat"); // "chat"|"prompts"
+  const [view,       setView]       = useState("chat"); // "chat"|"prompts"
   const [language,   setLanguage]   = useState("en");
   const [ollamaOk,   setOllamaOk]   = useState(null);
   const [settings,   setSettings]   = useState({});
@@ -30,7 +30,6 @@ export default function App() {
   // ── Global keyboard shortcut: Ctrl+Shift+N (or Cmd+Shift+N on Mac) → New Chat ──
   useEffect(() => {
     const handleKeyDown = (e) => {
-      console.log("Key pressed:", e.key, "Ctrl:", e.ctrlKey, "Shift:", e.shiftKey); // ADD THIS
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "N") {
         e.preventDefault();
         newChat();
@@ -57,11 +56,25 @@ export default function App() {
   }
 
   const refreshSessions = useCallback(async () => {
+<<<<<<< HEAD
+    try {
+      const s = await api.getSessions();
+      setSessions(s || []);
+    } catch {}
+  }, []);
+
+  const refreshDocuments = useCallback(async (sid) => {
+    try {
+      const d = await api.getDocuments(sid);
+      setDocuments(d.documents || []);
+    } catch {}
+=======
     try { const s = await api.getSessions(); setSessions(s || []); } catch { }
   }, []);
 
   const refreshDocuments = useCallback(async (sid) => {
     try { const d = await api.getDocuments(sid); setDocuments(d.documents || []); } catch { }
+>>>>>>> upstream/main
   }, []);
 
   async function sendMessage(text) {
@@ -103,16 +116,16 @@ export default function App() {
   }
 
   async function newChat() {
-      const sid = uuidv4();
-      try {
-        await api.createSession({ title: "New Chat", model });
-      } catch {}
-      setSessionId(sid);
-      setMessages([]);
-      setDocuments([]);
-      setPanel(null);
-      refreshSessions();
-    }
+    const sid = uuidv4();
+    try {
+      await api.createSession({ title: "New Chat", model });
+    } catch {}
+    setSessionId(sid);
+    setMessages([]);
+    setDocuments([]);
+    setPanel(null);
+    refreshSessions();
+  }
 
   async function loadSession(sid) {
     setSessionId(sid);
@@ -126,7 +139,11 @@ export default function App() {
 
   async function handleDeleteSession(sid) {
     await api.deleteSession(sid);
-    if (sid === sessionId) { setSessionId(uuidv4()); setMessages([]); setDocuments([]); }
+    if (sid === sessionId) {
+      setSessionId(uuidv4());
+      setMessages([]);
+      setDocuments([]);
+    }
     refreshSessions();
   }
 
@@ -154,7 +171,11 @@ export default function App() {
         onNewChat={newChat}
         onLoadSession={loadSession}
         onDeleteSession={handleDeleteSession}
+<<<<<<< HEAD
+        refreshSessions={refreshSessions}   // ✅ ADD THIS LINE
+=======
         onClearAllSessions={handleClearAllSessions}
+>>>>>>> upstream/main
         model={model}
         models={models}
         onModelChange={setModel}
