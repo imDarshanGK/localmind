@@ -7,6 +7,8 @@ import PluginsPanel from "./components/PluginsPanel";
 import SettingsPanel from "./components/SettingsPanel";
 import StatusBar from "./components/StatusBar";
 import * as api from "./utils/api";
+import { getSessionColor, setSessionColor } from "./utils/colorHelper";
+
 
 export default function App() {
   const [sessionId,  setSessionId]  = useState(() => uuidv4());
@@ -31,7 +33,7 @@ export default function App() {
         api.getModels(), api.getSessions(), api.getSettings(), api.getOllamaStatus(),
       ]);
       if (mRes.status === "fulfilled") setModels(mRes.value.models || []);
-      if (sRes.status === "fulfilled") setSessions(sRes.value || []);
+      if (sRes.status === "fulfilled") setSessions((sRes.value || []).map(s => ({ ...s, color: getSessionColor(s.id) })));
       if (settRes.status === "fulfilled") {
         setSettings(settRes.value);
         if (settRes.value.default_model) setModel(settRes.value.default_model);
@@ -42,8 +44,9 @@ export default function App() {
   }
 
   const refreshSessions = useCallback(async () => {
-    try { const s = await api.getSessions(); setSessions(s || []); } catch {}
+    try { const s = await api.getSessions(); setSessions((s || []).map(sess => ({ ...sess, color: getSessionColor(sess.id) }))); } catch {}
   }, []);
+
 
   const refreshDocuments = useCallback(async (sid) => {
     try { const d = await api.getDocuments(sid); setDocuments(d.documents || []); } catch {}
@@ -113,6 +116,11 @@ export default function App() {
     setMessages([]);
   }
 
+  const handleUpdateSessionColor = useCallback((sid, color) => {
+    setSessionColor(sid, color);
+    setSessions(prev => prev.map(s => s.id === sid ? { ...s, color } : s));
+  }, []);
+
   return (
     <div className={`flex h-screen overflow-hidden ${settings.theme === "light" ? "bg-gray-100" : "bg-gray-950"} text-gray-100`}>
       <Sidebar
@@ -126,6 +134,7 @@ export default function App() {
         onModelChange={setModel}
         language={language}
         onLanguageChange={setLanguage}
+        onUpdateSessionColor={handleUpdateSessionColor}
       />
 
       <div className="flex flex-col flex-1 overflow-hidden relative">

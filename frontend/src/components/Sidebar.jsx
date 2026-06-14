@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AppLogoIcon, ChatIcon, LockIcon, StarIcon } from "./Icons";
+import { PALETTE } from "../utils/colorHelper";
 
 const LANGUAGES = [
   {code:"en",label:"English"},{code:"hi",label:"हिन्दी"},{code:"ta",label:"தமிழ்"},
@@ -7,10 +8,33 @@ const LANGUAGES = [
   {code:"de",label:"Deutsch"},{code:"es",label:"Español"},
 ];
 
-export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSession, onDeleteSession, model, models, onModelChange, language, onLanguageChange }) {
+export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSession, onDeleteSession, model, models, onModelChange, language, onLanguageChange, onUpdateSessionColor }) {
   const [search, setSearch] = useState("");
+  const [contextMenu, setContextMenu] = useState(null); // { sessionId, x, y }
+
   const modelList = models.length > 0 ? models.map(m=>m.name) : ["llama3","mistral","phi3","gemma2"];
   const filtered  = sessions.filter(s => s.title?.toLowerCase().includes(search.toLowerCase()));
+
+  useEffect(() => {
+    const closeMenu = () => setContextMenu(null);
+    window.addEventListener("click", closeMenu);
+    window.addEventListener("contextmenu", closeMenu);
+    return () => {
+      window.removeEventListener("click", closeMenu);
+      window.removeEventListener("contextmenu", closeMenu);
+    };
+  }, []);
+
+  const handleContextMenu = (e, sessionId) => {
+    e.preventDefault();
+    const menuWidth = 190;
+    const menuHeight = 40;
+    let x = e.clientX;
+    let y = e.clientY;
+    if (x + menuWidth > window.innerWidth) x = window.innerWidth - menuWidth - 8;
+    if (y + menuHeight > window.innerHeight) y = window.innerHeight - menuHeight - 8;
+    setContextMenu({ sessionId, x, y });
+  };
 
   return (
     <div className="w-64 flex flex-col bg-gray-900 border-r border-gray-800 shrink-0">
@@ -58,13 +82,20 @@ export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSes
           </p>
         )}
         {filtered.map(s => (
-          <div key={s.id} className={`group flex items-center gap-1 rounded-lg mb-0.5 transition
-            ${currentSession === s.id ? "bg-gray-700" : "hover:bg-gray-800"}`}>
+          <div key={s.id}
+            onContextMenu={(e) => handleContextMenu(e, s.id)}
+            className={`group flex items-center gap-1 rounded-lg mb-0.5 transition
+              ${currentSession === s.id ? "bg-gray-700" : "hover:bg-gray-800"}`}>
             <button onClick={()=>onLoadSession(s.id)}
               className="flex-1 text-left text-xs px-3 py-2 truncate text-gray-400 group-hover:text-gray-200">
               <span className={currentSession === s.id ? "text-white" : ""}>
                 <span className="inline-flex items-center gap-1.5">
                   <ChatIcon className="w-3.5 h-3.5 text-gray-500" />
+                  <span
+                    className="w-2 h-2 rounded-full shrink-0"
+                    style={{ backgroundColor: s.color }}
+                    title="Tag color"
+                  />
                   <span>{s.title || "New Chat"}</span>
                 </span>
               </span>
@@ -79,6 +110,28 @@ export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSes
           </div>
         ))}
       </div>
+
+      {/* Custom Context Menu Color Picker */}
+      {contextMenu && (
+        <div
+          className="fixed z-50 bg-gray-800 border border-gray-700 rounded-lg shadow-xl p-2 flex gap-1.5"
+          style={{ top: `${contextMenu.y}px`, left: `${contextMenu.x}px` }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {PALETTE.map((color) => (
+            <button
+              key={color.hex}
+              onClick={() => {
+                onUpdateSessionColor(contextMenu.sessionId, color.hex);
+                setContextMenu(null);
+              }}
+              title="Click to change color"
+              className="w-5 h-5 rounded-full border border-gray-600 hover:scale-110 active:scale-95 transition-transform"
+              style={{ backgroundColor: color.hex }}
+            />
+          ))}
+        </div>
+      )}
 
       {/* Footer */}
       <div className="px-4 py-3 border-t border-gray-800">
