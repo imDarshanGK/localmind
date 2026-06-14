@@ -5,6 +5,7 @@ Backend: FastAPI + Ollama + LangChain + ChromaDB + WebSockets
 
 import logging
 import os
+import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -33,8 +34,7 @@ logger = logging.getLogger(__name__)
 FRONTEND_DIST = Path(os.getenv("FRONTEND_DIST", "/app/frontend/dist"))
 
 
-import asyncio
-
+# Starting lifespan code block
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting LocalMind v2.0...")

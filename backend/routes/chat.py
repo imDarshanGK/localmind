@@ -11,7 +11,6 @@ from fastapi.responses import StreamingResponse
 from models.schemas import ChatRequest, ChatResponse
 from services import ollama_service, db_service
 
-import time 
 import psutil
 
 def _get_memory_usage():
@@ -189,7 +188,6 @@ async def chat_stream(req: ChatRequest):
     if not await ollama_service.is_ollama_running():
         raise HTTPException(503, "Ollama not running. Run: `ollama serve`")
     
-    first_token_time = None 
     start_time = time.perf_counter()
 
     resume_offset = req.resume_offset or 0

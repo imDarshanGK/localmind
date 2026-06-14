@@ -5,7 +5,7 @@ import pytest
 from unittest.mock import AsyncMock, patch
 
 import services.db_service as db
-from routes.chat import chat_stream, ACTIVE_STREAMS, StreamBuffer, clean_expired_streams
+from routes.chat import chat_stream, ACTIVE_STREAMS, StreamBuffer
 from models.schemas import ChatRequest
 
 # Initialize a temp SQLite database for tests
@@ -167,7 +167,7 @@ async def test_reconnect_after_generation_finished(mock_rag, mock_stream, mock_o
         use_documents=False,
         resume_offset=0
     )
-    response1 = await chat_stream(req1)
+    await chat_stream(req1)
     
     # Disconnect immediately without reading
     # Let generation finish in the background
