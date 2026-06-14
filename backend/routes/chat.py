@@ -40,7 +40,7 @@ async def chat(req: ChatRequest):
     if req.use_documents:
         settings = db_service.get_settings()
         top_k = int(settings.get("rag_top_k", 4))
-        context, sources = rag_service.retrieve_context(req.message, req.session_id, top_k)
+        context, sources, warning = rag_service.retrieve_context(req.message, req.session_id, top_k)
 
     db_service.save_message(req.session_id, "user", req.message)
 
@@ -72,7 +72,7 @@ async def chat_stream(req: ChatRequest):
 
     context, sources = "", []
     if req.use_documents:
-        context, sources = rag_service.retrieve_context(req.message, req.session_id)
+        context, sources, warning = rag_service.retrieve_context(req.message, req.session_id)
 
     db_service.save_message(req.session_id, "user", req.message)
 
@@ -111,7 +111,7 @@ async def chat_stream(req: ChatRequest):
         }
 
         db_service.save_message(req.session_id, "assistant", complete, sources, benchmarks)
-        yield f"data: {json.dumps({'done': True, 'sources': sources, 'benchmarks': benchmarks})}\n\n"
+        yield f"data: {json.dumps({'done': True, 'sources': sources, 'benchmarks': benchmarks, 'warning': warning})}\n\n"
         
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
