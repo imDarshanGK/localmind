@@ -60,7 +60,28 @@ def test_delete_session():
     r2 = client.delete(f"/api/sessions/{sid}")
     assert r2.status_code == 200
 
+def test_clone_session():
+    r = client.post(
+        "/api/sessions/",
+        json={"title": "Original Chat", "model": "llama3"}
+    )
+    sid = r.json()["id"]
+    db.save_message(sid, "user", "Hello")
+    db.save_message(sid, "assistant", "Hi there")
+    clone = client.post(f"/api/sessions/{sid}/clone")
+    assert clone.status_code == 200
+    cloned = clone.json()
+    assert cloned["id"] != sid
+    assert cloned["title"] == "Original Chat (Copy)"
+    assert cloned["model"] == "llama3"
+    msgs = client.get(f"/api/sessions/{cloned['id']}/messages")
+    assert msgs.status_code == 200
+    assert msgs.json()["count"] == 2
 
+def test_clone_session_not_found():
+    r = client.post("/api/sessions/nonexistent/clone")
+    assert r.status_code == 404
+    
 def test_get_messages_empty():
     r = client.post("/api/sessions/", json={"title": "Msg Test"})
     sid = r.json()["id"]

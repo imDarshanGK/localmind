@@ -40,27 +40,80 @@ export async function uploadDocument(file, session_id) {
   const fd = new FormData();
   fd.append("file", file); fd.append("session_id", session_id);
   const res = await fetch(`${BASE}/upload/`, { method: "POST", body: fd });
-  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || "Upload failed"); }
+  if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e.detail||"Upload failed"); }
   return res.json();
 }
 
 export function streamMessage(body, onToken, onDone) {
-  return fetch(`${BASE}/chat/stream`, {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  }).then(res => {
-    const reader = res.body.getReader(); const decoder = new TextDecoder();
-    function pump() {
-      return reader.read().then(({ done, value }) => {
-        if (done) return;
-        decoder.decode(value).split("\n").forEach(line => {
-          if (line.startsWith("data: ")) {
-            try { const d = JSON.parse(line.slice(6)); if (d.token) onToken(d.token); if (d.done) onDone(d.sources || [], d.benchmarks || null); } catch { }
+  let accumulatedText = "";
+  let sourcesList = [];
+  let doneReceived = false;
+  let retriesLeft = 3;
+
+  function runStream(offset = 0) {
+    const requestBody = { ...body, resume_offset: offset };
+    
+    return fetch(`${BASE}/chat/stream`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(requestBody),
+    })
+    .then(res => {
+      if (!res.ok) {
+        throw new Error(`HTTP error ${res.status}`);
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      
+      function pump() {
+        return reader.read().then(({ done, value }) => {
+          if (done) {
+            if (doneReceived) {
+              return;
+            }
+            throw new Error("Stream closed prematurely");
           }
+          
+          const text = decoder.decode(value, { stream: true });
+          text.split("\n").forEach(line => {
+            if (line.startsWith("data: ")) {
+              try {
+                const d = JSON.parse(line.slice(6));
+                if (d.token) {
+                  accumulatedText += d.token;
+                  onToken(d.token);
+                }
+                if (d.done) {
+                  doneReceived = true;
+                  sourcesList = d.sources || [];
+                  onDone({
+                    sources: sourcesList,
+                    benchmarks: d.benchmarks || null
+                  });
+                }
+              } catch (e) {
+                // Ignore parse errors
+              }
+            }
+          });
+          return pump();
         });
-        return pump();
-      });
-    }
-    return pump();
-  });
+      }
+      return pump();
+    })
+    .catch(err => {
+      if (doneReceived) {
+        return;
+      }
+      if (retriesLeft > 0) {
+        retriesLeft--;
+        // Wait 1 second before retrying
+        return new Promise(resolve => setTimeout(resolve, 1000))
+          .then(() => runStream(accumulatedText.length));
+      }
+      throw err;
+    });
+  }
+
+  return runStream(0);
 }
