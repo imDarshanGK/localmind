@@ -106,7 +106,13 @@ export default function App() {
         await api.streamMessage(
           { message: text, session_id: activeSid, model, use_documents: documents.length > 0, language },
           (token) => setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, content: m.content + token } : m)),
-          (sources, benchmarks) => {
+          (res, maybeBenchmarks) => {
+            let sources = res;
+            let benchmarks = maybeBenchmarks;
+            if (res && typeof res === "object" && !Array.isArray(res)) {
+              sources = res.sources;
+              benchmarks = res.benchmarks;
+            }
             setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, sources, benchmarks, streaming: false } : m));
             refreshSessions();
           },

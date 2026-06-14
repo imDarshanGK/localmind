@@ -44,7 +44,7 @@ export async function uploadDocument(file, session_id) {
   const fd = new FormData();
   fd.append("file", file); fd.append("session_id", session_id);
   const res = await fetch(`${BASE}/upload/`, { method: "POST", body: fd });
-  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || "Upload failed"); }
+  if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e.detail||"Upload failed"); }
   return res.json();
 }
 
@@ -64,6 +64,30 @@ export function streamMessage(body, onToken, onDone, signal) {
           if (line.startsWith("data: ")) {
             try { const d = JSON.parse(line.slice(6)); if (d.token) onToken(d.token); if (d.done) onDone(d.sources || [], d.benchmarks || null); } catch { }
           }
+          
+          const text = decoder.decode(value, { stream: true });
+          text.split("\n").forEach(line => {
+            if (line.startsWith("data: ")) {
+              try {
+                const d = JSON.parse(line.slice(6));
+                if (d.token) {
+                  accumulatedText += d.token;
+                  onToken(d.token);
+                }
+                if (d.done) {
+                  doneReceived = true;
+                  sourcesList = d.sources || [];
+                  onDone({
+                    sources: sourcesList,
+                    benchmarks: d.benchmarks || null
+                  });
+                }
+              } catch (e) {
+                // Ignore parse errors
+              }
+            }
+          });
+          return pump();
         });
         return pump();
       });

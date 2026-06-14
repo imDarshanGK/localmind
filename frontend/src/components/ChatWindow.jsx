@@ -117,7 +117,7 @@ export default function ChatWindow({ messages, loading, onSend, onStop, sessionI
             <AppLogoIcon className="w-14 h-14 text-purple-400 opacity-70" />
             <div>
               <p className="text-xl font-semibold text-gray-200 mb-1">LocalMind is ready</p>
-              <p className="text-sm text-gray-500">100% private · runs offline · no cloud</p>
+              <p className="text-sm text-gray-400">100% private · runs offline · no cloud</p>
             </div>
             <div className="grid grid-cols-2 gap-2 mt-4 max-w-lg w-full">
               {SUGGESTIONS.map(s => (
@@ -137,7 +137,7 @@ export default function ChatWindow({ messages, loading, onSend, onStop, sessionI
                 <div className="flex items-center gap-1.5 mb-1.5 ml-1">
                   <AppLogoIcon className="w-4 h-4 text-purple-400" />
                   <span className="text-xs font-semibold text-purple-400">LocalMind</span>
-                  {msg.streaming && <span className="text-xs text-gray-500 animate-pulse">typing...</span>}
+                  {msg.streaming && <span className="text-xs text-gray-400 animate-pulse">typing...</span>}
                 </div>
               )}
               <div className={`px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words
@@ -161,7 +161,7 @@ export default function ChatWindow({ messages, loading, onSend, onStop, sessionI
               )}
               {msg.role === "user" && (
                 <div className="text-right mt-1 mr-1">
-                  <span className="text-xs text-gray-600">You</span>
+                  <span className="text-xs text-gray-400">You</span>
                 </div>
               )}
               {msg.role === "assistant" && !msg.streaming && (
