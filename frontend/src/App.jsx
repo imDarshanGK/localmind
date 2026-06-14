@@ -5,27 +5,42 @@ import ChatWindow from "./components/ChatWindow";
 import UploadPanel from "./components/UploadPanel";
 import PluginsPanel from "./components/PluginsPanel";
 import SettingsPanel from "./components/SettingsPanel";
+import PromptRegistryPage from "./components/PromptRegistryPage";
 import StatusBar from "./components/StatusBar";
 import * as api from "./utils/api";
 import { getSessionColor, setSessionColor } from "./utils/colorHelper";
 
 
 export default function App() {
-  const [sessionId,  setSessionId]  = useState(() => uuidv4());
-  const [messages,   setMessages]   = useState([]);
-  const [sessions,   setSessions]   = useState([]);
-  const [model,      setModel]      = useState("llama3");
-  const [models,     setModels]     = useState([]);
-  const [documents,  setDocuments]  = useState([]);
-  const [loading,    setLoading]    = useState(false);
-  const [streaming,  setStreaming]  = useState(false);
-  const [panel,      setPanel]      = useState(null); // "upload"|"plugins"|"settings"|null
-  const [language,   setLanguage]   = useState("en");
-  const [ollamaOk,   setOllamaOk]   = useState(null);
-  const [settings,   setSettings]   = useState({});
-  const [useStream,  setUseStream]  = useState(true);
+  const [sessionId, setSessionId] = useState(() => uuidv4());
+  const [messages, setMessages] = useState([]);
+  const [sessions, setSessions] = useState([]);
+  const [model, setModel] = useState("llama3");
+  const [models, setModels] = useState([]);
+  const [documents, setDocuments] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [streaming, setStreaming] = useState(false);
+  const [panel, setPanel] = useState(null); // "upload"|"plugins"|"settings"|null
+  const [view, setView] = useState("chat"); // "chat"|"prompts"
+  const [language, setLanguage] = useState("en");
+  const [ollamaOk, setOllamaOk] = useState(null);
+  const [settings, setSettings] = useState({});
+  const [useStream, setUseStream] = useState(true);
 
   useEffect(() => { bootstrap(); }, []);
+
+  // ── Global keyboard shortcut: Ctrl+Shift+N (or Cmd+Shift+N on Mac) → New Chat ──
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      console.log("Key pressed:", e.key, "Ctrl:", e.ctrlKey, "Shift:", e.shiftKey); // ADD THIS
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "N") {
+        e.preventDefault();
+        newChat();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   async function bootstrap() {
     try {
@@ -40,20 +55,26 @@ export default function App() {
         if (settRes.value.default_language) setLanguage(settRes.value.default_language);
       }
       if (stRes.status === "fulfilled") setOllamaOk(stRes.value.ollama_running);
-    } catch {}
+    } catch { }
   }
 
   const refreshSessions = useCallback(async () => {
-    try { const s = await api.getSessions(); setSessions((s || []).map(sess => ({ ...sess, color: getSessionColor(sess.id) }))); } catch {}
+
+    try { const s = await api.getSessions(); setSessions((s || []).map(sess => ({ ...sess, color: getSessionColor(sess.id) }))); } catch { }
   }, []);
 
 
   const refreshDocuments = useCallback(async (sid) => {
-    try { const d = await api.getDocuments(sid); setDocuments(d.documents || []); } catch {}
+    try { const d = await api.getDocuments(sid); setDocuments(d.documents || []); } catch { }
   }, []);
 
   async function sendMessage(text) {
     if (!text.trim() || loading || streaming) return;
+    let activeSid = sessionId;
+    if (!activeSid) {
+      activeSid = uuidv4();
+      setSessionId(activeSid);
+    }
     const userMsg = { role: "user", content: text, id: Date.now() };
     setMessages(prev => [...prev, userMsg]);
 
@@ -63,20 +84,26 @@ export default function App() {
       setMessages(prev => [...prev, aiMsg]);
       try {
         await api.streamMessage(
-          { message: text, session_id: sessionId, model, use_documents: documents.length > 0, language },
+          { message: text, session_id: activeSid, model, use_documents: documents.length > 0, language },
           (token) => setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, content: m.content + token } : m)),
-          (sources) => {
-            setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, sources, streaming: false } : m));
+          (res, maybeBenchmarks) => {
+            let sources = res;
+            let benchmarks = maybeBenchmarks;
+            if (res && typeof res === "object" && !Array.isArray(res)) {
+              sources = res.sources;
+              benchmarks = res.benchmarks;
+            }
+            setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, sources, benchmarks, streaming: false } : m));
             refreshSessions();
           }
         );
       } catch (e) {
-        setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, content: e.message, streaming: false } : m));
+        setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, content: m.content + `\n\n[Connection lost: ${e.message}]`, streaming: false } : m));
       } finally { setStreaming(false); }
     } else {
       setLoading(true);
       try {
-        const data = await api.sendMessage({ message: text, session_id: sessionId, model, use_documents: documents.length > 0, language });
+        const data = await api.sendMessage({ message: text, session_id: activeSid, model, use_documents: documents.length > 0, language });
         setMessages(prev => [...prev, { role: "assistant", content: data.reply, sources: data.sources || [], id: Date.now() + 1 }]);
         refreshSessions();
       } catch (e) {
@@ -87,7 +114,9 @@ export default function App() {
 
   async function newChat() {
     const sid = uuidv4();
-    await api.createSession({ title: "New Chat", model });
+    try {
+      await api.createSession({ title: "New Chat", model });
+    } catch { }
     setSessionId(sid);
     setMessages([]);
     setDocuments([]);
@@ -102,13 +131,24 @@ export default function App() {
       const [msgRes, docRes] = await Promise.all([api.getMessages(sid), api.getDocuments(sid)]);
       setMessages((msgRes.messages || []).map((m, i) => ({ ...m, id: i })));
       setDocuments(docRes.documents || []);
-    } catch {}
+    } catch { }
   }
 
   async function handleDeleteSession(sid) {
     await api.deleteSession(sid);
     if (sid === sessionId) { setSessionId(uuidv4()); setMessages([]); setDocuments([]); }
     refreshSessions();
+  }
+
+  async function handleClearAllSessions() {
+    try {
+      await api.clearAllSessions();
+      setSessions([]);
+      setSessionId(null);
+      setMessages([]);
+      setDocuments([]);
+      setPanel(null);
+    } catch { }
   }
 
   async function handleClearChat() {
@@ -129,6 +169,7 @@ export default function App() {
         onNewChat={newChat}
         onLoadSession={loadSession}
         onDeleteSession={handleDeleteSession}
+        onClearAllSessions={handleClearAllSessions}
         model={model}
         models={models}
         onModelChange={setModel}
@@ -143,6 +184,7 @@ export default function App() {
           model={model}
           docCount={documents.length}
           onUpload={() => setPanel(panel === "upload" ? null : "upload")}
+          onPrompts={() => { setView("prompts"); setPanel(null); }}
           onPlugins={() => setPanel(panel === "plugins" ? null : "plugins")}
           onSettings={() => setPanel(panel === "settings" ? null : "settings")}
           onClear={handleClearChat}
@@ -169,12 +211,16 @@ export default function App() {
           />
         )}
 
-        <ChatWindow
-          messages={messages}
-          loading={loading || streaming}
-          onSend={sendMessage}
-          sessionId={sessionId}
-        />
+        {view === "prompts" ? (
+          <PromptRegistryPage onBack={() => setView("chat")} />
+        ) : (
+          <ChatWindow
+            messages={messages}
+            loading={loading || streaming}
+            onSend={sendMessage}
+            sessionId={sessionId}
+          />
+        )}
       </div>
     </div>
   );

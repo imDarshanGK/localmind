@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { AppLogoIcon, ChatIcon, LockIcon, StarIcon } from "./Icons";
 import { PALETTE } from "../utils/colorHelper";
+import { highlightText } from "../utils/search";
 
 const LANGUAGES = [
   {code:"en",label:"English"},{code:"hi",label:"हिन्दी"},{code:"ta",label:"தமிழ்"},
@@ -8,7 +9,7 @@ const LANGUAGES = [
   {code:"de",label:"Deutsch"},{code:"es",label:"Español"},
 ];
 
-export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSession, onDeleteSession, model, models, onModelChange, language, onLanguageChange, onUpdateSessionColor }) {
+export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSession, onDeleteSession, onClearAllSessions, model, models, onModelChange, language, onLanguageChange, onUpdateSessionColor }) {
   const [search, setSearch] = useState("");
   const [contextMenu, setContextMenu] = useState(null); // { sessionId, x, y }
 
@@ -48,8 +49,10 @@ export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSes
           </div>
         </div>
         <button onClick={onNewChat}
+          title="New Chat"
           className="w-full text-sm bg-purple-700 hover:bg-purple-600 active:bg-purple-800 text-white py-2 rounded-xl font-medium transition">
           + New Chat
+          <span className="block text-xs text-purple-300 font-normal opacity-75">Ctrl+Shift+N</span>
         </button>
       </div>
 
@@ -81,34 +84,43 @@ export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSes
             {sessions.length === 0 ? "No chats yet. Start one!" : "No results."}
           </p>
         )}
-        {filtered.map(s => (
-          <div key={s.id}
-            onContextMenu={(e) => handleContextMenu(e, s.id)}
-            className={`group flex items-center gap-1 rounded-lg mb-0.5 transition
-              ${currentSession === s.id ? "bg-gray-700" : "hover:bg-gray-800"}`}>
-            <button onClick={()=>onLoadSession(s.id)}
-              className="flex-1 text-left text-xs px-3 py-2 truncate text-gray-400 group-hover:text-gray-200">
-              <span className={currentSession === s.id ? "text-white" : ""}>
-                <span className="inline-flex items-center gap-1.5">
-                  <ChatIcon className="w-3.5 h-3.5 text-gray-500" />
-                  <span
-                    className="w-2 h-2 rounded-full shrink-0"
-                    style={{ backgroundColor: s.color }}
-                    title="Tag color"
-                  />
-                  <span>{s.title || "New Chat"}</span>
+        {filtered.map(s => {
+          const isActive = currentSession === s.id;
+          return (
+            <div key={s.id}
+              onContextMenu={(e) => handleContextMenu(e, s.id)}
+              className={`relative group flex items-center rounded-lg mb-0.5 transition
+                ${isActive ? "bg-gray-700" : "hover:bg-gray-800"}`}>
+              {/* Activity indicator: always rendered, transparent when inactive */}
+              <span
+                aria-hidden="true"
+                className={`absolute left-2.5 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-purple-400 transition-opacity duration-300
+                  ${isActive ? "opacity-100 animate-pulse" : "opacity-0"}`}
+              />
+              <button onClick={()=>onLoadSession(s.id)}
+                className="flex-1 text-left text-xs pl-6 pr-3 py-2 truncate text-gray-400 group-hover:text-gray-200">
+                <span className={isActive ? "text-white" : ""}>
+                  <span className="inline-flex items-center gap-1.5">
+                    <ChatIcon className="w-3.5 h-3.5 text-gray-500" />
+                    <span
+                      className="w-2 h-2 rounded-full shrink-0"
+                      style={{ backgroundColor: s.color }}
+                      title="Tag color"
+                    />
+                    <span>{highlightText(s.title || "New Chat", search)}</span>
+                  </span>
                 </span>
-              </span>
-              {s.message_count > 0 && (
-                <span className="ml-1 text-gray-600">{s.message_count}</span>
-              )}
-            </button>
-            <button onClick={()=>onDeleteSession(s.id)}
-              className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 px-2 py-2 transition text-xs">
-              ×
-            </button>
-          </div>
-        ))}
+                {s.message_count > 0 && (
+                  <span className="ml-1 text-gray-600">{s.message_count}</span>
+                )}
+              </button>
+              <button onClick={()=>onDeleteSession(s.id)}
+                className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 px-2 py-2 transition text-xs">
+                ×
+              </button>
+            </div>
+          );
+        })}
       </div>
 
       {/* Custom Context Menu Color Picker */}
@@ -130,6 +142,22 @@ export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSes
               style={{ backgroundColor: color.hex }}
             />
           ))}
+        </div>
+      )}
+
+      {sessions.length > 0 && (
+        <div className="px-3 py-2 border-t border-gray-800 shrink-0">
+          <button
+            onClick={() => {
+              if (window.confirm("Delete all sessions? This cannot be undone.")) {
+                onClearAllSessions();
+              }
+            }}
+            className="w-full text-left text-xs text-gray-500 hover:text-red-400 hover:bg-red-950/20 px-3 py-2 rounded-lg transition inline-flex items-center gap-2 font-medium"
+          >
+            <span>🗑</span>
+            <span>Clear all sessions</span>
+          </button>
         </div>
       )}
 

@@ -60,7 +60,28 @@ def test_delete_session():
     r2 = client.delete(f"/api/sessions/{sid}")
     assert r2.status_code == 200
 
+def test_clone_session():
+    r = client.post(
+        "/api/sessions/",
+        json={"title": "Original Chat", "model": "llama3"}
+    )
+    sid = r.json()["id"]
+    db.save_message(sid, "user", "Hello")
+    db.save_message(sid, "assistant", "Hi there")
+    clone = client.post(f"/api/sessions/{sid}/clone")
+    assert clone.status_code == 200
+    cloned = clone.json()
+    assert cloned["id"] != sid
+    assert cloned["title"] == "Original Chat (Copy)"
+    assert cloned["model"] == "llama3"
+    msgs = client.get(f"/api/sessions/{cloned['id']}/messages")
+    assert msgs.status_code == 200
+    assert msgs.json()["count"] == 2
 
+def test_clone_session_not_found():
+    r = client.post("/api/sessions/nonexistent/clone")
+    assert r.status_code == 404
+    
 def test_get_messages_empty():
     r = client.post("/api/sessions/", json={"title": "Msg Test"})
     sid = r.json()["id"]
@@ -129,6 +150,22 @@ def test_unknown_plugin():
     r = client.post("/api/plugins/run", json={"plugin":"unknown","input":"test"})
     assert r.status_code == 400
 
+
+def test_coderunner_success():
+    r = client.post("/api/plugins/run", json={"plugin": "coderunner", "input": "print('hello world')"})
+    assert r.status_code == 200
+    assert r.json()["success"]
+    assert "hello world" in r.json()["output"]
+
+
+def test_coderunner_timeout():
+    r = client.post("/api/plugins/run", json={
+        "plugin": "coderunner",
+        "input": "import time\ntime.sleep(6)"
+    })
+    assert r.status_code == 200
+    assert r.json()["success"]
+    assert "Timeout" in r.json()["output"]
 
 # ─── Settings ────────────────────────────────────────────
 def test_get_settings():
@@ -205,3 +242,80 @@ def test_export_txt():
     r2 = client.get(f"/api/export/{sid}/txt")
     assert r2.status_code == 200
     assert b"Plain text export" in r2.content
+
+
+# ─── Prompt Templates ────────────────────────────────────────
+def test_create_prompt_template():
+    r = client.post("/api/prompt-templates/", json={
+        "prompt_title": "Code Reviewer",
+        "prompt": "Review this code for bugs and suggest improvements."
+    })
+    assert r.status_code == 200
+    assert r.json()["prompt_title"] == "Code Reviewer"
+    assert "id" in r.json()
+
+
+def test_list_prompt_templates():
+    r = client.get("/api/prompt-templates/")
+    assert r.status_code == 200
+    assert isinstance(r.json(), list)
+    assert len(r.json()) >= 1
+
+
+def test_update_prompt_template():
+    r = client.post("/api/prompt-templates/", json={
+        "prompt_title": "Old Title",
+        "prompt": "Old prompt text"
+    })
+    tid = r.json()["id"]
+    r2 = client.put(f"/api/prompt-templates/{tid}", json={
+        "prompt_title": "New Title"
+    })
+    assert r2.json()["prompt_title"] == "New Title"
+
+
+def test_delete_prompt_template():
+    r = client.post("/api/prompt-templates/", json={
+        "prompt_title": "To Delete",
+        "prompt": "This will be deleted."
+    })
+    tid = r.json()["id"]
+    r2 = client.delete(f"/api/prompt-templates/{tid}")
+    assert r2.status_code == 200
+    assert r2.json()["status"] == "deleted"
+
+
+def test_get_prompt_template_not_found():
+    r = client.put("/api/prompt-templates/99999", json={
+        "prompt_title": "Nope"
+    })
+    assert r.status_code == 404
+
+
+def test_delete_prompt_template_not_found():
+    r = client.delete("/api/prompt-templates/99999")
+    assert r.status_code == 404
+
+
+def test_create_prompt_template_empty_title():
+    r = client.post("/api/prompt-templates/", json={
+        "prompt_title": "",
+        "prompt": "Some prompt"
+    })
+    assert r.status_code == 422
+
+def test_clear_all_sessions():
+    r1 = client.post("/api/sessions/", json={"title": "Session 1"})
+    r2 = client.post("/api/sessions/", json={"title": "Session 2"})
+    assert r1.status_code == 200
+    assert r2.status_code == 200
+
+    r_delete = client.delete("/api/sessions/")
+    assert r_delete.status_code == 200
+    assert r_delete.json() == {"message": "All sessions cleared"}
+
+    r_list = client.get("/api/sessions/")
+    assert r_list.status_code == 200
+    assert len(r_list.json()) == 0
+
+
