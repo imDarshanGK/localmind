@@ -102,7 +102,10 @@ def retrieve_context(query: str, session_id: str, top_k: int = 4) -> tuple[str, 
 
     context = "\n\n---\n\n".join(docs)
     sources = list({m.get("source", "unknown") for m in metas})
-    return context, sources
+    warning = None
+    if not docs or not context.strip():
+        warning = "⚠️ This answer may not be supported by your uploaded documents. Please verify manually."
+    return context, sources, warning
 
 
 def delete_session_index(session_id: str):

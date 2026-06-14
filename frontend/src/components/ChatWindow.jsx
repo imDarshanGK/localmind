@@ -160,7 +160,12 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
                     </span>
                   ))}
                 </div>
-              )}
+              {msg.warning && (
+          <div className="mt-2 px-3 py-2 bg-yellow-50 border border-yellow-400 rounded text-xs text-yellow-800">
+            {msg.warning}
+          </div>
+        )}
+        )}
               {msg.role === "user" && (
                 <div className="text-right mt-1 mr-1">
                   <span className="text-xs text-gray-600">You</span>
