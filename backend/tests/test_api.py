@@ -96,11 +96,67 @@ def test_clear_messages():
     assert r2.status_code == 200
 
 
+def test_delete_single_message():
+    r = client.post("/api/sessions/", json={"title": "Del Msg Test"})
+    sid = r.json()["id"]
+    db.save_message(sid, "user", "first")
+    db.save_message(sid, "assistant", "second")
+
+    msgs = client.get(f"/api/sessions/{sid}/messages").json()["messages"]
+    assert len(msgs) == 2
+    target_id = msgs[0]["id"]
+
+    r2 = client.delete(f"/api/sessions/{sid}/messages/{target_id}")
+    assert r2.status_code == 200
+    assert r2.json()["status"] == "deleted"
+
+    remaining = client.get(f"/api/sessions/{sid}/messages").json()["messages"]
+    assert len(remaining) == 1
+    assert all(m["id"] != target_id for m in remaining)
+
+
+def test_delete_message_not_found():
+    r = client.post("/api/sessions/", json={"title": "Del 404 Test"})
+    sid = r.json()["id"]
+    r2 = client.delete(f"/api/sessions/{sid}/messages/999999")
+    assert r2.status_code == 404
+
+
 # ─── Upload ──────────────────────────────────────────────
 def test_upload_invalid_type():
     files = {"file": ("bad.exe", b"data", "application/octet-stream")}
     r = client.post("/api/upload/", files=files, data={"session_id": "s1"})
     assert r.status_code == 400
+
+def test_upload_document_flow():
+    r = client.post(
+        "/api/sessions/",
+        json={"title": "Upload Flow Test"}
+    )
+    sid = r.json()["id"]
+
+    files = {
+        "file": ("sample.txt", b"hello localmind", "text/plain")
+    }
+
+    upload = client.post(
+        "/api/upload/",
+        files=files,
+        data={"session_id": sid}
+    )
+
+    assert upload.status_code == 200
+    assert upload.json()["filename"] == "sample.txt"
+
+    docs = client.get(f"/api/sessions/{sid}/documents")
+
+    assert docs.status_code == 200
+    assert len(docs.json()["documents"]) == 1
+
+    doc = docs.json()["documents"][0]
+
+    assert doc["filename"] == "sample.txt"
+    assert doc["session_id"] == sid
 
 def test_upload_too_large(monkeypatch):
     import routes.upload as up
@@ -108,6 +164,21 @@ def test_upload_too_large(monkeypatch):
     files = {"file": ("big.txt", b"x" * 10, "text/plain")}
     r = client.post("/api/upload/", files=files, data={"session_id": "s1"})
     assert r.status_code == 413
+
+
+def test_upload_emits_structured_logs(caplog):
+    import logging
+
+    with caplog.at_level(logging.INFO, logger="routes.upload"):
+        files = {"file": ("bad.exe", b"data", "application/octet-stream")}
+        r = client.post("/api/upload/", files=files, data={"session_id": "log-test"})
+
+    assert r.status_code == 400
+    messages = [rec.getMessage() for rec in caplog.records]
+    # Structured request log is emitted, with key=value fields.
+    assert any("upload_request" in m and "session=log-test" in m for m in messages)
+    # The unsupported-type rejection is logged as a structured warning.
+    assert any("upload_rejected" in m and "reason=unsupported_type" in m for m in messages)
 
 
 # ─── Plugins ─────────────────────────────────────────────
@@ -226,6 +297,42 @@ def test_export_json():
     assert r2.status_code == 200
     data = json.loads(r2.content)
     assert len(data["messages"]) == 2
+
+def test_export_complete_session_flow():
+    r = client.post(
+        "/api/sessions/",
+        json={"title": "Integration Export"}
+    )
+
+    sid = r.json()["id"]
+
+    db.save_message(
+        sid,
+        "user",
+        "What is LocalMind?"
+    )
+
+    db.save_message(
+        sid,
+        "assistant",
+        "LocalMind is an offline AI assistant."
+    )
+
+    export = client.get(
+        f"/api/export/{sid}/json"
+    )
+
+    assert export.status_code == 200
+
+    payload = json.loads(export.content)
+
+    assert payload["session"]["id"] == sid
+    assert payload["session"]["title"] == "Integration Export"
+
+    assert len(payload["messages"]) == 2
+
+    assert payload["messages"][0]["content"] == "What is LocalMind?"
+    assert payload["messages"][1]["content"] == "LocalMind is an offline AI assistant."
 
 def test_export_markdown():
     r = client.post("/api/sessions/", json={"title": "MD Export"})

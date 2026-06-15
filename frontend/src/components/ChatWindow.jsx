@@ -1,10 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import { exportSession } from "../utils/api";
-import { AppLogoIcon, ChartIcon, CloseIcon, CopyIcon, FileIcon, LockIcon, PlusCircleIcon, TemplateIcon } from "./Icons";
-import CodeBlockWithCopy from "./CodeBlockWithCopy";
-import PromptTemplateDialog from "./PromptTemplateDialog";
+import { AppLogoIcon, LockIcon } from "./Icons";
 
-export default function ChatWindow({ messages, loading, onSend, sessionId }) {
+export default function ChatWindow({ messages, loading, onSend, onDeleteMessage, onStop, sessionId }) {
   const [input, setInput] = useState("");
   const [showPlusMenu, setShowPlusMenu] = useState(false);
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
@@ -18,6 +16,34 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
   const [exportFormat, setExportFormat] = useState("markdown");
   const [copiedMsgId, setCopiedMsgId] = useState(null);
   const [hoveredStatsId, setHoveredStatsId] = useState(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+
+  // Inline delete control with a lightweight two-step confirm (no window.confirm).
+  const renderDeleteControl = (msgId) =>
+    confirmDeleteId === msgId ? (
+      <span className="flex items-center gap-1 text-xs">
+        <span className="text-gray-500">Delete?</span>
+        <button
+          onClick={() => { onDeleteMessage?.(msgId); setConfirmDeleteId(null); }}
+          className="px-1.5 py-0.5 rounded bg-red-600/80 hover:bg-red-600 text-white transition"
+          title="Confirm delete"
+        >Yes</button>
+        <button
+          onClick={() => setConfirmDeleteId(null)}
+          className="px-1.5 py-0.5 rounded hover:bg-gray-700 text-gray-400 transition"
+          title="Cancel"
+        >No</button>
+      </span>
+    ) : (
+      <button
+        onClick={() => setConfirmDeleteId(msgId)}
+        className="p-1 rounded hover:bg-gray-800 text-gray-500 hover:text-red-400 transition"
+        title="Delete message"
+        aria-label="Delete message"
+      >
+        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
+      </button>
+    );
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
@@ -99,7 +125,7 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
   ];
 
   return (
-    <div className="flex flex-col flex-1 overflow-hidden bg-gray-950">
+    <div className="flex flex-col flex-1 overflow-hidden bg-gray-950 text-gray-100">
       {/* Export bar */}
       {messages.length > 0 && (
         <div className="flex justify-end gap-2 px-5 pt-2">
@@ -112,11 +138,11 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
         </div>
       )}
 
-      {/* Messages */}
+      {/* Messages viewport */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5">
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center gap-4">
-              <AppLogoIcon className="w-14 h-14 text-purple-400 opacity-70" />
+            <AppLogoIcon className="w-14 h-14 text-purple-400 opacity-70" />
             <div>
               <p className="text-xl font-semibold text-gray-200 mb-1">LocalMind is ready</p>
               <p className="text-sm text-gray-400">100% private · runs offline · no cloud</p>
@@ -134,7 +160,7 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
 
         {messages.map((msg, i) => (
           <div key={msg.id || i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-            <div className={`max-w-2xl ${msg.role === "user" ? "max-w-xl" : "max-w-2xl"}`}>
+            <div className="max-w-2xl">
               {msg.role === "assistant" && (
                 <div className="flex items-center gap-1.5 mb-1.5 ml-1">
                   <AppLogoIcon className="w-4 h-4 text-purple-400" />
@@ -162,7 +188,8 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
                 </div>
               )}
               {msg.role === "user" && (
-                <div className="text-right mt-1 mr-1">
+                <div className="flex justify-end items-center gap-1 mt-1 mr-1">
+                  {renderDeleteControl(msg.id)}
                   <span className="text-xs text-gray-400">You</span>
                 </div>
               )}
@@ -180,6 +207,9 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
                       <CopyIcon className="w-4 h-4" />
                     )}
                   </button>
+
+                  {/* Delete button */}
+                  {renderDeleteControl(msg.id)}
 
                   {/* Stats hover button */}
                   <div
@@ -309,20 +339,34 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
               value={input}
               onChange={(e) => { setInput(e.target.value); autoResize(e); }}
               onKeyDown={handleKey}
-              placeholder="Ask anything... (Enter to send, Shift+Enter for new line)"
+              placeholder={loading ? "LocalMind is computing..." : "Ask anything..."}
               rows={1}
-              className="bg-transparent text-sm text-gray-100 placeholder-gray-500 resize-none outline-none w-full"
+              disabled={loading}
+              className="bg-transparent text-sm text-gray-100 placeholder-gray-500 resize-none outline-none w-full disabled:text-gray-500"
               style={{ minHeight: "24px", maxHeight: "160px" }}
             />
           </div>
 
-          <button 
-            onClick={send} 
-            disabled={(!input.trim() && !selectedTemplate) || loading}
-            className="shrink-0 text-sm bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white px-4 py-2 rounded-xl transition font-medium"
-          >
-            Send →
-          </button>
+          {/* DYNAMIC STOP GENERATION RENDERING BUTTON */}
+          {loading ? (
+            <button 
+              type="button"
+              onClick={onStop} 
+              className="shrink-0 text-sm bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-xl transition font-medium flex items-center gap-1.5"
+            >
+              <span className="w-2 h-2 bg-white rounded-sm" />
+              Stop
+            </button>
+          ) : (
+            <button 
+              type="button"
+              onClick={send} 
+              disabled={!input.trim()}
+              className="shrink-0 text-sm bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white px-4 py-2 rounded-xl transition font-medium"
+            >
+              Send →
+            </button>
+          )}
         </div>
         <p className="text-center text-xs text-gray-700 mt-2">
           <span className="inline-flex items-center gap-1">

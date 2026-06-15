@@ -118,6 +118,14 @@ async def clear_messages(session_id: str):
     return {"status": "cleared"}
 
 
+@router.delete("/{session_id}/messages/{message_id}")
+async def delete_message(session_id: str, message_id: int):
+    deleted = db_service.delete_message(session_id, message_id)
+    if not deleted:
+        raise HTTPException(404, "Message not found")
+    return {"status": "deleted", "session_id": session_id, "message_id": message_id}
+
+
 @router.get("/{session_id}/documents")
 async def get_documents(session_id: str):
     docs = db_service.get_documents(session_id)

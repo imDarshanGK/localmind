@@ -3,6 +3,7 @@
 import asyncio
 import time
 import json
+import logging
 from types import SimpleNamespace
 
 from fastapi import APIRouter, HTTPException
@@ -12,6 +13,9 @@ from models.schemas import ChatRequest, ChatResponse
 from services import ollama_service, db_service
 
 import psutil
+
+logger = logging.getLogger(__name__)
+
 
 def _get_memory_usage():
     mem = psutil.virtual_memory()
@@ -154,7 +158,13 @@ async def stream_from_buffer(buffer: StreamBuffer, resume_offset: int):
 @router.post("/", response_model=ChatResponse)
 async def chat(req: ChatRequest):
     """Standard (non-streaming) chat endpoint."""
+    logger.info(
+        "chat_request route=/chat stream=false session=%s model=%s language=%s "
+        "use_documents=%s prompt_chars=%d",
+        req.session_id, req.model, req.language, req.use_documents, len(req.message or ""),
+    )
     if not await ollama_service.is_ollama_running():
+        logger.warning("chat_rejected route=/chat session=%s reason=ollama_down", req.session_id)
         raise HTTPException(503, "Ollama not running. Run: `ollama serve`")
 
     db_service.create_session(req.session_id, model=req.model)
@@ -179,13 +189,25 @@ async def chat(req: ChatRequest):
 
     db_service.save_message(req.session_id, "assistant", reply, sources)
 
+    logger.info(
+        "chat_completed route=/chat session=%s model=%s reply_chars=%d sources=%d",
+        req.session_id, req.model, len(reply or ""), len(sources),
+    )
+
     return ChatResponse(reply=reply, session_id=req.session_id, model=req.model, sources=sources)
 
 
 @router.post("/stream")
 async def chat_stream(req: ChatRequest):
     """Streaming chat — returns Server-Sent Events."""
+    logger.info(
+        "chat_request route=/chat/stream stream=true session=%s model=%s language=%s "
+        "use_documents=%s resume_offset=%d prompt_chars=%d",
+        req.session_id, req.model, req.language, req.use_documents,
+        req.resume_offset or 0, len(req.message or ""),
+    )
     if not await ollama_service.is_ollama_running():
+        logger.warning("chat_rejected route=/chat/stream session=%s reason=ollama_down", req.session_id)
         raise HTTPException(503, "Ollama not running. Run: `ollama serve`")
     
     start_time = time.perf_counter()
