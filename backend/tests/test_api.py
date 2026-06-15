@@ -128,6 +128,36 @@ def test_upload_invalid_type():
     r = client.post("/api/upload/", files=files, data={"session_id": "s1"})
     assert r.status_code == 400
 
+def test_upload_document_flow():
+    r = client.post(
+        "/api/sessions/",
+        json={"title": "Upload Flow Test"}
+    )
+    sid = r.json()["id"]
+
+    files = {
+        "file": ("sample.txt", b"hello localmind", "text/plain")
+    }
+
+    upload = client.post(
+        "/api/upload/",
+        files=files,
+        data={"session_id": sid}
+    )
+
+    assert upload.status_code == 200
+    assert upload.json()["filename"] == "sample.txt"
+
+    docs = client.get(f"/api/sessions/{sid}/documents")
+
+    assert docs.status_code == 200
+    assert len(docs.json()["documents"]) == 1
+
+    doc = docs.json()["documents"][0]
+
+    assert doc["filename"] == "sample.txt"
+    assert doc["session_id"] == sid
+
 def test_upload_too_large(monkeypatch):
     import routes.upload as up
     monkeypatch.setattr(up, "MAX_BYTES", 5)
@@ -267,6 +297,42 @@ def test_export_json():
     assert r2.status_code == 200
     data = json.loads(r2.content)
     assert len(data["messages"]) == 2
+
+def test_export_complete_session_flow():
+    r = client.post(
+        "/api/sessions/",
+        json={"title": "Integration Export"}
+    )
+
+    sid = r.json()["id"]
+
+    db.save_message(
+        sid,
+        "user",
+        "What is LocalMind?"
+    )
+
+    db.save_message(
+        sid,
+        "assistant",
+        "LocalMind is an offline AI assistant."
+    )
+
+    export = client.get(
+        f"/api/export/{sid}/json"
+    )
+
+    assert export.status_code == 200
+
+    payload = json.loads(export.content)
+
+    assert payload["session"]["id"] == sid
+    assert payload["session"]["title"] == "Integration Export"
+
+    assert len(payload["messages"]) == 2
+
+    assert payload["messages"][0]["content"] == "What is LocalMind?"
+    assert payload["messages"][1]["content"] == "LocalMind is an offline AI assistant."
 
 def test_export_markdown():
     r = client.post("/api/sessions/", json={"title": "MD Export"})
