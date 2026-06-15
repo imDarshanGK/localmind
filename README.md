@@ -351,9 +351,12 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide.
 ## License
 
 MIT © 2026
+
 <div align="center">
 
 If LocalMind helped you, please star the repo. ⭐✨🚀
+
+</div>
 
 ---
 
@@ -370,4 +373,16 @@ Built something cool with LocalMind? We'd love to see it! Open a Pull Request to
 
 ---
 
+### 🛡️ Dependency Security Scanning
+
+Our CI pipeline automatically audits backend dependencies for known vulnerabilities (CVEs) on every push and pull request using `pip-audit`.
+
+To scan your dependencies locally before pushing code, run the following commands inside your virtual environment:
+
+```bash
+# Install the security scanner
+pip install pip-audit
+
+# Run the vulnerability audit against your requirements file
+pip-audit -r requirements.txt
 </div>
