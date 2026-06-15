@@ -1,9 +1,12 @@
 const BASE = (import.meta.env.VITE_API_BASE_URL || "/api").replace(/\/$/, "");
 
+// NEW: Handed 'signal' into options unpacking to attach it straight onto fetch
 async function req(path, opts = {}) {
+  const { signal, ...restOpts } = opts; // Separate signal from rest of parameters
   const res = await fetch(`${BASE}${path}`, {
     headers: { "Content-Type": "application/json", ...opts.headers },
-    ...opts,
+    signal, // <--- Attaches the AbortController listener to normal HTTP requests
+    ...restOpts,
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
@@ -12,7 +15,8 @@ async function req(path, opts = {}) {
   return res.json();
 }
 
-export const sendMessage = (b) => req("/chat/", { method: "POST", body: JSON.stringify(b) });
+// NEW: sendMessage can now accept an optional trailing signal parameter
+export const sendMessage = (b, signal) => req("/chat/", { method: "POST", body: JSON.stringify(b), signal });
 export const getSessions = () => req("/sessions/");
 export const createSession = (b) => req("/sessions/", { method: "POST", body: JSON.stringify(b) });
 export const updateSession = (id, b) => req(`/sessions/${id}`, { method: "PATCH", body: JSON.stringify(b) });
@@ -44,34 +48,21 @@ export async function uploadDocument(file, session_id) {
   return res.json();
 }
 
-export function streamMessage(body, onToken, onDone) {
-  let accumulatedText = "";
-  let sourcesList = [];
-  let doneReceived = false;
-  let retriesLeft = 3;
-
-  function runStream(offset = 0) {
-    const requestBody = { ...body, resume_offset: offset };
-    
-    return fetch(`${BASE}/chat/stream`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(requestBody),
-    })
-    .then(res => {
-      if (!res.ok) {
-        throw new Error(`HTTP error ${res.status}`);
-      }
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      
-      function pump() {
-        return reader.read().then(({ done, value }) => {
-          if (done) {
-            if (doneReceived) {
-              return;
-            }
-            throw new Error("Stream closed prematurely");
+// NEW: Appended 'signal' parameter right to the tail of your token reader stream
+export function streamMessage(body, onToken, onDone, signal) {
+  return fetch(`${BASE}/chat/stream`, {
+    method: "POST", 
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    signal // <--- Attaches the cancel token listener directly to your chunk stream reader
+  }).then(res => {
+    const reader = res.body.getReader(); const decoder = new TextDecoder();
+    function pump() {
+      return reader.read().then(({ done, value }) => {
+        if (done) return;
+        decoder.decode(value).split("\n").forEach(line => {
+          if (line.startsWith("data: ")) {
+            try { const d = JSON.parse(line.slice(6)); if (d.token) onToken(d.token); if (d.done) onDone(d.sources || [], d.benchmarks || null); } catch { }
           }
           
           const text = decoder.decode(value, { stream: true });
@@ -98,22 +89,9 @@ export function streamMessage(body, onToken, onDone) {
           });
           return pump();
         });
-      }
-      return pump();
-    })
-    .catch(err => {
-      if (doneReceived) {
-        return;
-      }
-      if (retriesLeft > 0) {
-        retriesLeft--;
-        // Wait 1 second before retrying
-        return new Promise(resolve => setTimeout(resolve, 1000))
-          .then(() => runStream(accumulatedText.length));
-      }
-      throw err;
-    });
-  }
-
-  return runStream(0);
+        return pump();
+      });
+    }
+    return pump();
+  });
 }
