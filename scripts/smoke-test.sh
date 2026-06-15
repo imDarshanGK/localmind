@@ -6,7 +6,7 @@ FRONTEND_URL="http://localhost:3000"
 BACKEND_URL="http://localhost:8000/health"
 BACKEND_CONTAINER="localmind-backend"
 FRONTEND_CONTAINER="localmind-frontend"
-MAX_ATTEMPTS=30
+MAX_ATTEMPTS=150
 SLEEP_INTERVAL=2
 
 # Get current script directory to locate docker-compose.yml correctly
