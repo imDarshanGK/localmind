@@ -297,11 +297,41 @@ localmind/
 
 ## Running Tests
 
+### Unit Tests
+
 ```bash
 cd backend
 pip install pytest pytest-asyncio
 pytest tests/ -v
 # 30+ tests covering: sessions, chat, plugins, upload, export, settings
+```
+
+### Smoke Tests (Docker Compose)
+
+**Purpose:**
+To verify that the entire Docker Compose deployment stack builds, starts up correctly, has functional healthchecks, maps ports correctly to the host, and can serve client requests.
+
+**How to run locally:**
+```bash
+bash scripts/smoke-test.sh
+```
+
+**Expected success output:**
+```text
+=== Starting Docker Compose Stack ===
+...
+=== Waiting for Docker containers to report healthy ===
+Checking status (Attempt 1/30)...
+Backend status: healthy, Frontend status: healthy
+Docker reports both containers are healthy.
+=== Verifying endpoints from the host ===
+Verifying backend health endpoint...
+Backend response: {"status": "healthy"}
+Verifying frontend endpoint...
+Frontend responsive.
+=== All smoke tests passed successfully! ===
+=== Shutting down Docker Compose Stack ===
+...
 ```
 
 ---

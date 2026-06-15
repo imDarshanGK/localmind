@@ -78,3 +78,14 @@ jobs:
         run: |
           cd frontend
           npm run lint --if-present
+
+  docker-smoke-test:
+    name: Docker Compose Smoke Test
+    runs-on: ubuntu-latest
+    needs: [backend-tests, frontend-build]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run smoke test
+        run: bash scripts/smoke-test.sh
