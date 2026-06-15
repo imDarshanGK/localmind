@@ -136,6 +136,21 @@ def test_upload_too_large(monkeypatch):
     assert r.status_code == 413
 
 
+def test_upload_emits_structured_logs(caplog):
+    import logging
+
+    with caplog.at_level(logging.INFO, logger="routes.upload"):
+        files = {"file": ("bad.exe", b"data", "application/octet-stream")}
+        r = client.post("/api/upload/", files=files, data={"session_id": "log-test"})
+
+    assert r.status_code == 400
+    messages = [rec.getMessage() for rec in caplog.records]
+    # Structured request log is emitted, with key=value fields.
+    assert any("upload_request" in m and "session=log-test" in m for m in messages)
+    # The unsupported-type rejection is logged as a structured warning.
+    assert any("upload_rejected" in m and "reason=unsupported_type" in m for m in messages)
+
+
 # ─── Plugins ─────────────────────────────────────────────
 def test_list_plugins():
     r = client.get("/api/plugins/")
