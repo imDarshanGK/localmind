@@ -1,6 +1,6 @@
 """
 RAG Service v2 — LangChain + ChromaDB + sentence-transformers
-Supports: PDF, TXT, CSV, DOCX, MD, HTML
+Supports: PDF, TXT, CSV, DOCX, MD, HTML, SRT, VTT
 """
 
 import os
@@ -34,6 +34,8 @@ LOADERS = {
     ".csv":  CSVLoader,
     ".docx": Docx2txtLoader,
     ".html": UnstructuredHTMLLoader,
+    ".srt":  TextLoader,  # Handle SubRip video/audio transcripts natively
+    ".vtt":  TextLoader,  # Handle WebVTT audio transcripts natively
 }
 
 SPLITTER = RecursiveCharacterTextSplitter(

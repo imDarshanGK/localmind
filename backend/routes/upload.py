@@ -15,6 +15,9 @@ ALLOWED = {
     "text/markdown": ".md",
     "text/html": ".html",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
+    "text/vtt": ".vtt",                 # WebVTT Transcript Format
+    "application/x-subrip": ".srt",     # SubRip Transcript Format
+    "text/srt": ".srt",                 # Fallback alternative header for SRT
 }
 MAX_BYTES = 50 * 1024 * 1024  # 50 MB
 
@@ -25,7 +28,7 @@ async def upload(file: UploadFile = File(...), session_id: str = Form(...)):
     # Be lenient — also allow by extension
     ext = Path(file.filename).suffix.lower()
     if content_type not in ALLOWED and ext not in ALLOWED.values():
-        raise HTTPException(400, "Unsupported file. Allowed: PDF, TXT, CSV, DOCX, MD, HTML")
+        raise HTTPException(400, "Unsupported file. Allowed: PDF, TXT, CSV, DOCX, MD, HTML, SRT, VTT")
 
     content = await file.read()
     if len(content) > MAX_BYTES:
