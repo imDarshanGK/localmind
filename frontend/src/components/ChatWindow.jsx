@@ -1,18 +1,110 @@
 import { useState, useRef, useEffect } from "react";
 import { exportSession } from "../utils/api";
-import { AppLogoIcon, FileIcon, LockIcon } from "./Icons";
+import { AppLogoIcon, LockIcon } from "./Icons";
 
-export default function ChatWindow({ messages, loading, onSend, sessionId }) {
+export default function ChatWindow({ messages, loading, onSend, onDeleteMessage, onStop, sessionId }) {
   const [input, setInput] = useState("");
+  const [showPlusMenu, setShowPlusMenu] = useState(false);
+  const [showTemplateDialog, setShowTemplateDialog] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState(null);
   const bottomRef = useRef(null);
   const textareaRef = useRef(null);
+  const plusMenuRef = useRef(null);
+
+  // NEW: state for selected messages and export format
+  const [selectedMessages, setSelectedMessages] = useState([]);
+  const [exportFormat, setExportFormat] = useState("markdown");
+  const [copiedMsgId, setCopiedMsgId] = useState(null);
+  const [hoveredStatsId, setHoveredStatsId] = useState(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+
+  // Inline delete control with a lightweight two-step confirm (no window.confirm).
+  const renderDeleteControl = (msgId) =>
+    confirmDeleteId === msgId ? (
+      <span className="flex items-center gap-1 text-xs">
+        <span className="text-gray-500">Delete?</span>
+        <button
+          onClick={() => { onDeleteMessage?.(msgId); setConfirmDeleteId(null); }}
+          className="px-1.5 py-0.5 rounded bg-red-600/80 hover:bg-red-600 text-white transition"
+          title="Confirm delete"
+        >Yes</button>
+        <button
+          onClick={() => setConfirmDeleteId(null)}
+          className="px-1.5 py-0.5 rounded hover:bg-gray-700 text-gray-400 transition"
+          title="Cancel"
+        >No</button>
+      </span>
+    ) : (
+      <button
+        onClick={() => setConfirmDeleteId(msgId)}
+        className="p-1 rounded hover:bg-gray-800 text-gray-500 hover:text-red-400 transition"
+        title="Delete message"
+        aria-label="Delete message"
+      >
+        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
+      </button>
+    );
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
+  // Close plus menu on outside click
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (plusMenuRef.current && !plusMenuRef.current.contains(e.target)) {
+        setShowPlusMenu(false);
+      }
+    }
+    if (showPlusMenu) document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showPlusMenu]);
+
+  function copyToClipboard(msgId, content) {
+    navigator.clipboard.writeText(content);
+    setCopiedMsgId(msgId);
+    setTimeout(() => setCopiedMsgId(null), 2000);
+  }
+
+  function handleSelectTemplate(template) {
+    setSelectedTemplate(template);
+    setShowTemplateDialog(false);
+    setShowPlusMenu(false);
+    setTimeout(() => textareaRef.current?.focus(), 0);
+  }
+
+  // Parse code blocks for copy button
+  function parseMessageWithCodeBlocks(content) {
+    if (!content) return [{ type: "text", content: "" }];
+    const parts = [];
+    const regex = /```(\w*)\n([\s\S]*?)```/g;
+    let lastIndex = 0;
+    let match;
+    while ((match = regex.exec(content)) !== null) {
+      if (match.index > lastIndex) {
+        parts.push({ type: "text", content: content.slice(lastIndex, match.index) });
+      }
+      parts.push({
+        type: "code",
+        language: match[1] || "text",
+        code: match[2].trim()
+      });
+      lastIndex = match.index + match[0].length;
+    }
+    if (lastIndex < content.length) {
+      parts.push({ type: "text", content: content.slice(lastIndex) });
+    }
+    if (parts.length === 0) {
+      parts.push({ type: "text", content });
+    }
+    return parts;
+  }
   function send() {
-    if (!input.trim() || loading) return;
-    onSend(input.trim());
+    if ((!input.trim() && !selectedTemplate) || loading) return;
+    const message = selectedTemplate
+      ? `${selectedTemplate.prompt}\n\n${input.trim()}`.trim()
+      : input.trim();
+    onSend(message);
     setInput("");
+    setSelectedTemplate(null);
     if (textareaRef.current) { textareaRef.current.style.height = "auto"; }
   }
 
@@ -33,7 +125,7 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
   ];
 
   return (
-    <div className="flex flex-col flex-1 overflow-hidden bg-gray-950">
+    <div className="flex flex-col flex-1 overflow-hidden bg-gray-950 text-gray-100">
       {/* Export bar */}
       {messages.length > 0 && (
         <div className="flex justify-end gap-2 px-5 pt-2">
@@ -46,14 +138,14 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
         </div>
       )}
 
-      {/* Messages */}
+      {/* Messages viewport */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5">
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center gap-4">
-              <AppLogoIcon className="w-14 h-14 text-purple-400 opacity-70" />
+            <AppLogoIcon className="w-14 h-14 text-purple-400 opacity-70" />
             <div>
               <p className="text-xl font-semibold text-gray-200 mb-1">LocalMind is ready</p>
-              <p className="text-sm text-gray-500">100% private · runs offline · no cloud</p>
+              <p className="text-sm text-gray-400">100% private · runs offline · no cloud</p>
             </div>
             <div className="grid grid-cols-2 gap-2 mt-4 max-w-lg w-full">
               {SUGGESTIONS.map(s => (
@@ -68,12 +160,12 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
 
         {messages.map((msg, i) => (
           <div key={msg.id || i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-            <div className={`max-w-2xl ${msg.role === "user" ? "max-w-xl" : "max-w-2xl"}`}>
+            <div className="max-w-2xl">
               {msg.role === "assistant" && (
                 <div className="flex items-center gap-1.5 mb-1.5 ml-1">
                   <AppLogoIcon className="w-4 h-4 text-purple-400" />
                   <span className="text-xs font-semibold text-purple-400">LocalMind</span>
-                  {msg.streaming && <span className="text-xs text-gray-500 animate-pulse">typing...</span>}
+                  {msg.streaming && <span className="text-xs text-gray-400 animate-pulse">typing...</span>}
                 </div>
               )}
               <div className={`px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words
@@ -137,8 +229,80 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
                 );
               })()}
               {msg.role === "user" && (
-                <div className="text-right mt-1 mr-1">
-                  <span className="text-xs text-gray-600">You</span>
+                <div className="flex justify-end items-center gap-1 mt-1 mr-1">
+                  {renderDeleteControl(msg.id)}
+                  <span className="text-xs text-gray-400">You</span>
+                </div>
+              )}
+              {msg.role === "assistant" && !msg.streaming && (
+                <div className="flex justify-end mt-1.5 mr-1 items-center gap-1">
+                  {/* Copy button */}
+                  <button
+                    onClick={() => copyToClipboard(msg.id, msg.content)}
+                    className="p-1 rounded hover:bg-gray-800 text-gray-500 hover:text-gray-300 transition"
+                    title="Copy response"
+                  >
+                    {copiedMsgId === msg.id ? (
+                      <svg className="w-4 h-4 text-green-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+                    ) : (
+                      <CopyIcon className="w-4 h-4" />
+                    )}
+                  </button>
+
+                  {/* Delete button */}
+                  {renderDeleteControl(msg.id)}
+
+                  {/* Stats hover button */}
+                  <div
+                    className="relative"
+                    onMouseEnter={() => setHoveredStatsId(msg.id)}
+                    onMouseLeave={() => setHoveredStatsId(null)}
+                  >
+                    <button
+                      className="p-1 rounded hover:bg-gray-800 text-gray-500 hover:text-gray-300 transition"
+                      title="Performance stats"
+                    >
+                      <ChartIcon className="w-4 h-4" />
+                    </button>
+
+                    {hoveredStatsId === msg.id && msg.benchmarks && Object.keys(msg.benchmarks).length > 0 && (
+                      <div className="absolute right-0 bottom-0 translate-x-full pl-2 z-50">
+                        <div className="bg-gray-900 border border-gray-700 rounded-lg p-3 shadow-xl min-w-[220px]">
+                        <p className="text-xs font-semibold text-gray-300 mb-2">Performance</p>
+                        <div className="space-y-1.5 text-xs text-gray-400">
+                          <div className="flex justify-between">
+                            <span>Time to first token</span>
+                            <span className="text-gray-300">{(msg.benchmarks.ttft_ms / 1000).toFixed(2)}s</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Total duration</span>
+                            <span className="text-gray-300">{(msg.benchmarks.total_duration_ms / 1000).toFixed(2)}s</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Tokens generated</span>
+                            <span className="text-gray-300">{msg.benchmarks.token_count}</span>
+                          </div>
+                          {msg.benchmarks.memory_used_gb && (
+                            <div>
+                              <div className="flex justify-between items-center">
+                                <span>RAM usage</span>
+                                <span className="inline-flex items-center gap-1 text-gray-300">
+                                  {msg.benchmarks.memory_used_gb} / {msg.benchmarks.memory_total_gb} GB
+                                  <span className="group relative">
+                                    <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full border border-gray-600 text-gray-500 text-[9px] font-bold cursor-help leading-none">i</span>
+                                    <span className="hidden group-hover:block absolute right-0 top-full mt-1 bg-gray-800 border border-gray-600 rounded-md px-2 py-1.5 text-[10px] text-gray-400 w-[180px] leading-tight z-50 shadow-lg">
+                                      Total system memory in use across all processes, not just the LLM.
+                                    </span>
+                                  </span>
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
@@ -164,23 +328,86 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
         <div ref={bottomRef} />
       </div>
 
-      {/* Input */}
+      {/* Prompt Template Dialog */}
+      {showTemplateDialog && (
+        <PromptTemplateDialog
+          onSelect={handleSelectTemplate}
+          onClose={() => { setShowTemplateDialog(false); setShowPlusMenu(false); }}
+        />
+      )}
+
+      {/* Input Form Footer */}
       <div className="px-4 pb-4 pt-2 shrink-0">
         <div className="flex items-end gap-2 bg-gray-900 border border-gray-700 rounded-2xl px-4 py-3 focus-within:border-purple-500 transition-colors">
-          <textarea
-            ref={textareaRef}
-            value={input}
-            onChange={(e) => { setInput(e.target.value); autoResize(e); }}
-            onKeyDown={handleKey}
-            placeholder="Ask anything... (Enter to send, Shift+Enter for new line)"
-            rows={1}
-            className="flex-1 bg-transparent text-sm text-gray-100 placeholder-gray-500 resize-none outline-none"
-            style={{ minHeight: "24px", maxHeight: "160px" }}
-          />
-          <button onClick={send} disabled={!input.trim() || loading}
-            className="shrink-0 text-sm bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white px-4 py-2 rounded-xl transition font-medium">
-            Send →
-          </button>
+          {/* Plus button for prompt templates */}
+          <div className="relative shrink-0" ref={plusMenuRef}>
+            <button
+              onClick={() => setShowPlusMenu(p => !p)}
+              className="p-1 text-gray-500 hover:text-purple-400 transition"
+              title="Insert prompt template"
+            >
+              <PlusCircleIcon className="w-5 h-5" />
+            </button>
+            {showPlusMenu && (
+              <div className="absolute bottom-full mb-2 left-0 bg-gray-800 border border-gray-700 rounded-lg shadow-xl py-1 min-w-[180px] z-50">
+                <button
+                  onClick={() => { setShowTemplateDialog(true); }}
+                  className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-purple-300 transition flex items-center gap-2"
+                >
+                  <TemplateIcon className="w-4 h-4" />
+                  Use Prompt Template
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Selected template chip */}
+          <div className="flex-1 flex flex-col gap-1">
+            {selectedTemplate && (
+              <div className="flex items-center gap-1.5 bg-gray-800 rounded-lg px-2.5 py-1 w-fit">
+                <TemplateIcon className="w-3.5 h-3.5 text-purple-400" />
+                <span className="text-xs text-gray-300">{selectedTemplate.prompt_title}</span>
+                <button
+                  onClick={() => setSelectedTemplate(null)}
+                  className="text-gray-500 hover:text-gray-300 transition"
+                >
+                  <CloseIcon className="w-3 h-3" />
+                </button>
+              </div>
+            )}
+            <textarea
+              ref={textareaRef}
+              value={input}
+              onChange={(e) => { setInput(e.target.value); autoResize(e); }}
+              onKeyDown={handleKey}
+              placeholder={loading ? "LocalMind is computing..." : "Ask anything..."}
+              rows={1}
+              disabled={loading}
+              className="bg-transparent text-sm text-gray-100 placeholder-gray-500 resize-none outline-none w-full disabled:text-gray-500"
+              style={{ minHeight: "24px", maxHeight: "160px" }}
+            />
+          </div>
+
+          {/* DYNAMIC STOP GENERATION RENDERING BUTTON */}
+          {loading ? (
+            <button 
+              type="button"
+              onClick={onStop} 
+              className="shrink-0 text-sm bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-xl transition font-medium flex items-center gap-1.5"
+            >
+              <span className="w-2 h-2 bg-white rounded-sm" />
+              Stop
+            </button>
+          ) : (
+            <button 
+              type="button"
+              onClick={send} 
+              disabled={!input.trim()}
+              className="shrink-0 text-sm bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white px-4 py-2 rounded-xl transition font-medium"
+            >
+              Send →
+            </button>
+          )}
         </div>
         <p className="text-center text-xs text-gray-700 mt-2">
           <span className="inline-flex items-center gap-1">
