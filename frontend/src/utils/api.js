@@ -24,6 +24,7 @@ export const deleteSession = (id) => req(`/sessions/${id}`, { method: "DELETE" }
 export const clearAllSessions = () => req("/sessions/", { method: "DELETE" });
 export const getMessages = (id) => req(`/sessions/${id}/messages`);
 export const clearMessages = (id) => req(`/sessions/${id}/messages`, { method: "DELETE" });
+export const deleteMessage = (id, messageId) => req(`/sessions/${id}/messages/${messageId}`, { method: "DELETE" });
 export const getDocuments = (id) => req(`/sessions/${id}/documents`);
 export const getModels = () => req("/models/");
 export const getOllamaStatus = () => req("/models/status");
@@ -64,6 +65,30 @@ export function streamMessage(body, onToken, onDone, signal) {
           if (line.startsWith("data: ")) {
             try { const d = JSON.parse(line.slice(6)); if (d.token) onToken(d.token); if (d.done) onDone(d.sources || [], d.benchmarks || null); } catch { }
           }
+          
+          const text = decoder.decode(value, { stream: true });
+          text.split("\n").forEach(line => {
+            if (line.startsWith("data: ")) {
+              try {
+                const d = JSON.parse(line.slice(6));
+                if (d.token) {
+                  accumulatedText += d.token;
+                  onToken(d.token);
+                }
+                if (d.done) {
+                  doneReceived = true;
+                  sourcesList = d.sources || [];
+                  onDone({
+                    sources: sourcesList,
+                    benchmarks: d.benchmarks || null
+                  });
+                }
+              } catch (e) {
+                // Ignore parse errors
+              }
+            }
+          });
+          return pump();
         });
         return pump();
       });
