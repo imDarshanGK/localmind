@@ -1,11 +1,12 @@
 """Upload routes — /api/upload"""
 
+import logging
 import os
 from pathlib import Path
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from models.schemas import UploadResponse
 from services import db_service
-
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 ALLOWED = {
@@ -28,6 +29,10 @@ async def upload(file: UploadFile = File(...), session_id: str = Form(...)):
     # Be lenient — also allow by extension
     ext = Path(file.filename).suffix.lower()
     if content_type not in ALLOWED and ext not in ALLOWED.values():
+        logger.warning(
+            "upload_rejected route=/upload session=%s filename=%s reason=unsupported_type",
+            session_id, file.filename,
+        )
         raise HTTPException(400, "Unsupported file. Allowed: PDF, TXT, CSV, DOCX, MD, HTML, SRT, VTT")
 
     content = await file.read()
