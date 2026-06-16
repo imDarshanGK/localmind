@@ -85,7 +85,7 @@ class PluginResult(BaseModel):
 class AppSettings(BaseModel):
     default_model: str = "llama3"
     default_language: str = "en"
-    temperature: float = 0.7
+    temperature: float = Field(default=0.7, ge=0.0, le=2.0)
     max_history_turns: int = 10
     rag_top_k: int = 4
     theme: str = "dark"

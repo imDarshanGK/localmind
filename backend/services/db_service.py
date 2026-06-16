@@ -179,8 +179,10 @@ def save_message(session_id: str, role: str, content: str, sources: list = None)
                 "SELECT title FROM sessions WHERE id=?", (session_id,)
             ).fetchone()
             if row and row["title"] == "New Chat":
-                title = content[:40] + ("..." if len(content) > 40 else "")
-                conn.execute("UPDATE sessions SET title=? WHERE id=?", (title, session_id))
+                stripped = content.strip()
+                if len(stripped) >= 3:
+                    title = stripped[:40] + ("..." if len(stripped) > 40 else "")
+                    conn.execute("UPDATE sessions SET title=? WHERE id=?", (title, session_id))
 
 
 def get_history(session_id: str, limit: int = 20) -> list[dict]:
