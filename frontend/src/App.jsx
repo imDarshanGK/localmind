@@ -5,8 +5,13 @@ import ChatWindow from "./components/ChatWindow";
 import UploadPanel from "./components/UploadPanel";
 import PluginsPanel from "./components/PluginsPanel";
 import SettingsPanel from "./components/SettingsPanel";
+import PromptRegistryPage from "./components/PromptRegistryPage";
 import StatusBar from "./components/StatusBar";
 import * as api from "./utils/api";
+import { getSessionColor, setSessionColor } from "./utils/colorHelper";
+
+
+// NOTE: Missing PromptRegistryPage import removed to allow seamless compilation
 
 // NOTE: Missing PromptRegistryPage import removed to allow seamless compilation
 
@@ -31,10 +36,10 @@ export default function App() {
 
   useEffect(() => { bootstrap(); }, []);
 
-  // —— Global keyboard shortcut: Ctrl+Shift+N (or Cmd+Shift+N on Mac) → New Chat ——
+  // ── Global keyboard shortcut: Ctrl+Shift+N (or Cmd+Shift+N on Mac) → New Chat ──
   useEffect(() => {
     const handleKeyDown = (e) => {
-      console.log("Key pressed:", e.key, "Ctrl:", e.ctrlKey, "Shift:", e.shiftKey);
+      console.log("Key pressed:", e.key, "Ctrl:", e.ctrlKey, "Shift:", e.shiftKey); // ADD THIS
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "N") {
         e.preventDefault();
         newChat();
@@ -50,7 +55,7 @@ export default function App() {
         api.getModels(), api.getSessions(), api.getSettings(), api.getOllamaStatus(),
       ]);
       if (mRes.status === "fulfilled") setModels(mRes.value.models || []);
-      if (sRes.status === "fulfilled") setSessions(sRes.value || []);
+      if (sRes.status === "fulfilled") setSessions((sRes.value || []).map(s => ({ ...s, color: getSessionColor(s.id) })));
       if (settRes.status === "fulfilled") {
         setSettings(settRes.value);
         if (settRes.value.default_model) setModel(settRes.value.default_model);
@@ -61,8 +66,10 @@ export default function App() {
   }
 
   const refreshSessions = useCallback(async () => {
-    try { const s = await api.getSessions(); setSessions(s || []); } catch { }
+
+    try { const s = await api.getSessions(); setSessions((s || []).map(sess => ({ ...sess, color: getSessionColor(sess.id) }))); } catch { }
   }, []);
+
 
   const refreshDocuments = useCallback(async (sid) => {
     try { const d = await api.getDocuments(sid); setDocuments(d.documents || []); } catch { }
@@ -78,7 +85,7 @@ export default function App() {
     setLoading(false);
 
     // Clean up the trailing 'typing' state bubble indicators in the messages layout array
-    setMessages(prev => 
+    setMessages(prev =>
       prev.map(m => m.streaming ? { ...m, streaming: false, content: m.content + "\n\n[Generation Stopped]" } : m)
     );
   }, []);
@@ -105,7 +112,13 @@ export default function App() {
         await api.streamMessage(
           { message: text, session_id: activeSid, model, use_documents: documents.length > 0, language },
           (token) => setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, content: m.content + token } : m)),
-          (sources, benchmarks) => {
+          (res, maybeBenchmarks) => {
+            let sources = res;
+            let benchmarks = maybeBenchmarks;
+            if (res && typeof res === "object" && !Array.isArray(res)) {
+              sources = res.sources;
+              benchmarks = res.benchmarks;
+            }
             setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, sources, benchmarks, streaming: false } : m));
             refreshSessions();
           },
@@ -116,9 +129,9 @@ export default function App() {
         if (e.name !== 'AbortError') {
           setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, content: e.message, streaming: false } : m));
         }
-      } finally { 
+      } finally {
         if (abortControllerRef.current === controller) abortControllerRef.current = null;
-        setStreaming(false); 
+        setStreaming(false);
       }
     } else {
       setLoading(true);
@@ -133,9 +146,9 @@ export default function App() {
         if (e.name !== 'AbortError') {
           setMessages(prev => [...prev, { role: "assistant", content: e.message, id: Date.now() + 1 }]);
         }
-      } finally { 
+      } finally {
         if (abortControllerRef.current === controller) abortControllerRef.current = null;
-        setLoading(false); 
+        setLoading(false);
       }
     }
   }
@@ -144,7 +157,8 @@ export default function App() {
     const sid = uuidv4();
     try {
       await api.createSession({ title: "New Chat", model });
-    } catch {}
+    } catch { }
+
     setSessionId(sid);
     setMessages([]);
     setDocuments([]);
@@ -157,9 +171,21 @@ export default function App() {
     setPanel(null);
     try {
       const [msgRes, docRes] = await Promise.all([api.getMessages(sid), api.getDocuments(sid)]);
-      setMessages((msgRes.messages || []).map((m, i) => ({ ...m, id: i })));
+      setMessages((msgRes.messages || []).map((m, i) => ({ ...m, id: m.id ?? i })));
       setDocuments(docRes.documents || []);
     } catch { }
+  }
+
+  async function handleDeleteMessage(messageId) {
+    // Optimistically remove from the thread for instant feedback.
+    setMessages(prev => prev.filter(m => m.id !== messageId));
+    try {
+      await api.deleteMessage(sessionId, messageId);
+      refreshSessions(); // keep the sidebar message count in sync
+    } catch {
+      // The message may have been local-only (not yet persisted); it is already
+      // removed from the UI, so nothing more to do.
+    }
   }
 
   async function handleDeleteSession(sid) {
@@ -184,6 +210,11 @@ export default function App() {
     setMessages([]);
   }
 
+  const handleUpdateSessionColor = useCallback((sid, color) => {
+    setSessionColor(sid, color);
+    setSessions(prev => prev.map(s => s.id === sid ? { ...s, color } : s));
+  }, []);
+
   return (
     <div className={`flex h-screen overflow-hidden ${settings.theme === "light" ? "bg-gray-100" : "bg-gray-950"} text-gray-100`}>
       <Sidebar
@@ -198,6 +229,7 @@ export default function App() {
         onModelChange={setModel}
         language={language}
         onLanguageChange={setLanguage}
+        onUpdateSessionColor={handleUpdateSessionColor}
       />
 
       <div className="flex flex-col flex-1 overflow-hidden relative">
@@ -243,6 +275,7 @@ export default function App() {
             messages={messages}
             loading={loading || streaming}
             onSend={sendMessage}
+            onDeleteMessage={handleDeleteMessage}
             onStop={stopGeneration}
             sessionId={sessionId}
           />

@@ -17,6 +17,7 @@ class ChatMessage(BaseModel):
     content: str
     timestamp: Optional[datetime] = None
     sources: List[str] = []
+    benchmarks: Optional[dict] = None
 
 
 class ChatRequest(BaseModel):
@@ -26,6 +27,7 @@ class ChatRequest(BaseModel):
     use_documents: bool = True
     temperature: float = Field(default=0.7, ge=0.0, le=2.0)
     language: str = "en"
+    resume_offset: Optional[int] = 0
 
 
 class ChatResponse(BaseModel):
@@ -95,3 +97,19 @@ class ExportFormat(str, Enum):
     markdown = "markdown"
     json = "json"
     txt = "txt"
+
+
+class SessionRenameItem(BaseModel):
+    session_id: str
+    new_title: str
+
+class BulkSessionRenameRequest(BaseModel):
+    sessions: List[SessionRenameItem]
+
+class PromptTemplateCreate(BaseModel):
+    prompt_title: str = Field(..., min_length=1, max_length=200)
+    prompt: str = Field(..., min_length=1)
+
+class PromptTemplateUpdate(BaseModel):
+    prompt_title: Optional[str] = None
+    prompt: Optional[str] = None
