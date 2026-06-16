@@ -1,6 +1,4 @@
 """Upload routes — /api/upload"""
-
-import logging
 import os
 from pathlib import Path
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks
