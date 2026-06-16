@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { exportSession } from "../utils/api";
-import { AppLogoIcon, LockIcon } from "./Icons";
+import { AppLogoIcon, ChartIcon, CloseIcon, CopyIcon, FileIcon, LockIcon, PlusCircleIcon, TemplateIcon } from "./Icons";
+import PromptTemplateDialog from "./PromptTemplateDialog";
 
 export default function ChatWindow({ messages, loading, onSend, onDeleteMessage, onStop, sessionId }) {
   const [input, setInput] = useState("");
@@ -175,18 +176,59 @@ export default function ChatWindow({ messages, loading, onSend, onDeleteMessage,
                 {msg.content}
                 {msg.streaming && <span className="inline-block w-1.5 h-4 bg-purple-400 ml-1 animate-pulse rounded" />}
               </div>
-              {msg.sources?.length > 0 && (
-                <div className="mt-1.5 ml-1 flex flex-wrap gap-1">
-                  {msg.sources.map((s,i) => (
-                    <span key={i} className="text-xs bg-gray-800 text-blue-400 px-2 py-0.5 rounded-full border border-gray-700">
-                      <span className="inline-flex items-center gap-1">
-                        <FileIcon className="w-3 h-3" />
-                        <span>{s}</span>
-                      </span>
-                    </span>
-                  ))}
-                </div>
-              )}
+              {msg.sources?.length > 0 && (() => {
+                // Normalize: legacy string sources ("file.pdf") → structured object.
+                // New sources already arrive as {source, chunk, preview}.
+                // This single path handles both without any database migration.
+                const normalizeSrc = (s) =>
+                  typeof s === "string"
+                    ? { source: s, chunk: null, preview: null }
+                    : s;
+
+                return (
+                  <div className="mt-1.5 ml-1 flex flex-wrap gap-1.5">
+                    {msg.sources.map((raw, i) => {
+                      const s = normalizeSrc(raw);
+                      const hasPreview = s.preview && s.preview.trim().length > 0;
+                      return (
+                        <span key={i} className="relative group inline-flex">
+                          {/* Badge */}
+                          <span className="text-xs bg-gray-800 text-blue-400 px-2 py-0.5 rounded-full border border-gray-700 cursor-default inline-flex items-center gap-1 group-hover:border-blue-500 group-hover:bg-gray-750 transition-colors">
+                            <FileIcon className="w-3 h-3 shrink-0" />
+                            <span>{s.source}</span>
+                            {s.chunk !== null && (
+                              <span className="text-gray-500 text-[10px]">#{s.chunk + 1}</span>
+                            )}
+                          </span>
+
+                          {/* Hover tooltip — only rendered when a preview exists (new sessions) */}
+                          {hasPreview && (
+                            <div className="
+                              absolute bottom-full left-0 mb-2 z-50 w-72
+                              invisible opacity-0 group-hover:visible group-hover:opacity-100
+                              transition-all duration-150 pointer-events-none
+                            ">
+                              {/* Arrow */}
+                              <div className="absolute left-3 -bottom-1.5 w-3 h-3 rotate-45 bg-gray-700 border-r border-b border-gray-600" />
+                              {/* Card */}
+                              <div className="relative bg-gray-700 border border-gray-600 rounded-xl shadow-xl px-3 py-2.5">
+                                <div className="flex items-center gap-1.5 mb-1.5 border-b border-gray-600 pb-1.5">
+                                  <FileIcon className="w-3 h-3 text-blue-400 shrink-0" />
+                                  <span className="text-xs font-semibold text-blue-400 truncate">{s.source}</span>
+                                  <span className="ml-auto text-[10px] text-gray-400 shrink-0">chunk {s.chunk + 1}</span>
+                                </div>
+                                <p className="text-xs text-gray-300 leading-relaxed line-clamp-5 whitespace-pre-wrap break-words">
+                                  {s.preview}
+                                </p>
+                              </div>
+                            </div>
+                          )}
+                        </span>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
               {msg.role === "user" && (
                 <div className="flex justify-end items-center gap-1 mt-1 mr-1">
                   {renderDeleteControl(msg.id)}

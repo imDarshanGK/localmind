@@ -10,11 +10,6 @@ import StatusBar from "./components/StatusBar";
 import * as api from "./utils/api";
 import { getSessionColor, setSessionColor } from "./utils/colorHelper";
 
-
-// NOTE: Missing PromptRegistryPage import removed to allow seamless compilation
-
-// NOTE: Missing PromptRegistryPage import removed to allow seamless compilation
-
 export default function App() {
   const [sessionId,  setSessionId]  = useState(() => uuidv4());
   const [messages,   setMessages]   = useState([]);
@@ -265,11 +260,8 @@ export default function App() {
           />
         )}
 
-        {/* Updated conditional layout wrapper to securely bypass missing components error */}
         {view === "prompts" ? (
-          <div className="flex-1 flex items-center justify-center text-gray-400 bg-gray-950 text-sm">
-            Prompt Registry component view placeholder.
-          </div>
+          <PromptRegistryPage onBack={() => setView("chat")} />
         ) : (
           <ChatWindow
             messages={messages}
