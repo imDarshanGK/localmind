@@ -8,22 +8,25 @@ import SettingsPanel from "./components/SettingsPanel";
 import PromptRegistryPage from "./components/PromptRegistryPage";
 import StatusBar from "./components/StatusBar";
 import * as api from "./utils/api";
+import { getSessionColor, setSessionColor } from "./utils/colorHelper";
+
 
 export default function App() {
-  const [sessionId,  setSessionId]  = useState(() => uuidv4());
-  const [messages,   setMessages]   = useState([]);
-  const [sessions,   setSessions]   = useState([]);
-  const [model,      setModel]      = useState("llama3");
-  const [models,     setModels]     = useState([]);
-  const [documents,  setDocuments]  = useState([]);
-  const [loading,    setLoading]    = useState(false);
-  const [streaming,  setStreaming]  = useState(false);
-  const [panel,      setPanel]      = useState(null); // "upload"|"plugins"|"settings"|null
-  const [view,       setView]       = useState("chat"); // "chat"|"prompts"
-  const [language,   setLanguage]   = useState("en");
-  const [ollamaOk,   setOllamaOk]   = useState(null);
-  const [settings,   setSettings]   = useState({});
-  const [useStream,  setUseStream]  = useState(true);
+
+  const [sessionId, setSessionId] = useState(() => uuidv4());
+  const [messages, setMessages] = useState([]);
+  const [sessions, setSessions] = useState([]);
+  const [model, setModel] = useState("llama3");
+  const [models, setModels] = useState([]);
+  const [documents, setDocuments] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [streaming, setStreaming] = useState(false);
+  const [panel, setPanel] = useState(null); // "upload"|"plugins"|"settings"|null
+  const [view, setView] = useState("chat"); // "chat"|"prompts"
+  const [language, setLanguage] = useState("en");
+  const [ollamaOk, setOllamaOk] = useState(null);
+  const [settings, setSettings] = useState({});
+  const [useStream, setUseStream] = useState(true);
 
   // --- FEATURE REFERENCE: TRACK ACTIVE REQUEST ABORT SIGNAL ---
   const abortControllerRef = useRef(null);
@@ -49,7 +52,7 @@ export default function App() {
         api.getModels(), api.getSessions(), api.getSettings(), api.getOllamaStatus(),
       ]);
       if (mRes.status === "fulfilled") setModels(mRes.value.models || []);
-      if (sRes.status === "fulfilled") setSessions(sRes.value || []);
+      if (sRes.status === "fulfilled") setSessions((sRes.value || []).map(s => ({ ...s, color: getSessionColor(s.id) })));
       if (settRes.status === "fulfilled") {
         setSettings(settRes.value);
         if (settRes.value.default_model) setModel(settRes.value.default_model);
@@ -60,8 +63,10 @@ export default function App() {
   }
 
   const refreshSessions = useCallback(async () => {
-    try { const s = await api.getSessions(); setSessions(s || []); } catch { }
+
+    try { const s = await api.getSessions(); setSessions((s || []).map(sess => ({ ...sess, color: getSessionColor(sess.id) }))); } catch { }
   }, []);
+
 
   const refreshDocuments = useCallback(async (sid) => {
     try { const d = await api.getDocuments(sid); setDocuments(d.documents || []); } catch { }
@@ -77,7 +82,7 @@ export default function App() {
     setLoading(false);
 
     // Clean up the trailing 'typing' state bubble indicators in the messages layout array
-    setMessages(prev => 
+    setMessages(prev =>
       prev.map(m => m.streaming ? { ...m, streaming: false, content: m.content + "\n\n[Generation Stopped]" } : m)
     );
   }, []);
@@ -121,9 +126,9 @@ export default function App() {
         if (e.name !== 'AbortError') {
           setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, content: e.message, streaming: false } : m));
         }
-      } finally { 
+      } finally {
         if (abortControllerRef.current === controller) abortControllerRef.current = null;
-        setStreaming(false); 
+        setStreaming(false);
       }
     } else {
       setLoading(true);
@@ -138,9 +143,9 @@ export default function App() {
         if (e.name !== 'AbortError') {
           setMessages(prev => [...prev, { role: "assistant", content: e.message, id: Date.now() + 1 }]);
         }
-      } finally { 
+      } finally {
         if (abortControllerRef.current === controller) abortControllerRef.current = null;
-        setLoading(false); 
+        setLoading(false);
       }
     }
   }
@@ -149,7 +154,8 @@ export default function App() {
     const sid = uuidv4();
     try {
       await api.createSession({ title: "New Chat", model });
-    } catch {}
+    } catch { }
+
     setSessionId(sid);
     setMessages([]);
     setDocuments([]);
@@ -201,6 +207,11 @@ export default function App() {
     setMessages([]);
   }
 
+  const handleUpdateSessionColor = useCallback((sid, color) => {
+    setSessionColor(sid, color);
+    setSessions(prev => prev.map(s => s.id === sid ? { ...s, color } : s));
+  }, []);
+
   return (
     <div className={`flex h-screen overflow-hidden ${settings.theme === "light" ? "bg-gray-100" : "bg-gray-950"} text-gray-100`}>
       <Sidebar
@@ -215,6 +226,7 @@ export default function App() {
         onModelChange={setModel}
         language={language}
         onLanguageChange={setLanguage}
+        onUpdateSessionColor={handleUpdateSessionColor}
       />
 
       <div className="flex flex-col flex-1 overflow-hidden relative">

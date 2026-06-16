@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AppLogoIcon, ChatIcon, LockIcon, StarIcon } from "./Icons";
+import { PALETTE } from "../utils/colorHelper";
 import { highlightText } from "../utils/search";
 
 const LANGUAGES = [
@@ -8,10 +9,34 @@ const LANGUAGES = [
   {code:"de",label:"Deutsch"},{code:"es",label:"Español"},
 ];
 
-export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSession, onDeleteSession, onClearAllSessions, model, models, onModelChange, language, onLanguageChange }) {
+export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSession, onDeleteSession, onClearAllSessions, model, models, onModelChange, language, onLanguageChange, onUpdateSessionColor }) {
   const [search, setSearch] = useState("");
+  const [contextMenu, setContextMenu] = useState(null); // { sessionId, x, y }
+
   const modelList = models.length > 0 ? models.map(m=>m.name) : ["llama3","mistral","phi3","gemma2"];
   const filtered  = sessions.filter(s => s.title?.toLowerCase().includes(search.toLowerCase()));
+
+  useEffect(() => {
+    const closeMenu = () => setContextMenu(null);
+    window.addEventListener("click", closeMenu);
+    window.addEventListener("contextmenu", closeMenu);
+    return () => {
+      window.removeEventListener("click", closeMenu);
+      window.removeEventListener("contextmenu", closeMenu);
+    };
+  }, []);
+
+  const handleContextMenu = (e, sessionId) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const menuWidth = 190;
+    const menuHeight = 40;
+    let x = e.clientX;
+    let y = e.clientY;
+    if (x + menuWidth > window.innerWidth) x = window.innerWidth - menuWidth - 8;
+    if (y + menuHeight > window.innerHeight) y = window.innerHeight - menuHeight - 8;
+    setContextMenu({ sessionId, x, y });
+  };
 
   return (
     <div className="w-64 flex flex-col bg-gray-900 border-r border-gray-800 shrink-0">
@@ -63,34 +88,64 @@ export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSes
         {filtered.map(s => {
           const isActive = currentSession === s.id;
           return (
-          <div key={s.id} className={`relative group flex items-center rounded-lg mb-0.5 transition
-            ${isActive ? "bg-gray-700" : "hover:bg-gray-800"}`}>
-            {/* Activity indicator: always rendered, transparent when inactive */}
-            <span
-              aria-hidden="true"
-              className={`absolute left-2.5 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-purple-400 transition-opacity duration-300
-                ${isActive ? "opacity-100 animate-pulse" : "opacity-0"}`}
-            />
-            <button onClick={()=>onLoadSession(s.id)}
-              className="flex-1 text-left text-xs pl-6 pr-3 py-2 truncate text-gray-400 group-hover:text-gray-200">
-              <span className={isActive ? "text-white" : ""}>
-                <span className="inline-flex items-center gap-1.5">
-                  <ChatIcon className="w-3.5 h-3.5 text-gray-500" />
-                  <span>{highlightText(s.title || "New Chat", search)}</span>
+            <div key={s.id}
+              onContextMenu={(e) => handleContextMenu(e, s.id)}
+              className={`relative group flex items-center rounded-lg mb-0.5 transition
+                ${isActive ? "bg-gray-700" : "hover:bg-gray-800"}`}>
+              {/* Activity indicator: always rendered, transparent when inactive */}
+              <span
+                aria-hidden="true"
+                className={`absolute left-2.5 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-purple-400 transition-opacity duration-300
+                  ${isActive ? "opacity-100 animate-pulse" : "opacity-0"}`}
+              />
+              <button onClick={()=>onLoadSession(s.id)}
+                className="flex-1 text-left text-xs pl-6 pr-3 py-2 truncate text-gray-400 group-hover:text-gray-200">
+                <span className={isActive ? "text-white" : ""}>
+                  <span className="inline-flex items-center gap-1.5">
+                    <ChatIcon className="w-3.5 h-3.5 text-gray-500" />
+                    <span
+                      className="w-2 h-2 rounded-full shrink-0"
+                      style={{ backgroundColor: s.color }}
+                      title="Tag color"
+                    />
+                    <span>{highlightText(s.title || "New Chat", search)}</span>
+                  </span>
                 </span>
-              </span>
-              {s.message_count > 0 && (
-                <span className="ml-1 text-gray-600">{s.message_count}</span>
-              )}
-            </button>
-            <button onClick={()=>onDeleteSession(s.id)}
-              className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 px-2 py-2 transition text-xs">
-              ×
-            </button>
-          </div>
+                {s.message_count > 0 && (
+                  <span className="ml-1 text-gray-600">{s.message_count}</span>
+                )}
+              </button>
+              <button onClick={()=>onDeleteSession(s.id)}
+                className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 px-2 py-2 transition text-xs">
+                ×
+              </button>
+            </div>
           );
         })}
       </div>
+
+      {/* Custom Context Menu Color Picker */}
+      {contextMenu && (
+        <div
+          className="fixed z-50 bg-gray-800 border border-gray-700 rounded-lg shadow-xl p-2 flex gap-1.5"
+          style={{ top: `${contextMenu.y}px`, left: `${contextMenu.x}px` }}
+          onClick={(e) => e.stopPropagation()}
+          onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
+        >
+          {PALETTE.map((color) => (
+            <button
+              key={color.hex}
+              onClick={() => {
+                onUpdateSessionColor(contextMenu.sessionId, color.hex);
+                setContextMenu(null);
+              }}
+              title="Click to change color"
+              className="w-5 h-5 rounded-full border border-gray-600 hover:scale-110 active:scale-95 transition-transform"
+              style={{ backgroundColor: color.hex }}
+            />
+          ))}
+        </div>
+      )}
 
       {sessions.length > 0 && (
         <div className="px-3 py-2 border-t border-gray-800 shrink-0">
