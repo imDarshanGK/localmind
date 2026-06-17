@@ -10,9 +10,12 @@ import chromadb
 from chromadb.config import Settings
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import (
-    PyPDFLoader, TextLoader, CSVLoader, Docx2txtLoader, UnstructuredHTMLLoader,
+    PyPDFLoader, TextLoader, CSVLoader, UnstructuredHTMLLoader,
 )
+from services.docx_loader import DocxWithTablesLoader
 from sentence_transformers import SentenceTransformer
+
+from services.citation_utils import build_sources
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +35,7 @@ LOADERS = {
     ".txt":  TextLoader,
     ".md":   TextLoader,
     ".csv":  CSVLoader,
-    ".docx": Docx2txtLoader,
+    ".docx": DocxWithTablesLoader,
     ".html": UnstructuredHTMLLoader,
 }
 
@@ -85,7 +88,7 @@ def index_document(file_path: str, session_id: str, doc_id: int = None) -> int:
     return len(chunks)
 
 
-def retrieve_context(query: str, session_id: str, top_k: int = 4) -> tuple[str, list[str]]:
+def retrieve_context(query: str, session_id: str, top_k: int = 4) -> tuple[str, list[dict]]:
     col = _collection(session_id)
     if col.count() == 0:
         return "", []
@@ -101,7 +104,10 @@ def retrieve_context(query: str, session_id: str, top_k: int = 4) -> tuple[str, 
     metas = results["metadatas"][0]  if results["metadatas"] else []
 
     context = "\n\n---\n\n".join(docs)
-    sources = list({m.get("source", "unknown") for m in metas})
+
+    # Build structured source list: one entry per unique (filename, chunk) pair,
+    # preserving a short preview of the retrieved text for inline citation display.
+    sources = build_sources(docs, metas)
     return context, sources
 
 

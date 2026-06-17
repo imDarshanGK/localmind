@@ -73,6 +73,22 @@ async def get_session(session_id: str):
         raise HTTPException(404, "Session not found")
     return s
 
+@router.post("/{session_id}/clone")
+async def clone_session(session_id: str):
+    s = db_service.get_session(session_id)
+    if not s:
+        raise HTTPException(404, "Session not found")
+    new_id = str(uuid.uuid4())
+    db_service.create_session(new_id, title=f"{s['title']} (Copy)", model=s["model"])
+    messages = db_service.get_messages_full(session_id)
+    for msg in messages:
+        db_service.save_message(
+            new_id,
+            msg["role"],
+            msg["content"],
+            msg["sources"]
+        )
+    return db_service.get_session(new_id)
 
 @router.patch("/{session_id}")
 async def update_session(session_id: str, body: SessionUpdate):
@@ -111,6 +127,14 @@ async def get_messages(session_id: str):
 async def clear_messages(session_id: str):
     db_service.clear_messages(session_id)
     return {"status": "cleared"}
+
+
+@router.delete("/{session_id}/messages/{message_id}")
+async def delete_message(session_id: str, message_id: int):
+    deleted = db_service.delete_message(session_id, message_id)
+    if not deleted:
+        raise HTTPException(404, "Message not found")
+    return {"status": "deleted", "session_id": session_id, "message_id": message_id}
 
 
 @router.get("/{session_id}/documents")
