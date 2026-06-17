@@ -295,6 +295,34 @@ localmind/
 
 ---
 
+## Smoke Tests
+
+Local execution:
+```bash
+docker compose up -d --build
+bash tests/smoke_test.sh
+```
+
+Preserve containers:
+```bash
+KEEP_CONTAINERS=true bash tests/smoke_test.sh
+```
+
+Increase timeout:
+```bash
+TIMEOUT_SECONDS=180 bash tests/smoke_test.sh
+```
+
+Cleanup:
+```bash
+docker compose down -v
+```
+
+Expected outputs: You should see attempt logs for both the frontend and backend, concluding with "All smoke tests passed successfully."
+Troubleshooting: If a service fails to start, the script will automatically print the diagnostic output of `docker compose ps` and `docker compose logs`. Verify that port 8000 (backend) and 3000 (frontend) are not already in use.
+
+---
+
 ## Running Tests
 
 ```bash
