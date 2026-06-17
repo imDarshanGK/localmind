@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { exportSession } from "../utils/api";
-import { AppLogoIcon, LockIcon } from "./Icons";
+import { AppLogoIcon, LockIcon, PlusCircleIcon, FileIcon, CopyIcon, ChartIcon, TemplateIcon, CloseIcon } from "./Icons";
 
 export default function ChatWindow({ messages, loading, onSend, onDeleteMessage, onStop, sessionId }) {
   const [input, setInput] = useState("");
