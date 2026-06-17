@@ -96,6 +96,32 @@ def test_clear_messages():
     assert r2.status_code == 200
 
 
+def test_delete_single_message():
+    r = client.post("/api/sessions/", json={"title": "Del Msg Test"})
+    sid = r.json()["id"]
+    db.save_message(sid, "user", "first")
+    db.save_message(sid, "assistant", "second")
+
+    msgs = client.get(f"/api/sessions/{sid}/messages").json()["messages"]
+    assert len(msgs) == 2
+    target_id = msgs[0]["id"]
+
+    r2 = client.delete(f"/api/sessions/{sid}/messages/{target_id}")
+    assert r2.status_code == 200
+    assert r2.json()["status"] == "deleted"
+
+    remaining = client.get(f"/api/sessions/{sid}/messages").json()["messages"]
+    assert len(remaining) == 1
+    assert all(m["id"] != target_id for m in remaining)
+
+
+def test_delete_message_not_found():
+    r = client.post("/api/sessions/", json={"title": "Del 404 Test"})
+    sid = r.json()["id"]
+    r2 = client.delete(f"/api/sessions/{sid}/messages/999999")
+    assert r2.status_code == 404
+
+
 # ─── Upload ──────────────────────────────────────────────
 def test_upload_invalid_type():
     files = {"file": ("bad.exe", b"data", "application/octet-stream")}

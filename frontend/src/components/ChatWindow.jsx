@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from "react";
 import { exportSession } from "../utils/api";
-import { AppLogoIcon, LockIcon } from "./Icons";
+import { AppLogoIcon, ChartIcon, CloseIcon, CopyIcon, FileIcon, LockIcon, PlusCircleIcon, TemplateIcon } from "./Icons";
+import PromptTemplateDialog from "./PromptTemplateDialog";
 
-export default function ChatWindow({ messages, loading, onSend, onStop, sessionId }) {
+export default function ChatWindow({ messages, loading, onSend, onDeleteMessage, onStop, sessionId }) {
   const [input, setInput] = useState("");
   const [showPlusMenu, setShowPlusMenu] = useState(false);
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
@@ -16,6 +17,34 @@ export default function ChatWindow({ messages, loading, onSend, onStop, sessionI
   const [exportFormat, setExportFormat] = useState("markdown");
   const [copiedMsgId, setCopiedMsgId] = useState(null);
   const [hoveredStatsId, setHoveredStatsId] = useState(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+
+  // Inline delete control with a lightweight two-step confirm (no window.confirm).
+  const renderDeleteControl = (msgId) =>
+    confirmDeleteId === msgId ? (
+      <span className="flex items-center gap-1 text-xs">
+        <span className="text-gray-500">Delete?</span>
+        <button
+          onClick={() => { onDeleteMessage?.(msgId); setConfirmDeleteId(null); }}
+          className="px-1.5 py-0.5 rounded bg-red-600/80 hover:bg-red-600 text-white transition"
+          title="Confirm delete"
+        >Yes</button>
+        <button
+          onClick={() => setConfirmDeleteId(null)}
+          className="px-1.5 py-0.5 rounded hover:bg-gray-700 text-gray-400 transition"
+          title="Cancel"
+        >No</button>
+      </span>
+    ) : (
+      <button
+        onClick={() => setConfirmDeleteId(msgId)}
+        className="p-1 rounded hover:bg-gray-800 text-gray-500 hover:text-red-400 transition"
+        title="Delete message"
+        aria-label="Delete message"
+      >
+        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
+      </button>
+    );
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
@@ -147,20 +176,62 @@ export default function ChatWindow({ messages, loading, onSend, onStop, sessionI
                 {msg.content}
                 {msg.streaming && <span className="inline-block w-1.5 h-4 bg-purple-400 ml-1 animate-pulse rounded" />}
               </div>
-              {msg.sources?.length > 0 && (
-                <div className="mt-1.5 ml-1 flex flex-wrap gap-1">
-                  {msg.sources.map((s,i) => (
-                    <span key={i} className="text-xs bg-gray-800 text-blue-400 px-2 py-0.5 rounded-full border border-gray-700">
-                      <span className="inline-flex items-center gap-1">
-                        <FileIcon className="w-3 h-3" />
-                        <span>{s}</span>
-                      </span>
-                    </span>
-                  ))}
-                </div>
-              )}
+              {msg.sources?.length > 0 && (() => {
+                // Normalize: legacy string sources ("file.pdf") → structured object.
+                // New sources already arrive as {source, chunk, preview}.
+                // This single path handles both without any database migration.
+                const normalizeSrc = (s) =>
+                  typeof s === "string"
+                    ? { source: s, chunk: null, preview: null }
+                    : s;
+
+                return (
+                  <div className="mt-1.5 ml-1 flex flex-wrap gap-1.5">
+                    {msg.sources.map((raw, i) => {
+                      const s = normalizeSrc(raw);
+                      const hasPreview = s.preview && s.preview.trim().length > 0;
+                      return (
+                        <span key={i} className="relative group inline-flex">
+                          {/* Badge */}
+                          <span className="text-xs bg-gray-800 text-blue-400 px-2 py-0.5 rounded-full border border-gray-700 cursor-default inline-flex items-center gap-1 group-hover:border-blue-500 group-hover:bg-gray-750 transition-colors">
+                            <FileIcon className="w-3 h-3 shrink-0" />
+                            <span>{s.source}</span>
+                            {s.chunk !== null && (
+                              <span className="text-gray-500 text-[10px]">#{s.chunk + 1}</span>
+                            )}
+                          </span>
+
+                          {/* Hover tooltip — only rendered when a preview exists (new sessions) */}
+                          {hasPreview && (
+                            <div className="
+                              absolute bottom-full left-0 mb-2 z-50 w-72
+                              invisible opacity-0 group-hover:visible group-hover:opacity-100
+                              transition-all duration-150 pointer-events-none
+                            ">
+                              {/* Arrow */}
+                              <div className="absolute left-3 -bottom-1.5 w-3 h-3 rotate-45 bg-gray-700 border-r border-b border-gray-600" />
+                              {/* Card */}
+                              <div className="relative bg-gray-700 border border-gray-600 rounded-xl shadow-xl px-3 py-2.5">
+                                <div className="flex items-center gap-1.5 mb-1.5 border-b border-gray-600 pb-1.5">
+                                  <FileIcon className="w-3 h-3 text-blue-400 shrink-0" />
+                                  <span className="text-xs font-semibold text-blue-400 truncate">{s.source}</span>
+                                  <span className="ml-auto text-[10px] text-gray-400 shrink-0">chunk {s.chunk + 1}</span>
+                                </div>
+                                <p className="text-xs text-gray-300 leading-relaxed line-clamp-5 whitespace-pre-wrap break-words">
+                                  {s.preview}
+                                </p>
+                              </div>
+                            </div>
+                          )}
+                        </span>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
               {msg.role === "user" && (
-                <div className="text-right mt-1 mr-1">
+                <div className="flex justify-end items-center gap-1 mt-1 mr-1">
+                  {renderDeleteControl(msg.id)}
                   <span className="text-xs text-gray-400">You</span>
                 </div>
               )}
@@ -178,6 +249,9 @@ export default function ChatWindow({ messages, loading, onSend, onStop, sessionI
                       <CopyIcon className="w-4 h-4" />
                     )}
                   </button>
+
+                  {/* Delete button */}
+                  {renderDeleteControl(msg.id)}
 
                   {/* Stats hover button */}
                   <div

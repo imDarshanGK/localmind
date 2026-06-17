@@ -1,9 +1,22 @@
 """Pydantic v2 schemas for LocalMind API."""
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List
 from datetime import datetime
 from enum import Enum
+
+
+class SourceChunk(BaseModel):
+    """A single retrieved document chunk attached to an assistant message."""
+
+    source: str
+    """Original filename (e.g. 'report.pdf')."""
+
+    chunk: int = 0
+    """Zero-based chunk index within the document."""
+
+    preview: str = ""
+    """Up to 300 characters of the retrieved chunk text for inline preview."""
 
 
 class MessageRole(str, Enum):
@@ -16,8 +29,29 @@ class ChatMessage(BaseModel):
     role: MessageRole
     content: str
     timestamp: Optional[datetime] = None
-    sources: List[str] = []
+    sources: List[SourceChunk] = []
     benchmarks: Optional[dict] = None
+
+    @field_validator("sources", mode="before")
+    @classmethod
+    def normalize_sources(cls, v: list) -> list:
+        """Coerce legacy string source entries into SourceChunk objects.
+
+        Old sessions stored sources as a plain JSON array of filename strings,
+        e.g. ["report.pdf", "notes.txt"]. New sessions store structured dicts.
+        This validator accepts both shapes and always produces List[SourceChunk],
+        so no database migration is required.
+        """
+        if not isinstance(v, list):
+            return v
+        normalized = []
+        for item in v:
+            if isinstance(item, str):
+                # Legacy format: bare filename string → SourceChunk with empty preview
+                normalized.append(SourceChunk(source=item))
+            else:
+                normalized.append(item)
+        return normalized
 
 
 class ChatRequest(BaseModel):
@@ -34,7 +68,7 @@ class ChatResponse(BaseModel):
     reply: str
     session_id: str
     model: str
-    sources: List[str] = []
+    sources: List[SourceChunk] = []
     tokens_used: Optional[int] = None
 
 

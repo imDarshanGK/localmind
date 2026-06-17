@@ -24,6 +24,7 @@ export const deleteSession = (id) => req(`/sessions/${id}`, { method: "DELETE" }
 export const clearAllSessions = () => req("/sessions/", { method: "DELETE" });
 export const getMessages = (id) => req(`/sessions/${id}/messages`);
 export const clearMessages = (id) => req(`/sessions/${id}/messages`, { method: "DELETE" });
+export const deleteMessage = (id, messageId) => req(`/sessions/${id}/messages/${messageId}`, { method: "DELETE" });
 export const getDocuments = (id) => req(`/sessions/${id}/documents`);
 export const getModels = () => req("/models/");
 export const getOllamaStatus = () => req("/models/status");
