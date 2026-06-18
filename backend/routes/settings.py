@@ -35,6 +35,17 @@ async def update_settings(body: AppSettings):
                 "type": "value_error"
             }]
         )
+    
+    # 3. Enforce safety validation boundary limits on RAG Chunk Overlap
+    if body.rag_chunk_overlap < 0 or body.rag_chunk_overlap > 200:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=[{
+                "loc": ["body", "rag_chunk_overlap"],
+                "msg": "RAG chunk overlap must be between 0 and 200 characters.",
+                "type": "value_error"
+            }]
+        )
 
     # Save cleanly to db layer once structural validation boundaries pass
     for key, val in body.model_dump().items():

@@ -18,6 +18,7 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
     temperature:      settings?.temperature      ?? 0.7,
     max_history_turns:settings?.max_history_turns|| 10,
     rag_top_k:        settings?.rag_top_k        || 4,
+    rag_chunk_overlap: settings?.rag_chunk_overlap ?? 50,
     theme:            settings?.theme            || "dark",
   });
 
@@ -98,6 +99,12 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
         <Field label={`RAG Context Chunks: ${form.rag_top_k}`} error={errors.rag_top_k}>
           <input type="range" min="1" max="10" step="1" value={form.rag_top_k}
             onChange={e => set("rag_top_k", parseInt(e.target.value))}
+            className="w-full accent-purple-500" />
+        </Field>
+
+        <Field label={`RAG Chunk Overlap: ${form.rag_chunk_overlap}`} error={errors.rag_chunk_overlap}>
+          <input type="range" min="0" max="200" step="10" value={form.rag_chunk_overlap}
+            onChange={e => set("rag_chunk_overlap", parseInt(e.target.value))}
             className="w-full accent-purple-500" />
         </Field>
 
