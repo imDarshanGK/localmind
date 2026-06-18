@@ -1,6 +1,6 @@
 """
 RAG Service v2 — LangChain + ChromaDB + sentence-transformers
-Supports: PDF, TXT, CSV, DOCX, MD, HTML
+Supports: PDF, TXT, CSV, DOCX, MD, HTML, SRT, VTT
 """
 
 import os
@@ -10,9 +10,12 @@ import chromadb
 from chromadb.config import Settings
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import (
-    PyPDFLoader, TextLoader, CSVLoader, Docx2txtLoader, UnstructuredHTMLLoader,
+    PyPDFLoader, TextLoader, CSVLoader, UnstructuredHTMLLoader,
 )
+from services.docx_loader import DocxWithTablesLoader
 from sentence_transformers import SentenceTransformer
+
+from services.citation_utils import build_sources
 
 logger = logging.getLogger(__name__)
 
@@ -32,8 +35,10 @@ LOADERS = {
     ".txt":  TextLoader,
     ".md":   TextLoader,
     ".csv":  CSVLoader,
-    ".docx": Docx2txtLoader,
+    ".docx": DocxWithTablesLoader,
     ".html": UnstructuredHTMLLoader,
+    ".srt":  TextLoader,  # Handle SubRip video/audio transcripts natively
+    ".vtt":  TextLoader,  # Handle WebVTT audio transcripts natively
 }
 
 SPLITTER = RecursiveCharacterTextSplitter(
@@ -50,7 +55,7 @@ def _collection(session_id: str):
     )
 
 
-def index_document(file_path: str, session_id: str) -> int:
+def index_document(file_path: str, session_id: str, doc_id: int = None) -> int:
     ext = Path(file_path).suffix.lower()
     loader_cls = LOADERS.get(ext)
     if not loader_cls:
@@ -61,18 +66,31 @@ def index_document(file_path: str, session_id: str) -> int:
     if not chunks:
         return 0
 
-    texts      = [c.page_content for c in chunks]
-    embeddings = embedder.encode(texts, show_progress_bar=False).tolist()
-    ids        = [f"{session_id}_{i}" for i in range(len(texts))]
-    metadatas  = [{"source": Path(file_path).name, "chunk": i} for i in range(len(texts))]
+    texts = [c.page_content for c in chunks]
+    ids = [f"{session_id}_{i}" for i in range(len(texts))]
+    metadatas = [{"source": Path(file_path).name, "chunk": i} for i in range(len(texts))]
 
     col = _collection(session_id)
-    col.upsert(ids=ids, documents=texts, embeddings=embeddings, metadatas=metadatas)
+    
+    import time
+    batch_size = 200
+    for i in range(0, len(texts), batch_size):
+        batch_texts = texts[i:i + batch_size]
+        batch_ids = ids[i:i + batch_size]
+        batch_metas = metadatas[i:i + batch_size]
+        
+        batch_embeddings = embedder.encode(batch_texts, show_progress_bar=False).tolist()
+        col.upsert(ids=batch_ids, documents=batch_texts, embeddings=batch_embeddings, metadatas=batch_metas)
+        if doc_id is not None:
+            from services import db_service
+            db_service.update_document_status(doc_id, "processing", chunks_indexed=(i + len(batch_texts)))
+        time.sleep(0.05)  # Yield GIL to allow event loop to process other requests
+
     logger.info(f"Indexed {len(chunks)} chunks for session={session_id}")
     return len(chunks)
 
 
-def retrieve_context(query: str, session_id: str, top_k: int = 4) -> tuple[str, list[str]]:
+def retrieve_context(query: str, session_id: str, top_k: int = 4) -> tuple[str, list[dict]]:
     col = _collection(session_id)
     if col.count() == 0:
         return "", []
@@ -88,7 +106,10 @@ def retrieve_context(query: str, session_id: str, top_k: int = 4) -> tuple[str, 
     metas = results["metadatas"][0]  if results["metadatas"] else []
 
     context = "\n\n---\n\n".join(docs)
-    sources = list({m.get("source", "unknown") for m in metas})
+
+    # Build structured source list: one entry per unique (filename, chunk) pair,
+    # preserving a short preview of the retrieved text for inline citation display.
+    sources = build_sources(docs, metas)
     return context, sources
 
 

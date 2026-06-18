@@ -1,9 +1,22 @@
 """Pydantic v2 schemas for LocalMind API."""
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List
 from datetime import datetime
 from enum import Enum
+
+
+class SourceChunk(BaseModel):
+    """A single retrieved document chunk attached to an assistant message."""
+
+    source: str
+    """Original filename (e.g. 'report.pdf')."""
+
+    chunk: int = 0
+    """Zero-based chunk index within the document."""
+
+    preview: str = ""
+    """Up to 300 characters of the retrieved chunk text for inline preview."""
 
 
 class MessageRole(str, Enum):
@@ -16,7 +29,29 @@ class ChatMessage(BaseModel):
     role: MessageRole
     content: str
     timestamp: Optional[datetime] = None
-    sources: List[str] = []
+    sources: List[SourceChunk] = []
+    benchmarks: Optional[dict] = None
+
+    @field_validator("sources", mode="before")
+    @classmethod
+    def normalize_sources(cls, v: list) -> list:
+        """Coerce legacy string source entries into SourceChunk objects.
+
+        Old sessions stored sources as a plain JSON array of filename strings,
+        e.g. ["report.pdf", "notes.txt"]. New sessions store structured dicts.
+        This validator accepts both shapes and always produces List[SourceChunk],
+        so no database migration is required.
+        """
+        if not isinstance(v, list):
+            return v
+        normalized = []
+        for item in v:
+            if isinstance(item, str):
+                # Legacy format: bare filename string → SourceChunk with empty preview
+                normalized.append(SourceChunk(source=item))
+            else:
+                normalized.append(item)
+        return normalized
 
 
 class ChatRequest(BaseModel):
@@ -26,13 +61,14 @@ class ChatRequest(BaseModel):
     use_documents: bool = True
     temperature: float = Field(default=0.7, ge=0.0, le=2.0)
     language: str = "en"
+    resume_offset: Optional[int] = 0
 
 
 class ChatResponse(BaseModel):
     reply: str
     session_id: str
     model: str
-    sources: List[str] = []
+    sources: List[SourceChunk] = []
     tokens_used: Optional[int] = None
 
 
@@ -95,3 +131,19 @@ class ExportFormat(str, Enum):
     markdown = "markdown"
     json = "json"
     txt = "txt"
+
+
+class SessionRenameItem(BaseModel):
+    session_id: str
+    new_title: str
+
+class BulkSessionRenameRequest(BaseModel):
+    sessions: List[SessionRenameItem]
+
+class PromptTemplateCreate(BaseModel):
+    prompt_title: str = Field(..., min_length=1, max_length=200)
+    prompt: str = Field(..., min_length=1)
+
+class PromptTemplateUpdate(BaseModel):
+    prompt_title: Optional[str] = None
+    prompt: Optional[str] = None

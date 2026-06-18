@@ -14,10 +14,11 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
 [![SSoC 2026](https://img.shields.io/badge/SSoC-2026-blueviolet?style=flat-square)](https://ssoc.dev)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square)](CONTRIBUTING.md)
+[![Discord](https://img.shields.io/badge/Discord-Join%20Community-5865F2?style=flat-square&logo=discord&logoColor=white)](https://discord.gg/gvTUuMXk)
 
 <br/>
 
-[Quick Start](#quick-start) · [Features](#features) · [Tech Stack](#tech-stack) · [Contributing](#contributing) · [Screenshots](#screenshots)
+[Quick Start](#quick-start) · [Features](#features) · [Tech Stack](#tech-stack) · [Troubleshooting](#macos-install-troubleshooting) · [Contributing](#contributing) · [Screenshots](#screenshots)
 
 ---
 
@@ -62,7 +63,7 @@
 
 ## 🛠 Tech Stack
 
-```
+```text
 ┌────────────────────────────────────────────────┐
 │               LocalMind v2.0                   │
 ├──────────────┬─────────────────────────────────┤
@@ -133,11 +134,108 @@ VITE_API_BASE_URL=https://<your-backend>.onrender.com/api
 
 The included `render.yaml` defines a backend web service and a frontend static site for the same repo.
 
+## macOS Install Troubleshooting
+
+### `node` or `npm` not found
+**Symptom:** `zsh: command not found: node` or `The engine "node" is incompatible with this module`
+
+```bash
+brew install nvm
+echo 'export NVM_DIR="$HOME/.nvm"' >> ~/.zshrc
+echo '[ -s "$(brew --prefix nvm)/nvm.sh" ] && . "$(brew --prefix nvm)/nvm.sh"' >> ~/.zshrc
+source ~/.zshrc
+nvm install 18 && nvm use 18
+```
+> Open a new terminal window after running this so the PATH update takes effect.
+
+---
+
+### `pip install` fails building wheels
+**Symptom:** `xcrun: error: invalid active developer path` or `clang: error: command not found`
+
+```bash
+xcode-select --install   # one-time, installs Apple Command Line Tools
+
+cd backend
+python3 -m venv venv && source venv/bin/activate
+pip install --upgrade pip setuptools wheel
+pip install -r requirements.txt
+```
+> If the popup says tools are already installed, run `xcode-select -p` to confirm the path, then retry pip.
+
+---
+
+### Apple Silicon architecture mismatch
+**Symptom:** `bad CPU type in executable` or `mach-o file, but is an incompatible architecture`
+
+```bash
+cd backend
+rm -rf venv
+arch -arm64 python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+cd ../frontend
+arch -arm64 npm install
+```
+> If your Python or Node was installed under Intel Homebrew, open a Rosetta shell first (`arch -x86_64 zsh`) and rerun the same commands there.
+
+---
+
+### Port 3000 or 8000 already in use
+**Symptom:** `EADDRINUSE: address already in use`
+
+```bash
+lsof -ti :3000 | xargs kill
+lsof -ti :8000 | xargs kill
+```
+> Then re-run `npm run dev` and `uvicorn app:app --reload --port 8000`.
+
+---
+
+### Ollama not reachable
+**Symptom:** `Failed to connect to Ollama` or `Connection refused — localhost:11434`
+
+```bash
+ollama serve
+ollama pull llama3
+curl http://localhost:11434/api/tags   # should return a JSON list of models
+```
+> If `ollama` is not found, download the app from [ollama.com](https://ollama.com) and reopen Terminal.
+
+---
+
+### Python version too old
+**Symptom:** `python --version` shows 3.10 or earlier
+
+```bash
+brew install python@3.11
+
+cd backend
+python3.11 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+> Run `python --version` inside the activated venv — it should show `3.11.x`.
+
+---
+
+## Verifying Your macOS Setup
+
+```bash
+node --version      # v18.x or v20.x
+npm --version       # 8 or higher
+python3 --version   # Python 3.11.x or higher
+ollama list         # shows llama3 or another pulled model
+```
+
+If all four pass and `npm run dev` starts without errors, your setup is complete.
+
 ---
 
 ## Project Structure
 
-```
+```text
 localmind/
 ├── backend/
 │   ├── app.py                    # FastAPI entry point
@@ -223,8 +321,38 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide.
 ## License
 
 MIT © 2026
+
 <div align="center">
 
 If LocalMind helped you, please star the repo. ⭐✨🚀
 
+</div>
+
+---
+
+## 🌟 Community Showcase
+
+Built something cool with LocalMind? We'd love to see it! Open a Pull Request to add your project, tutorial, or integration to this list.
+
+### 🛠️ Projects & Integrations
+* **[Community projects will appear here.]** - A brief 1-2 sentence description of what your integration does. (By [@yourusername](https://github.com/yourusername))
+* *Contributions welcome! Add your tool here.*
+
+### 📚 Community Articles & Tutorials
+* *Have you written a blog post or recorded a video setup guide? Share it with the community here!*
+
+---
+
+### 🛡️ Dependency Security Scanning
+
+Our CI pipeline automatically audits backend dependencies for known vulnerabilities (CVEs) on every push and pull request using `pip-audit`.
+
+To scan your dependencies locally before pushing code, run the following commands inside your virtual environment:
+
+```bash
+# Install the security scanner
+pip install pip-audit
+
+# Run the vulnerability audit against your requirements file
+pip-audit -r requirements.txt
 </div>
