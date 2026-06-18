@@ -10,23 +10,21 @@ import StatusBar from "./components/StatusBar";
 import * as api from "./utils/api";
 import { getSessionColor, setSessionColor } from "./utils/colorHelper";
 
-
 export default function App() {
-
-  const [sessionId, setSessionId] = useState(() => uuidv4());
-  const [messages, setMessages] = useState([]);
-  const [sessions, setSessions] = useState([]);
-  const [model, setModel] = useState("llama3");
-  const [models, setModels] = useState([]);
-  const [documents, setDocuments] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [streaming, setStreaming] = useState(false);
-  const [panel, setPanel] = useState(null); // "upload"|"plugins"|"settings"|null
-  const [view, setView] = useState("chat"); // "chat"|"prompts"
-  const [language, setLanguage] = useState("en");
-  const [ollamaOk, setOllamaOk] = useState(null);
-  const [settings, setSettings] = useState({});
-  const [useStream, setUseStream] = useState(true);
+  const [sessionId,  setSessionId]  = useState(() => uuidv4());
+  const [messages,   setMessages]   = useState([]);
+  const [sessions,   setSessions]   = useState([]);
+  const [model,      setModel]      = useState("llama3");
+  const [models,     setModels]     = useState([]);
+  const [documents,  setDocuments]  = useState([]);
+  const [loading,    setLoading]    = useState(false);
+  const [streaming,  setStreaming]  = useState(false);
+  const [panel,      setPanel]      = useState(null); // "upload"|"plugins"|"settings"|null
+  const [view,       setView]       = useState("chat"); // "chat"|"prompts"
+  const [language,   setLanguage]   = useState("en");
+  const [ollamaOk,   setOllamaOk]   = useState(null);
+  const [settings,   setSettings]   = useState({});
+  const [useStream,  setUseStream]  = useState(true);
 
   // --- FEATURE REFERENCE: TRACK ACTIVE REQUEST ABORT SIGNAL ---
   const abortControllerRef = useRef(null);
