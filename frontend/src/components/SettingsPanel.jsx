@@ -1,8 +1,14 @@
 import { useState } from "react";
 import { SettingsIcon } from "./Icons";
 
-const MODELS    = ["llama3","mistral","phi3","gemma2","deepseek-r1"];
-const LANGUAGES = [{code:"en",label:"English"},{code:"hi",label:"हिन्दी"},{code:"ta",label:"தமிழ்"},{code:"te",label:"తెలుగు"},{code:"kn",label:"ಕನ್ನಡ"},{code:"fr",label:"Français"},  {code:"ar",label:"العربية"},
+const MODELS    = ["llama3", "mistral", "phi3", "gemma2", "deepseek-r1"];
+const LANGUAGES = [
+  { code: "en", label: "English" },
+  { code: "hi", label: "हिन्दी" },
+  { code: "ta", label: "தமிழ்" },
+  { code: "te", label: "తెలుగు" },
+  { code: "kn", label: "ಕನ್ನಡ" },
+  { code: "fr", label: "Français" }
 ];
 
 export default function SettingsPanel({ settings, onSave, onClose }) {
