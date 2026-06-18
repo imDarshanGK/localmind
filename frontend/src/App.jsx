@@ -44,6 +44,25 @@ export default function App() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
+  // Poll Ollama status and refresh models on recovery
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const stRes = await api.getOllamaStatus();
+        const isRunning = stRes.ollama_running;
+        setOllamaOk((prev) => {
+          if (prev === false && isRunning === true) {
+            api.getModels().then(mRes => setModels(mRes.models || []));
+          }
+          return isRunning;
+        });
+      } catch {
+        setOllamaOk(false);
+      }
+    }, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
   async function bootstrap() {
     try {
       const [mRes, sRes, settRes, stRes] = await Promise.allSettled([
@@ -79,11 +98,16 @@ export default function App() {
     setStreaming(false);
     setLoading(false);
 
+    // Call backend to actually stop the ongoing generation task
+    if (sessionId) {
+      api.cancelStream(sessionId).catch(e => console.error("Cancel stream error:", e));
+    }
+
     // Clean up the trailing 'typing' state bubble indicators in the messages layout array
     setMessages(prev =>
       prev.map(m => m.streaming ? { ...m, streaming: false, content: m.content + "\n\n[Generation Stopped]" } : m)
     );
-  }, []);
+  }, [sessionId]);
 
   async function sendMessage(text) {
     if (!text.trim() || loading || streaming) return;
