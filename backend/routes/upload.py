@@ -1,5 +1,4 @@
 """Upload routes — /api/upload"""
-
 import os
 from pathlib import Path
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks
@@ -18,6 +17,9 @@ ALLOWED = {
     "text/markdown": ".md",
     "text/html": ".html",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
+    "text/vtt": ".vtt",                 # WebVTT Transcript Format
+    "application/x-subrip": ".srt",     # SubRip Transcript Format
+    "text/srt": ".srt",                 # Fallback alternative header for SRT
 }
 MAX_BYTES = 50 * 1024 * 1024  # 50 MB
 
@@ -38,7 +40,7 @@ async def upload(file: UploadFile = File(...), session_id: str = Form(...), back
             "upload_rejected route=/upload session=%s filename=%s reason=unsupported_type",
             session_id, file.filename,
         )
-        raise HTTPException(400, "Unsupported file. Allowed: PDF, TXT, CSV, DOCX, MD, HTML")
+        raise HTTPException(400, "Unsupported file. Allowed: PDF, TXT, CSV, DOCX, MD, HTML, SRT, VTT")
 
     content = await file.read()
     if len(content) > MAX_BYTES:

@@ -6,7 +6,8 @@ import { highlightText } from "../utils/search";
 const LANGUAGES = [
   {code:"en",label:"English"},{code:"hi",label:"हिन्दी"},{code:"ta",label:"தமிழ்"},
   {code:"te",label:"తెలుగు"},{code:"kn",label:"ಕನ್ನಡ"},{code:"fr",label:"Français"},
-  {code:"de",label:"Deutsch"},{code:"es",label:"Español"},
+  {code:"de",label:"Deutsch"},{code:"es",label:"Español"},  {code:"ar",label:"العربية"},
+
 ];
 
 export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSession, onDeleteSession, onClearAllSessions, model, models, onModelChange, language, onLanguageChange, onUpdateSessionColor }) {
