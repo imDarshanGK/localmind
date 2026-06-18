@@ -46,7 +46,7 @@ export async function uploadDocument(file, session_id) {
   const fd = new FormData();
   fd.append("file", file); fd.append("session_id", session_id);
   const res = await fetch(`${BASE}/upload/`, { method: "POST", body: fd });
-  if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e.detail||"Upload failed"); }
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || "Upload failed"); }
   return res.json();
 }
 
