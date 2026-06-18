@@ -2,6 +2,7 @@
 
 import json
 import tempfile
+import os
 from unittest.mock import AsyncMock, patch
 
 from fastapi.testclient import TestClient
@@ -59,6 +60,24 @@ def test_delete_session():
     sid = r.json()["id"]
     r2 = client.delete(f"/api/sessions/{sid}")
     assert r2.status_code == 200
+
+
+def test_delete_session_removes_files():
+    r = client.post("/api/sessions/", json={"title": "To Delete With Files"})
+    sid = r.json()["id"]
+    
+    upload_dir = f"./data/uploads/{sid}"
+    os.makedirs(upload_dir, exist_ok=True)
+    with open(os.path.join(upload_dir, "test.txt"), "w") as f:
+        f.write("dummy")
+        
+    assert os.path.exists(upload_dir)
+    
+    r2 = client.delete(f"/api/sessions/{sid}")
+    assert r2.status_code == 200
+    
+    assert not os.path.exists(upload_dir)
+
 
 def test_clone_session():
     r = client.post(
