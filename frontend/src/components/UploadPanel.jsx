@@ -51,11 +51,16 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose 
         onClick={()=>fileRef.current.click()}
         className={`border-2 border-dashed rounded-xl px-4 py-5 text-center cursor-pointer transition mb-3
           ${dragging ? "border-purple-500 bg-purple-900/20" : "border-gray-700 hover:border-purple-600 hover:bg-gray-800/50"}`}>
-        <input ref={fileRef} type="file" accept=".pdf,.txt,.csv,.docx,.md,.html" className="hidden"
+        
+        {/* Updated accept attribute to include .srt and .vtt transcript options */}
+        <input ref={fileRef} type="file" accept=".pdf,.txt,.csv,.docx,.md,.html,.srt,.vtt" className="hidden"
           onChange={e=>handleFile(e.target.files[0])} />
+        
         <p className="text-2xl mb-1 flex justify-center">{uploading ? <SpinnerIcon className="w-7 h-7 text-purple-400" /> : <UploadIcon className="w-7 h-7 text-gray-300" />}</p>
         <p className="text-sm text-gray-400">{uploading ? "Indexing document..." : "Drop file here or click to browse"}</p>
-        <p className="text-xs text-gray-600 mt-1">PDF · TXT · CSV · DOCX · MD · HTML · max 50MB</p>
+        
+        {/* Updated visual footer labels to explicitly display audio transcript support */}
+        <p className="text-xs text-gray-600 mt-1">PDF · TXT · CSV · DOCX · MD · HTML · SRT · VTT · max 50MB</p>
       </div>
 
       {result && <p className="text-xs text-green-400 mb-2 inline-flex items-center gap-1"><CheckIcon className="w-3.5 h-3.5" />{result.message}</p>}
