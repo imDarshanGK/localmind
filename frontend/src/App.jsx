@@ -44,6 +44,25 @@ export default function App() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
+  // Poll Ollama status and refresh models on recovery
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const stRes = await api.getOllamaStatus();
+        const isRunning = stRes.ollama_running;
+        setOllamaOk((prev) => {
+          if (prev === false && isRunning === true) {
+            api.getModels().then(mRes => setModels(mRes.models || []));
+          }
+          return isRunning;
+        });
+      } catch {
+        setOllamaOk(false);
+      }
+    }, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
   async function bootstrap() {
     try {
       const [mRes, sRes, settRes, stRes] = await Promise.allSettled([
