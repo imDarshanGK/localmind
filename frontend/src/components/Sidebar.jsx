@@ -15,6 +15,7 @@ const LANGUAGES = [
   { code: "de", label: "Deutsch" },
   { code: "es", label: "Español" },
   { code: "ar", label: "العربية" },
+  { code: "ja", label: "日本語" },
 ];
 
 export default function Sidebar({
