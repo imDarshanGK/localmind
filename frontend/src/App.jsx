@@ -10,8 +10,6 @@ import StatusBar from "./components/StatusBar";
 import * as api from "./utils/api";
 import { getSessionColor, setSessionColor } from "./utils/colorHelper";
 
-
-
 export default function App() {
   const [sessionId,  setSessionId]  = useState(() => uuidv4());
   const [messages,   setMessages]   = useState([]);
