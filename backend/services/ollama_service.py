@@ -94,6 +94,7 @@ async def chat_stream(
     backoff = 1.0
 
     while attempt <= actual_max_attempts:
+        is_transient = False
         try:
             async with httpx.AsyncClient(timeout=TIMEOUT) as client:
                 async with client.stream("POST", f"{OLLAMA_BASE_URL}/api/chat", json=payload) as resp:
@@ -211,6 +212,7 @@ async def pull_model(model_name: str) -> AsyncGenerator[str, None]:
     backoff = 1.0
 
     while attempt <= actual_max_attempts:
+        is_transient = False
         try:
             async with httpx.AsyncClient(timeout=600.0) as client:
                 async with client.stream(
