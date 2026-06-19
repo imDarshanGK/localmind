@@ -51,7 +51,6 @@ class StreamBuffer:
         self.benchmarks: dict | None = None
         self.cancelled = False
 
-
 async def clean_expired_streams():
     while True:
         try:

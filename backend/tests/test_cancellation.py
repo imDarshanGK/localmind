@@ -5,7 +5,6 @@ from unittest.mock import AsyncMock, patch
 
 import tempfile
 
-import services.db_service as db
 from routes.chat import chat_stream, cancel_stream, ACTIVE_STREAMS, StreamBuffer
 from models.schemas import ChatRequest
 

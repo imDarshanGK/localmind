@@ -5,6 +5,7 @@ Supports: PDF, TXT, CSV, DOCX, MD, HTML, SRT, VTT
 
 import os
 import logging
+import time
 from pathlib import Path
 import chromadb
 from chromadb.config import Settings
@@ -41,12 +42,6 @@ LOADERS = {
     ".vtt":  TextLoader,  # Handle WebVTT audio transcripts natively
 }
 
-SPLITTER = RecursiveCharacterTextSplitter(
-    chunk_size=600,
-    chunk_overlap=80,
-    separators=["\n\n", "\n", ". ", " "],
-)
-
 
 def _collection(session_id: str):
     return chroma_client.get_or_create_collection(
@@ -61,8 +56,21 @@ def index_document(file_path: str, session_id: str, doc_id: int = None) -> int:
     if not loader_cls:
         raise ValueError(f"Unsupported file type: {ext}. Supported: {list(LOADERS)}")
 
-    docs   = loader_cls(file_path).load()
-    chunks = SPLITTER.split_documents(docs)
+    docs = loader_cls(file_path).load()
+    
+    # Fetch live chunk overlap bounds configuration directly from database cache settings
+    from services.db_service import get_settings
+    current_settings = get_settings()
+    overlap_val = current_settings.get("rag_chunk_overlap", 50)
+
+    # Initialize a clean dynamic splitter configured to the user's current settings preference
+    dynamic_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=600,
+        chunk_overlap=int(overlap_val),
+        separators=["\n\n", "\n", ". ", " "],
+    )
+    
+    chunks = dynamic_splitter.split_documents(docs)
     if not chunks:
         return 0
 
@@ -72,7 +80,6 @@ def index_document(file_path: str, session_id: str, doc_id: int = None) -> int:
 
     col = _collection(session_id)
     
-    import time
     batch_size = 200
     for i in range(0, len(texts), batch_size):
         batch_texts = texts[i:i + batch_size]
@@ -86,7 +93,7 @@ def index_document(file_path: str, session_id: str, doc_id: int = None) -> int:
             db_service.update_document_status(doc_id, "processing", chunks_indexed=(i + len(batch_texts)))
         time.sleep(0.05)  # Yield GIL to allow event loop to process other requests
 
-    logger.info(f"Indexed {len(chunks)} chunks for session={session_id}")
+    logger.info(f"Indexed {len(chunks)} chunks for session={session_id} using chunk_overlap={overlap_val}")
     return len(chunks)
 
 
