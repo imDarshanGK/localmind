@@ -303,6 +303,15 @@ def save_setting(key: str, value):
 
 
 # ─── Plugin logs ─────────────────────────────────────────────
+
+def get_plugin_logs(limit: int = 50) -> list[dict]:
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT * FROM plugin_logs ORDER BY created_at DESC LIMIT ?",
+            (limit,)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
 def log_plugin(session_id: str, plugin: str, inp: str, out: str, success: bool = True):
     with get_db() as conn:
         conn.execute(

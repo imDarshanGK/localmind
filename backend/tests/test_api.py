@@ -289,6 +289,24 @@ def test_coderunner_timeout():
     assert r.json()["success"]
     assert "Timeout" in r.json()["output"]
 
+
+def test_get_plugin_logs():
+    client.post("/api/plugins/run", json={
+        "plugin": "calculator", 
+        "input": "3+7", 
+        "session_id": "test-audit-log"
+    })
+    r = client.get("/api/plugins/logs")
+    
+    assert r.status_code == 200
+    logs = r.json()["logs"]
+    
+    assert len(logs) >= 1
+    assert logs[0]["plugin"] == "calculator"
+    assert logs[0]["input"] == "3+7"
+    assert "10" in logs[0]["output"]
+    assert logs[0]["success"] == 1
+
 # ─── Settings ────────────────────────────────────────────
 def test_get_settings():
     r = client.get("/api/settings/")
