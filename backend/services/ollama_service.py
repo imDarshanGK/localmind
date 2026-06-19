@@ -6,7 +6,9 @@ import logging
 import os
 import httpx
 import json
+import asyncio
 from typing import AsyncGenerator
+from utils.retry import with_retry
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +42,7 @@ def _build_messages(message: str, context: str, history: list, language: str) ->
     return msgs
 
 
+@with_retry(max_attempts=3, initial_backoff=1.0)
 async def chat(
     message: str,
     model: str = "llama3",
@@ -80,22 +83,57 @@ async def chat_stream(
         "stream": True,
         "options": {"temperature": temperature, "top_p": 0.9, "num_predict": 2048},
     }
-    async with httpx.AsyncClient(timeout=TIMEOUT) as client:
-        async with client.stream("POST", f"{OLLAMA_BASE_URL}/api/chat", json=payload) as resp:
-            resp.raise_for_status()
-            async for line in resp.aiter_lines():
-                if line.strip():
-                    try:
-                        data = json.loads(line)
-                        token = data.get("message", {}).get("content", "")
-                        if token:
-                            yield token
-                        if data.get("done"):
-                            break
-                    except json.JSONDecodeError:
-                        continue
+    
+    max_attempts = 3
+    actual_max_attempts = max(1, max_attempts)
+    attempt = 1
+    backoff = 1.0
+
+    while attempt <= actual_max_attempts:
+        try:
+            async with httpx.AsyncClient(timeout=TIMEOUT) as client:
+                async with client.stream("POST", f"{OLLAMA_BASE_URL}/api/chat", json=payload) as resp:
+                    resp.raise_for_status()
+                    async for line in resp.aiter_lines():
+                        if line.strip():
+                            try:
+                                data = json.loads(line)
+                                token = data.get("message", {}).get("content", "")
+                                if token:
+                                    yield token
+                                if data.get("done"):
+                                    break
+                            except json.JSONDecodeError:
+                                continue
+            # If we exit the context manager normally, we are done, break out of retry loop
+            break
+        
+        except httpx.RequestError as e:
+            is_transient = True
+            error_msg = f"Network Error: {type(e).__name__}"
+            last_exc = e
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code in (408, 429, 500, 502, 503, 504):
+                is_transient = True
+                error_msg = f"HTTP {e.response.status_code}"
+                last_exc = e
+            else:
+                raise
+        except Exception:
+            raise
+
+        if is_transient:
+            if attempt == actual_max_attempts:
+                logger.error(f"chat_stream failed after {actual_max_attempts} attempts. Last error: {error_msg}")
+                raise last_exc
+            
+            logger.warning(f"chat_stream failed ({error_msg}). Retrying in {backoff}s... (Attempt {attempt}/{actual_max_attempts})")
+            await asyncio.sleep(backoff)
+            attempt += 1
+            backoff *= 2
 
 
+@with_retry(max_attempts=3, initial_backoff=1.0)
 async def list_models() -> list[dict]:
     async with httpx.AsyncClient(timeout=8.0) as client:
         try:
@@ -118,16 +156,44 @@ async def list_models() -> list[dict]:
 
 async def pull_model(model_name: str) -> AsyncGenerator[str, None]:
     """Pull a model from Ollama registry with progress streaming."""
-    async with httpx.AsyncClient(timeout=600.0) as client:
-        async with client.stream(
-            "POST", f"{OLLAMA_BASE_URL}/api/pull",
-            json={"name": model_name, "stream": True}
-        ) as resp:
-            async for line in resp.aiter_lines():
-                if line.strip():
-                    yield line + "\n"
+    max_attempts = 3
+    actual_max_attempts = max(1, max_attempts)
+    attempt = 1
+    backoff = 1.0
+
+    while attempt <= actual_max_attempts:
+        try:
+            async with httpx.AsyncClient(timeout=600.0) as client:
+                async with client.stream(
+                    "POST", f"{OLLAMA_BASE_URL}/api/pull",
+                    json={"name": model_name, "stream": True}
+                ) as resp:
+                    resp.raise_for_status()
+                    async for line in resp.aiter_lines():
+                        if line.strip():
+                            yield line + "\n"
+            break
+        except httpx.RequestError as e:
+            is_transient = True
+            last_exc = e
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code in (408, 429, 500, 502, 503, 504):
+                is_transient = True
+                last_exc = e
+            else:
+                raise
+        except Exception:
+            raise
+
+        if is_transient:
+            if attempt == actual_max_attempts:
+                raise last_exc
+            await asyncio.sleep(backoff)
+            attempt += 1
+            backoff *= 2
 
 
+@with_retry(max_attempts=3, initial_backoff=1.0)
 async def delete_model(model_name: str) -> bool:
     async with httpx.AsyncClient(timeout=30.0) as client:
         try:

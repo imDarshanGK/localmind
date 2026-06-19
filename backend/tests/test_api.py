@@ -120,6 +120,33 @@ def test_clear_messages():
     assert r2.status_code == 200
 
 
+def test_session_title_trimming_emoji():
+    # Test case 1: first message containing an emoji near the truncation boundary (40 graphemes)
+    r = client.post("/api/sessions/", json={"title": "New Chat"})
+    sid = r.json()["id"]
+    msg = "This message has exactly 39 characters 💪🏾 next part"
+    db.save_message(sid, "user", msg)
+    sess = db.get_session(sid)
+    assert sess["title"] == "This message has exactly 39 characters 💪🏾..."
+    assert "\ufffd" not in sess["title"]
+
+    # Test case 2: normal ASCII message -> title is trimmed and has "..." (no regression)
+    r2 = client.post("/api/sessions/", json={"title": "New Chat"})
+    sid2 = r2.json()["id"]
+    msg2 = "This is a very long ASCII message that will definitely exceed the limit of forty characters."
+    db.save_message(sid2, "user", msg2)
+    sess2 = db.get_session(sid2)
+    assert sess2["title"] == "This is a very long ASCII message that w..."
+
+    # Test case 3: message shorter than limit -> title unchanged
+    r3 = client.post("/api/sessions/", json={"title": "New Chat"})
+    sid3 = r3.json()["id"]
+    msg3 = "Short message"
+    db.save_message(sid3, "user", msg3)
+    sess3 = db.get_session(sid3)
+    assert sess3["title"] == "Short message"
+
+
 def test_delete_single_message():
     r = client.post("/api/sessions/", json={"title": "Del Msg Test"})
     sid = r.json()["id"]
