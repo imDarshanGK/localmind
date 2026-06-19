@@ -350,6 +350,7 @@ def test_export_json():
     assert len(data["messages"]) == 2
 
 def test_export_complete_session_flow():
+    
     r = client.post(
         "/api/sessions/",
         json={"title": "Integration Export"}
@@ -379,7 +380,8 @@ def test_export_complete_session_flow():
 
     assert payload["session"]["id"] == sid
     assert payload["session"]["title"] == "Integration Export"
-
+    assert "created_at" in payload["session"]
+    assert "updated_at" in payload["session"]
     assert len(payload["messages"]) == 2
 
     assert payload["messages"][0]["content"] == "What is LocalMind?"
