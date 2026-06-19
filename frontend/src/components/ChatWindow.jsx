@@ -1,3 +1,4 @@
+import ReactMarkdown from "react-markdown";
 import { useState, useRef, useEffect } from "react";
 import { exportSession } from "../utils/api";
 import { AppLogoIcon, ChartIcon, CloseIcon, CopyIcon, FileIcon, LockIcon, PlusCircleIcon, TemplateIcon } from "./Icons";
@@ -100,13 +101,19 @@ export default function ChatWindow({ messages, loading, onSend, onDeleteMessage,
   }
   function send() {
     if ((!input.trim() && !selectedTemplate) || loading) return;
+
     const message = selectedTemplate
       ? `${selectedTemplate.prompt}\n\n${input.trim()}`.trim()
       : input.trim();
-    onSend(message);
+
+    onSend(message);   // ✅ ONLY THIS (STRING)
+
     setInput("");
     setSelectedTemplate(null);
-    if (textareaRef.current) { textareaRef.current.style.height = "auto"; }
+
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+    }
   }
 
   function handleKey(e) {
@@ -173,7 +180,58 @@ export default function ChatWindow({ messages, loading, onSend, onDeleteMessage,
                 ${msg.role === "user"
                   ? "bg-purple-700 text-white rounded-br-sm"
                   : "bg-gray-800 text-gray-100 rounded-bl-sm border border-gray-700"}`}>
-                {msg.content}
+                <ReactMarkdown
+                  components={{
+                    code({ inline, className, children }) {
+                      let language = "text";
+
+                      //  Detect from markdown (```python)
+                      const match = /language-(\w+)/.exec(className || "");
+                      if (match) {
+                        language = match[1];
+                      } 
+                      //  Fallback detection (SMART 🔥)
+                      else {
+                        const codeText = String(children);
+
+                        if (codeText.includes("def ") || codeText.includes("print(")) {
+                          language = "python";
+                        } else if (
+                            codeText.includes("function") ||
+                            codeText.includes("console.log")
+                        ) {
+                            language = "javascript";
+                        } else if (
+                            codeText.includes("#include") ||
+                            codeText.includes("cout")
+                        ) {
+                            language = "cpp";
+                          }
+                        }
+
+                        // Inline code (no badge)
+                        if (inline) {
+                          return <code>{children}</code>;
+                        }
+
+                        return (
+                          <div className="relative bg-gray-900 rounded-lg mt-2">
+          
+                            {/* 🔥 LANGUAGE BADGE */}
+                            <div className="absolute top-2 right-2 text-xs bg-gray-700 px-2 py-1 rounded text-white">
+                              {language.toUpperCase()}
+                            </div>
+
+                            <pre className="p-4 overflow-x-auto">
+                              <code>{children}</code>
+                            </pre>
+                          </div>
+                        );
+                      }
+                    }}
+                  >
+                    {msg.content}
+                  </ReactMarkdown>
                 {msg.streaming && <span className="inline-block w-1.5 h-4 bg-purple-400 ml-1 animate-pulse rounded" />}
               </div>
               {msg.sources?.length > 0 && (() => {

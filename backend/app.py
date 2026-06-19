@@ -22,9 +22,10 @@ from routes.sessions import router as sessions_router
 from routes.plugins import router as plugins_router
 from routes.export import router as export_router
 from routes.settings import router as settings_router
+
 from routes.prompt_templates import router as prompt_templates_router
 from middleware.csrf import OriginValidationMiddleware
-from services.db_service import init_db
+from services.db_service import init_db, get_db
 
 logging.basicConfig(
     level=logging.INFO,
@@ -104,3 +105,12 @@ async def root():
 @app.get("/health", tags=["Health"])
 async def health():
     return {"status": "healthy"}
+
+@app.get("/health/db", tags=["Health"])
+async def db_health():
+    try:
+        with get_db() as conn:
+            conn.execute("SELECT 1")
+        return {"status": "healthy"}
+    except Exception:
+        return {"status": "unhealthy"}

@@ -30,6 +30,11 @@ def test_health():
     assert r.json()["status"] == "healthy"
 
 
+def test_db_health():
+    r = client.get("/health/db")
+    assert r.status_code == 200
+    assert r.json()["status"] == "healthy"
+
 # ─── Sessions ────────────────────────────────────────────
 def test_create_session():
     r = client.post("/api/sessions/", json={"title": "Test Chat", "model": "llama3"})
