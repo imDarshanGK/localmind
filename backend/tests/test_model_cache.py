@@ -1,6 +1,6 @@
 import pytest
 import time
-from unittest.mock import patch, AsyncMock
+from unittest.mock import patch
 from utils.cache import TTLCache
 from services.ollama_service import get_model_info, model_metadata_cache
 

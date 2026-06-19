@@ -6,7 +6,10 @@ import logging
 import os
 import httpx
 import json
+import asyncio
 from typing import AsyncGenerator
+from utils.retry import with_retry
+from utils.cache import TTLCache
 
 logger = logging.getLogger(__name__)
 
@@ -39,10 +42,6 @@ def _build_messages(message: str, context: str, history: list, language: str) ->
     msgs.append({"role": "user", "content": user_content})
     return msgs
 
-
-import asyncio
-from utils.retry import with_retry
-from utils.cache import TTLCache
 
 # Global cache for model metadata (5 minute TTL)
 model_metadata_cache = TTLCache(ttl_seconds=300)
