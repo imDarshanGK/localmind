@@ -3,7 +3,6 @@ version: "3.9"
 services:
   backend:
     build: ./backend
-    container_name: localmind-backend
     ports:
       - "8000:8000"
     volumes:
@@ -23,7 +22,6 @@ services:
 
   frontend:
     build: ./frontend
-    container_name: localmind-frontend
     ports:
       - "3000:80"
     depends_on:

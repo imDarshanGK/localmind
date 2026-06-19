@@ -1,0 +1,9 @@
+# Integration test runner dependencies
+# Install with: pip install -r tests/integration/requirements.txt
+# These are NOT included in the production backend image.
+
+pytest>=8.3.0
+pytest-docker>=3.1.1
+httpx>=0.27.0
+fpdf2>=2.7.9
+sseclient-py>=1.8.0
