@@ -6,7 +6,9 @@ import logging
 import os
 import httpx
 import json
+import asyncio
 from typing import AsyncGenerator
+from utils.retry import with_retry
 
 logger = logging.getLogger(__name__)
 
@@ -39,9 +41,6 @@ def _build_messages(message: str, context: str, history: list, language: str) ->
     msgs.append({"role": "user", "content": user_content})
     return msgs
 
-
-import asyncio
-from utils.retry import with_retry
 
 @with_retry(max_attempts=3, initial_backoff=1.0)
 async def chat(
