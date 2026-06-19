@@ -127,21 +127,6 @@ async def chat_stream(
         except Exception:
             raise
 
-       if is_transient:
-    if attempt == actual_max_attempts:
-        logger.error(
-            f"chat_stream failed after {actual_max_attempts} attempts. Last error: {error_msg}"
-        )
-        raise last_exc
-
-    logger.warning(
-        f"chat_stream failed ({error_msg}). Retrying in {backoff}s... "
-        f"(Attempt {attempt}/{actual_max_attempts})"
-    )
-    await asyncio.sleep(backoff)
-    attempt += 1
-    backoff *= 2
-
         if is_transient:
             if attempt == actual_max_attempts:
                 logger.error(f"chat_stream failed after {actual_max_attempts} attempts. Last error: {error_msg}")
