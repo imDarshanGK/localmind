@@ -2,6 +2,7 @@
 
 import json
 import tempfile
+import os
 from unittest.mock import AsyncMock, patch
 
 from fastapi.testclient import TestClient
@@ -28,6 +29,11 @@ def test_health():
     r = client.get("/health")
     assert r.json()["status"] == "healthy"
 
+
+def test_db_health():
+    r = client.get("/health/db")
+    assert r.status_code == 200
+    assert r.json()["status"] == "healthy"
 
 # ─── Sessions ────────────────────────────────────────────
 def test_create_session():
@@ -59,6 +65,24 @@ def test_delete_session():
     sid = r.json()["id"]
     r2 = client.delete(f"/api/sessions/{sid}")
     assert r2.status_code == 200
+
+
+def test_delete_session_removes_files():
+    r = client.post("/api/sessions/", json={"title": "To Delete With Files"})
+    sid = r.json()["id"]
+    
+    upload_dir = f"./data/uploads/{sid}"
+    os.makedirs(upload_dir, exist_ok=True)
+    with open(os.path.join(upload_dir, "test.txt"), "w") as f:
+        f.write("dummy")
+        
+    assert os.path.exists(upload_dir)
+    
+    r2 = client.delete(f"/api/sessions/{sid}")
+    assert r2.status_code == 200
+    
+    assert not os.path.exists(upload_dir)
+
 
 def test_clone_session():
     r = client.post(
@@ -94,6 +118,33 @@ def test_clear_messages():
     db.save_message(sid, "user", "hello")
     r2 = client.delete(f"/api/sessions/{sid}/messages")
     assert r2.status_code == 200
+
+
+def test_session_title_trimming_emoji():
+    # Test case 1: first message containing an emoji near the truncation boundary (40 graphemes)
+    r = client.post("/api/sessions/", json={"title": "New Chat"})
+    sid = r.json()["id"]
+    msg = "This message has exactly 39 characters 💪🏾 next part"
+    db.save_message(sid, "user", msg)
+    sess = db.get_session(sid)
+    assert sess["title"] == "This message has exactly 39 characters 💪🏾..."
+    assert "\ufffd" not in sess["title"]
+
+    # Test case 2: normal ASCII message -> title is trimmed and has "..." (no regression)
+    r2 = client.post("/api/sessions/", json={"title": "New Chat"})
+    sid2 = r2.json()["id"]
+    msg2 = "This is a very long ASCII message that will definitely exceed the limit of forty characters."
+    db.save_message(sid2, "user", msg2)
+    sess2 = db.get_session(sid2)
+    assert sess2["title"] == "This is a very long ASCII message that w..."
+
+    # Test case 3: message shorter than limit -> title unchanged
+    r3 = client.post("/api/sessions/", json={"title": "New Chat"})
+    sid3 = r3.json()["id"]
+    msg3 = "Short message"
+    db.save_message(sid3, "user", msg3)
+    sess3 = db.get_session(sid3)
+    assert sess3["title"] == "Short message"
 
 
 def test_delete_single_message():
@@ -299,6 +350,7 @@ def test_export_json():
     assert len(data["messages"]) == 2
 
 def test_export_complete_session_flow():
+    
     r = client.post(
         "/api/sessions/",
         json={"title": "Integration Export"}
@@ -328,7 +380,8 @@ def test_export_complete_session_flow():
 
     assert payload["session"]["id"] == sid
     assert payload["session"]["title"] == "Integration Export"
-
+    assert "created_at" in payload["session"]
+    assert "updated_at" in payload["session"]
     assert len(payload["messages"]) == 2
 
     assert payload["messages"][0]["content"] == "What is LocalMind?"

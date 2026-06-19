@@ -17,6 +17,7 @@ async function req(path, opts = {}) {
 
 // NEW: sendMessage can now accept an optional trailing signal parameter
 export const sendMessage = (b, signal) => req("/chat/", { method: "POST", body: JSON.stringify(b), signal });
+export const cancelStream = (id) => req(`/chat/cancel/${id}`, { method: "POST" });
 export const getSessions = () => req("/sessions/");
 export const createSession = (b) => req("/sessions/", { method: "POST", body: JSON.stringify(b) });
 export const updateSession = (id, b) => req(`/sessions/${id}`, { method: "PATCH", body: JSON.stringify(b) });
@@ -27,6 +28,7 @@ export const clearMessages = (id) => req(`/sessions/${id}/messages`, { method: "
 export const deleteMessage = (id, messageId) => req(`/sessions/${id}/messages/${messageId}`, { method: "DELETE" });
 export const getDocuments = (id) => req(`/sessions/${id}/documents`);
 export const getModels = () => req("/models/");
+export const getModelInfo = (modelName) => req(`/models/${modelName}/info`);
 export const getOllamaStatus = () => req("/models/status");
 export const getPlugins = () => req("/plugins/");
 export const runPlugin = (b) => req("/plugins/run", { method: "POST", body: JSON.stringify(b) });

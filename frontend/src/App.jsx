@@ -10,11 +10,6 @@ import StatusBar from "./components/StatusBar";
 import * as api from "./utils/api";
 import { getSessionColor, setSessionColor } from "./utils/colorHelper";
 
-
-// NOTE: Missing PromptRegistryPage import removed to allow seamless compilation
-
-// NOTE: Missing PromptRegistryPage import removed to allow seamless compilation
-
 export default function App() {
   const [sessionId,  setSessionId]  = useState(() => uuidv4());
   const [messages,   setMessages]   = useState([]);
@@ -47,6 +42,25 @@ export default function App() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  // Poll Ollama status and refresh models on recovery
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const stRes = await api.getOllamaStatus();
+        const isRunning = stRes.ollama_running;
+        setOllamaOk((prev) => {
+          if (prev === false && isRunning === true) {
+            api.getModels().then(mRes => setModels(mRes.models || []));
+          }
+          return isRunning;
+        });
+      } catch {
+        setOllamaOk(false);
+      }
+    }, 10000);
+    return () => clearInterval(interval);
   }, []);
 
   async function bootstrap() {
@@ -84,11 +98,16 @@ export default function App() {
     setStreaming(false);
     setLoading(false);
 
+    // Call backend to actually stop the ongoing generation task
+    if (sessionId) {
+      api.cancelStream(sessionId).catch(e => console.error("Cancel stream error:", e));
+    }
+
     // Clean up the trailing 'typing' state bubble indicators in the messages layout array
     setMessages(prev =>
       prev.map(m => m.streaming ? { ...m, streaming: false, content: m.content + "\n\n[Generation Stopped]" } : m)
     );
-  }, []);
+  }, [sessionId]);
 
   async function sendMessage(text) {
     if (!text.trim() || loading || streaming) return;
@@ -265,11 +284,8 @@ export default function App() {
           />
         )}
 
-        {/* Updated conditional layout wrapper to securely bypass missing components error */}
         {view === "prompts" ? (
-          <div className="flex-1 flex items-center justify-center text-gray-400 bg-gray-950 text-sm">
-            Prompt Registry component view placeholder.
-          </div>
+          <PromptRegistryPage onBack={() => setView("chat")} />
         ) : (
           <ChatWindow
             messages={messages}

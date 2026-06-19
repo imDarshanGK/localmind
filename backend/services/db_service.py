@@ -9,6 +9,7 @@ import os
 from contextlib import contextmanager
 import time
 from sqlite3 import OperationalError
+import grapheme
 
 DB_PATH = os.getenv("DB_PATH", "./data/localmind.db")
 os.makedirs(os.path.dirname(DB_PATH) if os.path.dirname(DB_PATH) else ".", exist_ok=True)
@@ -193,7 +194,10 @@ def save_message(session_id: str, role: str, content: str, sources: list = None,
                 "SELECT title FROM sessions WHERE id=?", (session_id,)
             ).fetchone()
             if row and row["title"] == "New Chat":
-                title = content[:40] + ("..." if len(content) > 40 else "")
+                if grapheme.length(content) > 40:
+                    title = grapheme.slice(content, start=0, end=40) + "..."
+                else:
+                    title = content
                 conn.execute("UPDATE sessions SET title=? WHERE id=?", (title, session_id))
 
 
