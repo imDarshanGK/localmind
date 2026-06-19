@@ -6,7 +6,8 @@ import { highlightText } from "../utils/search";
 const LANGUAGES = [
   {code:"en",label:"English"},{code:"hi",label:"हिन्दी"},{code:"ta",label:"தமிழ்"},
   {code:"te",label:"తెలుగు"},{code:"kn",label:"ಕನ್ನಡ"},{code:"fr",label:"Français"},
-  {code:"de",label:"Deutsch"},{code:"es",label:"Español"},
+  {code:"de",label:"Deutsch"},{code:"es",label:"Español"},  {code:"ar",label:"العربية"},
+
 ];
 
 export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSession, onDeleteSession, onClearAllSessions, model, models, onModelChange, language, onLanguageChange, onUpdateSessionColor }) {
@@ -59,7 +60,25 @@ export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSes
 
       {/* Model */}
       <div className="px-4 py-3 border-b border-gray-800">
-        <label className="text-xs text-gray-500 block mb-1">AI Model</label>
+        <div className="flex items-center justify-between mb-1">
+          <label className="text-xs text-gray-500">AI Model</label>
+          <button 
+            id="btn-model-info"
+            onClick={async () => {
+              try {
+                const { getModelInfo } = await import('../utils/api');
+                const info = await getModelInfo(model);
+                alert(`Model Info for ${model}:\n\nFamily: ${info.details?.family}\nFormat: ${info.details?.format}\nParameter Size: ${info.details?.parameter_size}\nQuantization: ${info.details?.quantization_level}`);
+              } catch (e) {
+                alert(`Failed to fetch model info: ${e.message}`);
+              }
+            }}
+            className="text-[10px] text-purple-400 hover:text-purple-300"
+            title="View Model Metadata (Cached)"
+          >
+            [Info]
+          </button>
+        </div>
         <select value={model} onChange={e=>onModelChange(e.target.value)}
           className="w-full text-xs bg-gray-800 text-gray-200 border border-gray-700 rounded-lg px-2 py-1.5 outline-none focus:border-purple-500">
           {modelList.map(m => <option key={m} value={m}>{m}</option>)}
