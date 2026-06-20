@@ -11,7 +11,7 @@ import * as api from "./utils/api";
 import { getSessionColor, setSessionColor } from "./utils/colorHelper";
 
 export default function App() {
-  const [sessionId,  setSessionId]  = useState(() => uuidv4());
+  const [sessionId,  setSessionId]  = useState(null);
   const [messages,   setMessages]   = useState([]);
   const [sessions,   setSessions]   = useState([]);
   const [model,      setModel]      = useState("llama3");
@@ -69,13 +69,25 @@ export default function App() {
         api.getModels(), api.getSessions(), api.getSettings(), api.getOllamaStatus(),
       ]);
       if (mRes.status === "fulfilled") setModels(mRes.value.models || []);
-      if (sRes.status === "fulfilled") setSessions((sRes.value || []).map(s => ({ ...s, color: getSessionColor(s.id) })));
+      
+      let loadedSessions = [];
+      if (sRes.status === "fulfilled") {
+        loadedSessions = sRes.value || [];
+        setSessions(loadedSessions.map(s => ({ ...s, color: getSessionColor(s.id) })));
+      }
+      
       if (settRes.status === "fulfilled") {
         setSettings(settRes.value);
         if (settRes.value.default_model) setModel(settRes.value.default_model);
         if (settRes.value.default_language) setLanguage(settRes.value.default_language);
       }
       if (stRes.status === "fulfilled") setOllamaOk(stRes.value.ollama_running);
+
+      if (loadedSessions.length > 0) {
+        loadSession(loadedSessions[0].id);
+      } else {
+        await newChat();
+      }
     } catch { }
   }
 
@@ -111,11 +123,12 @@ export default function App() {
 
   async function sendMessage(text) {
     if (!text.trim() || loading || streaming) return;
-    let activeSid = sessionId;
-    if (!activeSid) {
-      activeSid = uuidv4();
-      setSessionId(activeSid);
+    if (!sessionId) {
+      console.warn("No active session. Cannot send message.");
+      alert("No active session. Please create or select a chat first.");
+      return;
     }
+    const activeSid = sessionId;
     const userMsg = { role: "user", content: text, id: Date.now() };
     setMessages(prev => [...prev, userMsg]);
 
@@ -173,16 +186,18 @@ export default function App() {
   }
 
   async function newChat() {
-    const sid = uuidv4();
     try {
-      await api.createSession({ title: "New Chat", model });
-    } catch { }
-
-    setSessionId(sid);
-    setMessages([]);
-    setDocuments([]);
-    setPanel(null);
-    refreshSessions();
+      const session = await api.createSession({ title: "New Chat", model });
+      if (session && session.id) {
+        setSessionId(session.id);
+        setMessages([]);
+        setDocuments([]);
+        setPanel(null);
+        refreshSessions();
+      }
+    } catch (err) {
+      console.error("Failed to create session:", err);
+    }
   }
 
   async function loadSession(sid) {
@@ -209,8 +224,11 @@ export default function App() {
 
   async function handleDeleteSession(sid) {
     await api.deleteSession(sid);
-    if (sid === sessionId) { setSessionId(uuidv4()); setMessages([]); setDocuments([]); }
-    refreshSessions();
+    if (sid === sessionId) {
+      await newChat();
+    } else {
+      refreshSessions();
+    }
   }
 
   async function handleClearAllSessions() {
