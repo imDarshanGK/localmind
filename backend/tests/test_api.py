@@ -37,9 +37,10 @@ def test_db_health():
 
 # ─── Sessions ────────────────────────────────────────────
 def test_create_session():
-    r = client.post("/api/sessions/", json={"title": "Test Chat", "model": "llama3"})
+    r = client.post("/api/sessions/", json={"title": "Test Chat", "model": "llama3", "language": "hi"})
     assert r.status_code == 200
     assert "id" in r.json()
+    assert r.json()["language"] == "hi"
 
 
 def test_list_sessions():
@@ -54,10 +55,11 @@ def test_get_session_not_found():
 
 
 def test_update_session():
-    r = client.post("/api/sessions/", json={"title": "Old Title"})
+    r = client.post("/api/sessions/", json={"title": "Old Title", "language": "hi"})
     sid = r.json()["id"]
-    r2 = client.patch(f"/api/sessions/{sid}", json={"title": "New Title"})
+    r2 = client.patch(f"/api/sessions/{sid}", json={"title": "New Title", "language": "ta"})
     assert r2.json()["title"] == "New Title"
+    assert r2.json()["language"] == "ta"
 
 
 def test_delete_session():
@@ -87,7 +89,7 @@ def test_delete_session_removes_files():
 def test_clone_session():
     r = client.post(
         "/api/sessions/",
-        json={"title": "Original Chat", "model": "llama3"}
+        json={"title": "Original Chat", "model": "llama3", "language": "fr"}
     )
     sid = r.json()["id"]
     db.save_message(sid, "user", "Hello")
@@ -98,6 +100,7 @@ def test_clone_session():
     assert cloned["id"] != sid
     assert cloned["title"] == "Original Chat (Copy)"
     assert cloned["model"] == "llama3"
+    assert cloned["language"] == "fr"
     msgs = client.get(f"/api/sessions/{cloned['id']}/messages")
     assert msgs.status_code == 200
     assert msgs.json()["count"] == 2
