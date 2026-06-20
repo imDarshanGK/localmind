@@ -30,6 +30,7 @@
 |---------|-------------|
 | Streaming Responses | See AI reply token-by-token in real time |
 | Plugin System | Calculator, Word Counter, JSON Formatter, Code Runner, Summarizer |
+| Audit Log | Track and view history of all plugin executions |
 | 8 Languages | English, Hindi, Tamil, Telugu, Kannada, French, German, Spanish |
 | Export Chats | Download conversations as Markdown, JSON, or TXT |
 | Session Manager | Full CRUD - create, rename, search, delete chat sessions |
@@ -53,6 +54,7 @@
 | Session Manager (CRUD) | Included |
 | Session Search | Included |
 | Plugin System (6 plugins) | Included |
+| Plugin Audit Log | Included |
 | Export (MD / JSON / TXT) | Included |
 | Settings Panel | Included |
 | Docker Compose | Included |
