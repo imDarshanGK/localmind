@@ -28,6 +28,7 @@ export const clearMessages = (id) => req(`/sessions/${id}/messages`, { method: "
 export const deleteMessage = (id, messageId) => req(`/sessions/${id}/messages/${messageId}`, { method: "DELETE" });
 export const getDocuments = (id) => req(`/sessions/${id}/documents`);
 export const getModels = () => req("/models/");
+export const getModelInfo = (modelName) => req(`/models/${modelName}/info`);
 export const getOllamaStatus = () => req("/models/status");
 export const getPlugins = () => req("/plugins/");
 export const runPlugin = (b) => req("/plugins/run", { method: "POST", body: JSON.stringify(b) });

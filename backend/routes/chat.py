@@ -45,11 +45,11 @@ class StreamBuffer:
         self.listeners = set()
         self.created_at = time.time()
         self.updated_at = time.time()
-        self.completed_at = None
-        self.error = None
+        self.completed_at: float | None = None
+        self.error: str | None = None
         self.sources = []
+        self.benchmarks: dict | None = None
         self.cancelled = False
-
 
 async def clean_expired_streams():
     while True:
