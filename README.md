@@ -30,6 +30,7 @@
 |---------|-------------|
 | Streaming Responses | See AI reply token-by-token in real time |
 | Plugin System | Calculator, Word Counter, JSON Formatter, Code Runner, Summarizer |
+| Audit Log | Track and view history of all plugin executions |
 | 8 Languages | English, Hindi, Tamil, Telugu, Kannada, French, German, Spanish |
 | Export Chats | Download conversations as Markdown, JSON, or TXT |
 | Session Manager | Full CRUD - create, rename, search, delete chat sessions |
@@ -53,6 +54,7 @@
 | Session Manager (CRUD) | Included |
 | Session Search | Included |
 | Plugin System (6 plugins) | Included |
+| Plugin Audit Log | Included |
 | Export (MD / JSON / TXT) | Included |
 | Settings Panel | Included |
 | Docker Compose | Included |
@@ -306,6 +308,19 @@ pytest tests/ -v
 
 ---
 
+---
+
+## 🚀 Optimization & Performance Utilities
+
+### Embeddings Cache Warmup
+To prevent cold-start latency when users upload documents for the first time, you can pre-download and warm up the SentenceTransformer inference weights (`all-MiniLM-L6-v2`) before starting the web server.
+
+Run the following command within your active virtual environment inside the backend directory:
+
+```bash
+cd backend
+python warmup.py
+
 ## 🤝 Contributing
 
 1. Fork → Clone → Create branch (`git checkout -b feature/your-feature`)
@@ -321,9 +336,12 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide.
 ## License
 
 MIT © 2026
+
 <div align="center">
 
 If LocalMind helped you, please star the repo. ⭐✨🚀
+
+</div>
 
 ---
 
@@ -340,4 +358,16 @@ Built something cool with LocalMind? We'd love to see it! Open a Pull Request to
 
 ---
 
+### 🛡️ Dependency Security Scanning
+
+Our CI pipeline automatically audits backend dependencies for known vulnerabilities (CVEs) on every push and pull request using `pip-audit`.
+
+To scan your dependencies locally before pushing code, run the following commands inside your virtual environment:
+
+```bash
+# Install the security scanner
+pip install pip-audit
+
+# Run the vulnerability audit against your requirements file
+pip-audit -r requirements.txt
 </div>

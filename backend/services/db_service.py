@@ -9,6 +9,7 @@ import os
 from contextlib import contextmanager
 import time
 from sqlite3 import OperationalError
+import grapheme
 
 DB_PATH = os.getenv("DB_PATH", "./data/localmind.db")
 os.makedirs(os.path.dirname(DB_PATH) if os.path.dirname(DB_PATH) else ".", exist_ok=True)
@@ -193,7 +194,10 @@ def save_message(session_id: str, role: str, content: str, sources: list = None,
                 "SELECT title FROM sessions WHERE id=?", (session_id,)
             ).fetchone()
             if row and row["title"] == "New Chat":
-                title = content[:40] + ("..." if len(content) > 40 else "")
+                if grapheme.length(content) > 40:
+                    title = grapheme.slice(content, start=0, end=40) + "..."
+                else:
+                    title = content
                 conn.execute("UPDATE sessions SET title=? WHERE id=?", (title, session_id))
 
 
@@ -209,11 +213,12 @@ def get_history(session_id: str, limit: int = 20) -> list[dict]:
 def get_messages_full(session_id: str) -> list[dict]:
     with get_db() as conn:
         rows = conn.execute(
-            "SELECT role, content, sources, created_at, benchmarks FROM messages WHERE session_id=? ORDER BY created_at ASC",
+            "SELECT id, role, content, sources, created_at, benchmarks FROM messages WHERE session_id=? ORDER BY created_at ASC",
             (session_id,),
         ).fetchall()
         return [
             {
+                "id": r["id"],
                 "role": r["role"],
                 "content": r["content"],
                 "sources": json.loads(r["sources"] or "[]"),
@@ -228,6 +233,27 @@ def clear_messages(session_id: str):
     with get_db() as conn:
         conn.execute("DELETE FROM messages WHERE session_id=?", (session_id,))
         conn.execute("UPDATE sessions SET message_count=0 WHERE id=?", (session_id,))
+
+
+def delete_message(session_id: str, message_id: int) -> int:
+    """Delete a single message from a session.
+
+    Returns the number of rows deleted (0 if the message does not exist in this
+    session). The delete is scoped by session_id so a message can only be
+    removed from its own thread.
+    """
+    with get_db() as conn:
+        cur = conn.execute(
+            "DELETE FROM messages WHERE id=? AND session_id=?",
+            (message_id, session_id),
+        )
+        deleted = cur.rowcount
+        if deleted:
+            conn.execute(
+                "UPDATE sessions SET message_count=MAX(message_count - ?, 0), updated_at=datetime('now') WHERE id=?",
+                (deleted, session_id),
+            )
+        return deleted
 
 
 # ─── Documents ───────────────────────────────────────────────
@@ -277,6 +303,15 @@ def save_setting(key: str, value):
 
 
 # ─── Plugin logs ─────────────────────────────────────────────
+
+def get_plugin_logs(limit: int = 50) -> list[dict]:
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT * FROM plugin_logs ORDER BY created_at DESC LIMIT ?",
+            (limit,)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
 def log_plugin(session_id: str, plugin: str, inp: str, out: str, success: bool = True):
     with get_db() as conn:
         conn.execute(

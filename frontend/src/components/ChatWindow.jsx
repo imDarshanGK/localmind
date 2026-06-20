@@ -1,10 +1,10 @@
+import ReactMarkdown from "react-markdown";
 import { useState, useRef, useEffect } from "react";
 import { exportSession } from "../utils/api";
 import { AppLogoIcon, ChartIcon, CloseIcon, CopyIcon, FileIcon, LockIcon, PlusCircleIcon, TemplateIcon } from "./Icons";
-import CodeBlockWithCopy from "./CodeBlockWithCopy";
 import PromptTemplateDialog from "./PromptTemplateDialog";
 
-export default function ChatWindow({ messages, loading, onSend, sessionId }) {
+export default function ChatWindow({ messages, loading, onSend, onDeleteMessage, onStop, sessionId }) {
   const [input, setInput] = useState("");
   const [showPlusMenu, setShowPlusMenu] = useState(false);
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
@@ -18,6 +18,34 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
   const [exportFormat, setExportFormat] = useState("markdown");
   const [copiedMsgId, setCopiedMsgId] = useState(null);
   const [hoveredStatsId, setHoveredStatsId] = useState(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+
+  // Inline delete control with a lightweight two-step confirm (no window.confirm).
+  const renderDeleteControl = (msgId) =>
+    confirmDeleteId === msgId ? (
+      <span className="flex items-center gap-1 text-xs">
+        <span className="text-gray-500">Delete?</span>
+        <button
+          onClick={() => { onDeleteMessage?.(msgId); setConfirmDeleteId(null); }}
+          className="px-1.5 py-0.5 rounded bg-red-600/80 hover:bg-red-600 text-white transition"
+          title="Confirm delete"
+        >Yes</button>
+        <button
+          onClick={() => setConfirmDeleteId(null)}
+          className="px-1.5 py-0.5 rounded hover:bg-gray-700 text-gray-400 transition"
+          title="Cancel"
+        >No</button>
+      </span>
+    ) : (
+      <button
+        onClick={() => setConfirmDeleteId(msgId)}
+        className="p-1 rounded hover:bg-gray-800 text-gray-500 hover:text-red-400 transition"
+        title="Delete message"
+        aria-label="Delete message"
+      >
+        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
+      </button>
+    );
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
@@ -73,13 +101,19 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
   }
   function send() {
     if ((!input.trim() && !selectedTemplate) || loading) return;
+
     const message = selectedTemplate
       ? `${selectedTemplate.prompt}\n\n${input.trim()}`.trim()
       : input.trim();
-    onSend(message);
+
+    onSend(message);   // ✅ ONLY THIS (STRING)
+
     setInput("");
     setSelectedTemplate(null);
-    if (textareaRef.current) { textareaRef.current.style.height = "auto"; }
+
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+    }
   }
 
   function handleKey(e) {
@@ -99,7 +133,7 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
   ];
 
   return (
-    <div className="flex flex-col flex-1 overflow-hidden bg-gray-950">
+    <div className="flex flex-col flex-1 overflow-hidden bg-gray-950 text-gray-100">
       {/* Export bar */}
       {messages.length > 0 && (
         <div className="flex justify-end gap-2 px-5 pt-2">
@@ -112,14 +146,14 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
         </div>
       )}
 
-      {/* Messages */}
+      {/* Messages viewport */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5">
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center gap-4">
-              <AppLogoIcon className="w-14 h-14 text-purple-400 opacity-70" />
+            <AppLogoIcon className="w-14 h-14 text-purple-400 opacity-70" />
             <div>
               <p className="text-xl font-semibold text-gray-200 mb-1">LocalMind is ready</p>
-              <p className="text-sm text-gray-500">100% private · runs offline · no cloud</p>
+              <p className="text-sm text-gray-400">100% private · runs offline · no cloud</p>
             </div>
             <div className="grid grid-cols-2 gap-2 mt-4 max-w-lg w-full">
               {SUGGESTIONS.map(s => (
@@ -134,36 +168,129 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
 
         {messages.map((msg, i) => (
           <div key={msg.id || i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-            <div className={`max-w-2xl ${msg.role === "user" ? "max-w-xl" : "max-w-2xl"}`}>
+            <div className="max-w-2xl">
               {msg.role === "assistant" && (
                 <div className="flex items-center gap-1.5 mb-1.5 ml-1">
                   <AppLogoIcon className="w-4 h-4 text-purple-400" />
                   <span className="text-xs font-semibold text-purple-400">LocalMind</span>
-                  {msg.streaming && <span className="text-xs text-gray-500 animate-pulse">typing...</span>}
+                  {msg.streaming && <span className="text-xs text-gray-400 animate-pulse">typing...</span>}
                 </div>
               )}
               <div className={`px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words
                 ${msg.role === "user"
                   ? "bg-purple-700 text-white rounded-br-sm"
                   : "bg-gray-800 text-gray-100 rounded-bl-sm border border-gray-700"}`}>
-                {msg.content}
+                <ReactMarkdown
+                  components={{
+                    code({ inline, className, children }) {
+                      let language = "text";
+
+                      //  Detect from markdown (```python)
+                      const match = /language-(\w+)/.exec(className || "");
+                      if (match) {
+                        language = match[1];
+                      } 
+                      //  Fallback detection (SMART 🔥)
+                      else {
+                        const codeText = String(children);
+
+                        if (codeText.includes("def ") || codeText.includes("print(")) {
+                          language = "python";
+                        } else if (
+                            codeText.includes("function") ||
+                            codeText.includes("console.log")
+                        ) {
+                            language = "javascript";
+                        } else if (
+                            codeText.includes("#include") ||
+                            codeText.includes("cout")
+                        ) {
+                            language = "cpp";
+                          }
+                        }
+
+                        // Inline code (no badge)
+                        if (inline) {
+                          return <code>{children}</code>;
+                        }
+
+                        return (
+                          <div className="relative bg-gray-900 rounded-lg mt-2">
+          
+                            {/* 🔥 LANGUAGE BADGE */}
+                            <div className="absolute top-2 right-2 text-xs bg-gray-700 px-2 py-1 rounded text-white">
+                              {language.toUpperCase()}
+                            </div>
+
+                            <pre className="p-4 overflow-x-auto">
+                              <code>{children}</code>
+                            </pre>
+                          </div>
+                        );
+                      }
+                    }}
+                  >
+                    {msg.content}
+                  </ReactMarkdown>
                 {msg.streaming && <span className="inline-block w-1.5 h-4 bg-purple-400 ml-1 animate-pulse rounded" />}
               </div>
-              {msg.sources?.length > 0 && (
-                <div className="mt-1.5 ml-1 flex flex-wrap gap-1">
-                  {msg.sources.map((s,i) => (
-                    <span key={i} className="text-xs bg-gray-800 text-blue-400 px-2 py-0.5 rounded-full border border-gray-700">
-                      <span className="inline-flex items-center gap-1">
-                        <FileIcon className="w-3 h-3" />
-                        <span>{s}</span>
-                      </span>
-                    </span>
-                  ))}
-                </div>
-              )}
+              {msg.sources?.length > 0 && (() => {
+                // Normalize: legacy string sources ("file.pdf") → structured object.
+                // New sources already arrive as {source, chunk, preview}.
+                // This single path handles both without any database migration.
+                const normalizeSrc = (s) =>
+                  typeof s === "string"
+                    ? { source: s, chunk: null, preview: null }
+                    : s;
+
+                return (
+                  <div className="mt-1.5 ml-1 flex flex-wrap gap-1.5">
+                    {msg.sources.map((raw, i) => {
+                      const s = normalizeSrc(raw);
+                      const hasPreview = s.preview && s.preview.trim().length > 0;
+                      return (
+                        <span key={i} className="relative group inline-flex">
+                          {/* Badge */}
+                          <span className="text-xs bg-gray-800 text-blue-400 px-2 py-0.5 rounded-full border border-gray-700 cursor-default inline-flex items-center gap-1 group-hover:border-blue-500 group-hover:bg-gray-750 transition-colors">
+                            <FileIcon className="w-3 h-3 shrink-0" />
+                            <span>{s.source}</span>
+                            {s.chunk !== null && (
+                              <span className="text-gray-500 text-[10px]">#{s.chunk + 1}</span>
+                            )}
+                          </span>
+
+                          {/* Hover tooltip — only rendered when a preview exists (new sessions) */}
+                          {hasPreview && (
+                            <div className="
+                              absolute bottom-full left-0 mb-2 z-50 w-72
+                              invisible opacity-0 group-hover:visible group-hover:opacity-100
+                              transition-all duration-150 pointer-events-none
+                            ">
+                              {/* Arrow */}
+                              <div className="absolute left-3 -bottom-1.5 w-3 h-3 rotate-45 bg-gray-700 border-r border-b border-gray-600" />
+                              {/* Card */}
+                              <div className="relative bg-gray-700 border border-gray-600 rounded-xl shadow-xl px-3 py-2.5">
+                                <div className="flex items-center gap-1.5 mb-1.5 border-b border-gray-600 pb-1.5">
+                                  <FileIcon className="w-3 h-3 text-blue-400 shrink-0" />
+                                  <span className="text-xs font-semibold text-blue-400 truncate">{s.source}</span>
+                                  <span className="ml-auto text-[10px] text-gray-400 shrink-0">chunk {s.chunk + 1}</span>
+                                </div>
+                                <p className="text-xs text-gray-300 leading-relaxed line-clamp-5 whitespace-pre-wrap break-words">
+                                  {s.preview}
+                                </p>
+                              </div>
+                            </div>
+                          )}
+                        </span>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
               {msg.role === "user" && (
-                <div className="text-right mt-1 mr-1">
-                  <span className="text-xs text-gray-600">You</span>
+                <div className="flex justify-end items-center gap-1 mt-1 mr-1">
+                  {renderDeleteControl(msg.id)}
+                  <span className="text-xs text-gray-400">You</span>
                 </div>
               )}
               {msg.role === "assistant" && !msg.streaming && (
@@ -180,6 +307,9 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
                       <CopyIcon className="w-4 h-4" />
                     )}
                   </button>
+
+                  {/* Delete button */}
+                  {renderDeleteControl(msg.id)}
 
                   {/* Stats hover button */}
                   <div
@@ -309,20 +439,34 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
               value={input}
               onChange={(e) => { setInput(e.target.value); autoResize(e); }}
               onKeyDown={handleKey}
-              placeholder="Ask anything... (Enter to send, Shift+Enter for new line)"
+              placeholder={loading ? "LocalMind is computing..." : "Ask anything..."}
               rows={1}
-              className="bg-transparent text-sm text-gray-100 placeholder-gray-500 resize-none outline-none w-full"
+              disabled={loading}
+              className="bg-transparent text-sm text-gray-100 placeholder-gray-500 resize-none outline-none w-full disabled:text-gray-500"
               style={{ minHeight: "24px", maxHeight: "160px" }}
             />
           </div>
 
-          <button 
-            onClick={send} 
-            disabled={(!input.trim() && !selectedTemplate) || loading}
-            className="shrink-0 text-sm bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white px-4 py-2 rounded-xl transition font-medium"
-          >
-            Send →
-          </button>
+          {/* DYNAMIC STOP GENERATION RENDERING BUTTON */}
+          {loading ? (
+            <button 
+              type="button"
+              onClick={onStop} 
+              className="shrink-0 text-sm bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-xl transition font-medium flex items-center gap-1.5"
+            >
+              <span className="w-2 h-2 bg-white rounded-sm" />
+              Stop
+            </button>
+          ) : (
+            <button 
+              type="button"
+              onClick={send} 
+              disabled={!input.trim()}
+              className="shrink-0 text-sm bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white px-4 py-2 rounded-xl transition font-medium"
+            >
+              Send →
+            </button>
+          )}
         </div>
         <p className="text-center text-xs text-gray-700 mt-2">
           <span className="inline-flex items-center gap-1">

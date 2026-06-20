@@ -5,6 +5,7 @@ Backend: FastAPI + Ollama + LangChain + ChromaDB + WebSockets
 
 import logging
 import os
+import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -21,9 +22,10 @@ from routes.sessions import router as sessions_router
 from routes.plugins import router as plugins_router
 from routes.export import router as export_router
 from routes.settings import router as settings_router
+
 from routes.prompt_templates import router as prompt_templates_router
 from middleware.csrf import OriginValidationMiddleware
-from services.db_service import init_db
+from services.db_service import init_db, get_db
 
 logging.basicConfig(
     level=logging.INFO,
@@ -33,6 +35,7 @@ logger = logging.getLogger(__name__)
 FRONTEND_DIST = Path(os.getenv("FRONTEND_DIST", "/app/frontend/dist"))
 
 
+# Starting lifespan code block
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting LocalMind v2.0...")
@@ -40,9 +43,18 @@ async def lifespan(app: FastAPI):
     os.makedirs("./data/chromadb", exist_ok=True)
     os.makedirs("./data/exports", exist_ok=True)
     init_db()
+    
+    # Start stream cleanup task
+    from routes.chat import clean_expired_streams
+    cleanup_task = asyncio.create_task(clean_expired_streams())
+    
     logger.info("LocalMind v2.0 ready!")
     yield
     logger.info("👋 Shutting down...")
+    
+    # Cancel stream cleanup task
+    cleanup_task.cancel()
+    await asyncio.gather(cleanup_task, return_exceptions=True)
 
 
 app = FastAPI(
@@ -93,3 +105,12 @@ async def root():
 @app.get("/health", tags=["Health"])
 async def health():
     return {"status": "healthy"}
+
+@app.get("/health/db", tags=["Health"])
+async def db_health():
+    try:
+        with get_db() as conn:
+            conn.execute("SELECT 1")
+        return {"status": "healthy"}
+    except Exception:
+        return {"status": "unhealthy"}
