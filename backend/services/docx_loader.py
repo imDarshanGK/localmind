@@ -6,7 +6,7 @@ Replaces Docx2txtLoader which silently drops all table data.
 from pathlib import Path
 from docx import Document as DocxDocument
 from docx.oxml.ns import qn
-from langchain.schema import Document
+from langchain_core.documents import Document
 
 
 class DocxWithTablesLoader:

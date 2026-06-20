@@ -14,6 +14,46 @@ export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSes
   const [search, setSearch] = useState("");
   const [contextMenu, setContextMenu] = useState(null); // { sessionId, x, y }
 
+  const [isResizing, setIsResizing] = useState(false);
+  const [width, setWidth] = useState(() => {
+    const saved = localStorage.getItem("sidebarWidth");
+    let w = saved !== null && !isNaN(parseInt(saved, 10)) ? parseInt(saved, 10) : 280;
+    if (w < 10) w = 10;
+    if (w > window.innerWidth - 10) w = window.innerWidth - 10;
+    return w;
+  });
+
+  useEffect(() => {
+    if (!isResizing) return;
+    
+    const handleMouseMove = (e) => {
+      let newWidth = e.clientX;
+      if (newWidth < 10) newWidth = 10;
+      if (newWidth > window.innerWidth - 10) newWidth = window.innerWidth - 10;
+      setWidth(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+    };
+
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+    document.body.style.userSelect = "none";
+
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+      document.body.style.userSelect = "";
+    };
+  }, [isResizing]);
+
+  useEffect(() => {
+    if (!isResizing) {
+      localStorage.setItem("sidebarWidth", width);
+    }
+  }, [isResizing, width]);
+
   const modelList = models.length > 0 ? models.map(m=>m.name) : ["llama3","mistral","phi3","gemma2"];
   const filtered  = sessions.filter(s => s.title?.toLowerCase().includes(search.toLowerCase()));
 
@@ -40,7 +80,15 @@ export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSes
   };
 
   return (
-    <div className="w-64 flex flex-col bg-gray-900 border-r border-gray-800 shrink-0">
+    <div 
+      className="relative flex flex-col bg-gray-900 border-r border-gray-800 shrink-0 overflow-x-hidden transition-[width] duration-0"
+      style={{ width: `${width}px` }}
+    >
+      {/* Drag handle */}
+      <div 
+        onMouseDown={() => setIsResizing(true)}
+        className="absolute top-0 right-0 w-[5px] h-full cursor-col-resize hover:bg-purple-500/50 z-50 transition-colors"
+      />
       {/* Logo */}
       <div className="px-4 pt-5 pb-4 border-b border-gray-800">
         <div className="flex items-center gap-2 mb-4">
@@ -60,7 +108,25 @@ export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSes
 
       {/* Model */}
       <div className="px-4 py-3 border-b border-gray-800">
-        <label className="text-xs text-gray-500 block mb-1">AI Model</label>
+        <div className="flex items-center justify-between mb-1">
+          <label className="text-xs text-gray-500">AI Model</label>
+          <button 
+            id="btn-model-info"
+            onClick={async () => {
+              try {
+                const { getModelInfo } = await import('../utils/api');
+                const info = await getModelInfo(model);
+                alert(`Model Info for ${model}:\n\nFamily: ${info.details?.family}\nFormat: ${info.details?.format}\nParameter Size: ${info.details?.parameter_size}\nQuantization: ${info.details?.quantization_level}`);
+              } catch (e) {
+                alert(`Failed to fetch model info: ${e.message}`);
+              }
+            }}
+            className="text-[10px] text-purple-400 hover:text-purple-300"
+            title="View Model Metadata (Cached)"
+          >
+            [Info]
+          </button>
+        </div>
         <select value={model} onChange={e=>onModelChange(e.target.value)}
           className="w-full text-xs bg-gray-800 text-gray-200 border border-gray-700 rounded-lg px-2 py-1.5 outline-none focus:border-purple-500">
           {modelList.map(m => <option key={m} value={m}>{m}</option>)}
