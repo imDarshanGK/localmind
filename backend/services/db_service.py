@@ -79,6 +79,15 @@ def init_db():
                 benchmarks TEXT DEFAULT '{}',
                 FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
             );
+                           
+            CREATE TABLE IF NOT EXISTS message_reactions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                message_id INTEGER NOT NULL,
+                emoji TEXT NOT NULL,
+                created_at TEXT DEFAULT (datetime('now')),
+                FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE CASCADE,
+                UNIQUE(message_id, emoji)
+            );
 
             CREATE TABLE IF NOT EXISTS documents (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -176,6 +185,62 @@ def get_all_sessions() -> list[dict]:
 
 
 # ─── Messages ────────────────────────────────────────────────
+# ─── Message Reactions ───────────────────────────────────────────────────────
+def toggle_message_reaction(message_id: int, emoji: str) -> str:
+    """
+    Toggles an emoji reaction on a message.
+    If the reaction exists, it is removed. If it does not, it is added.
+    Returns 'added' or 'removed'.
+    """
+    with get_db() as conn:
+        # Check if this specific emoji reaction already exists for this message
+        row = conn.execute(
+            "SELECT id FROM message_reactions WHERE message_id = ? AND emoji = ?",
+            (message_id, emoji)
+        ).fetchone()
+
+        if row:
+            conn.execute("DELETE FROM message_reactions WHERE id = ?", (row["id"],))
+            return "removed"
+        else:
+            conn.execute(
+                "INSERT INTO message_reactions (message_id, emoji) VALUES (?, ?)",
+                (message_id, emoji)
+            )
+            return "added"
+
+
+def get_reactions_for_message(message_id: int) -> list[str]:
+    """Fetches all unique emoji strings applied to a message."""
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT emoji FROM message_reactions WHERE message_id = ? ORDER BY created_at ASC",
+            (message_id,)
+        ).fetchall()
+        return [r["emoji"] for r in rows]
+
+
+def get_session_reactions_map(session_id: str) -> dict[int, list[str]]:
+    """
+    Fetches all reactions for all messages in a session at once.
+    Returns a dictionary mapping message_id -> list of emojis.
+    """
+    with get_db() as conn:
+        rows = conn.execute("""
+            SELECT r.message_id, r.emoji 
+            FROM message_reactions r
+            JOIN messages m ON r.message_id = m.id
+            WHERE m.session_id = ?
+            ORDER BY r.created_at ASC
+        """, (session_id,)).fetchall()
+        
+        reactions_map = {}
+        for r in rows:
+            msg_id = r["message_id"]
+            if msg_id not in reactions_map:
+                reactions_map[msg_id] = []
+            reactions_map[msg_id].append(r["emoji"])
+        return reactions_map
 def save_message(session_id: str, role: str, content: str, sources: list = None, benchmarks: dict = None):
     sources = sources or []
     with get_db() as conn:

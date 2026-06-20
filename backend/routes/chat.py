@@ -1,4 +1,4 @@
-"""Chat routes — /api/chat — supports normal + streaming"""
+"""Chat routes — /api/chat — supports normal + streaming + message reactions"""
 
 import asyncio
 import time
@@ -8,6 +8,7 @@ from types import SimpleNamespace
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 
 from models.schemas import ChatRequest, ChatResponse
 from services import ollama_service, db_service
@@ -25,7 +26,6 @@ router = APIRouter()
 
 def _retrieve_context(*args, **kwargs):
     from services import rag_service as rag_service_module
-
     return rag_service_module.retrieve_context(*args, **kwargs)
 
 
@@ -103,24 +103,34 @@ async def background_generator(buffer: StreamBuffer, req, context, history, sour
             "memory_total_gb": memory_total_gb,
         }
 
-        # Save successfully completed message
-        db_service.save_message(buffer.session_id, "assistant", buffer.buffer, sources, benchmarks)
+        # Save successfully completed message and get its autoincremented ID
+        msg_id = db_service.save_message(buffer.session_id, "assistant", buffer.buffer, sources, benchmarks)
+        
         buffer.completed = True
         buffer.sources = sources
         buffer.benchmarks = benchmarks
         buffer.completed_at = time.time()
+        buffer.message_id = msg_id  # Store it on the buffer for any late attachments
 
         for listener in list(buffer.listeners):
-            await listener.put({"done": True, "sources": sources, "benchmarks": benchmarks})
+            await listener.put({
+                "done": True, 
+                "message_id": msg_id,  # <--- Send the real DB ID to the frontend!
+                "sources": sources, 
+                "benchmarks": benchmarks
+            })
 
     except Exception as e:
         buffer.error = str(e)
         buffer.completed_at = time.time()
         # Save partial response
         if buffer.buffer:
-            db_service.save_message(buffer.session_id, "assistant", buffer.buffer, sources)
-        for listener in list(buffer.listeners):
-            await listener.put({"error": str(e)})
+            msg_id = db_service.save_message(buffer.session_id, "assistant", buffer.buffer, sources)
+            for listener in list(buffer.listeners):
+                await listener.put({"error": str(e), "message_id": msg_id})
+        else:
+            for listener in list(buffer.listeners):
+                await listener.put({"error": str(e)})
 
 
 async def stream_from_buffer(buffer: StreamBuffer, resume_offset: int):
@@ -131,7 +141,7 @@ async def stream_from_buffer(buffer: StreamBuffer, resume_offset: int):
 
     # 2. If already finished, stop
     if buffer.completed:
-        yield f"data: {json.dumps({'done': True, 'sources': buffer.sources, 'benchmarks': getattr(buffer, 'benchmarks', None)})}\n\n"
+        yield f"data: {json.dumps({'done': True, 'message_id': getattr(buffer, 'message_id', None), 'sources': buffer.sources, 'benchmarks': getattr(buffer, 'benchmarks', None)})}\n\n"
         return
     if buffer.error:
         yield f"data: {json.dumps({'error': buffer.error})}\n\n"
@@ -154,6 +164,45 @@ async def stream_from_buffer(buffer: StreamBuffer, resume_offset: int):
     finally:
         buffer.listeners.discard(listener)
 
+
+# ─── New Reaction Schemas & Routes ──────────────────────────────────────────
+
+class ReactionToggleRequest(BaseModel):
+    message_id: int
+    emoji: str
+
+@router.post("/messages/toggle-reaction")
+async def api_toggle_reaction(payload: ReactionToggleRequest):
+    """Toggles an emoji reaction for a given message and returns updated arrays."""
+    try:
+        action = db_service.toggle_message_reaction(payload.message_id, payload.emoji)
+        updated_reactions = db_service.get_reactions_for_message(payload.message_id)
+        return {
+            "success": True,
+            "action": action,
+            "message_id": payload.message_id,
+            "reactions": updated_reactions
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to toggle reaction: {str(e)}")
+
+
+@router.get("/{session_id}/messages")
+async def get_session_messages(session_id: str):
+    """Fetches full historical messages for a session bundled with active reactions."""
+    try:
+        messages = db_service.get_messages_full(session_id)
+        reactions_map = db_service.get_session_reactions_map(session_id)
+        
+        for msg in messages:
+            msg["reactions"] = reactions_map.get(msg["id"], [])
+            
+        return {"messages": messages}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch session messages: {str(e)}")
+
+
+# ─── Standard Chat Operations ───────────────────────────────────────────────
 
 @router.post("/", response_model=ChatResponse)
 async def chat(req: ChatRequest):
@@ -277,4 +326,3 @@ async def chat_stream(req: ChatRequest):
     ))
 
     return StreamingResponse(stream_from_buffer(buffer, resume_offset), media_type="text/event-stream")
-
