@@ -289,6 +289,24 @@ def test_coderunner_timeout():
     assert r.json()["success"]
     assert "Timeout" in r.json()["output"]
 
+
+def test_get_plugin_logs():
+    client.post("/api/plugins/run", json={
+        "plugin": "calculator", 
+        "input": "3+7", 
+        "session_id": "test-audit-log"
+    })
+    r = client.get("/api/plugins/logs")
+    
+    assert r.status_code == 200
+    logs = r.json()["logs"]
+    
+    assert len(logs) >= 1
+    assert logs[0]["plugin"] == "calculator"
+    assert logs[0]["input"] == "3+7"
+    assert "10" in logs[0]["output"]
+    assert logs[0]["success"] == 1
+
 # ─── Settings ────────────────────────────────────────────
 def test_get_settings():
     r = client.get("/api/settings/")
@@ -350,6 +368,7 @@ def test_export_json():
     assert len(data["messages"]) == 2
 
 def test_export_complete_session_flow():
+    
     r = client.post(
         "/api/sessions/",
         json={"title": "Integration Export"}
@@ -379,7 +398,8 @@ def test_export_complete_session_flow():
 
     assert payload["session"]["id"] == sid
     assert payload["session"]["title"] == "Integration Export"
-
+    assert "created_at" in payload["session"]
+    assert "updated_at" in payload["session"]
     assert len(payload["messages"]) == 2
 
     assert payload["messages"][0]["content"] == "What is LocalMind?"
