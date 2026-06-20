@@ -65,6 +65,7 @@ def init_db():
                 id TEXT PRIMARY KEY,
                 title TEXT DEFAULT 'New Chat',
                 model TEXT DEFAULT 'llama3',
+                language TEXT DEFAULT 'en',
                 message_count INTEGER DEFAULT 0,
                 created_at TEXT DEFAULT (datetime('now')),
                 updated_at TEXT DEFAULT (datetime('now'))
@@ -133,12 +134,16 @@ def init_db():
         cols = [row[1] for row in conn.execute("PRAGMA table_info(messages)").fetchall()]
         if "benchmarks" not in cols:
             conn.execute("ALTER TABLE messages ADD COLUMN benchmarks TEXT DEFAULT '{}'")
+
+        cols_sessions = [row[1] for row in conn.execute("PRAGMA table_info(sessions)").fetchall()]
+        if "language" not in cols_sessions:
+            conn.execute("ALTER TABLE sessions ADD COLUMN language TEXT DEFAULT 'en'")
 # ─── Sessions ────────────────────────────────────────────────
-def create_session(session_id: str, title: str = "New Chat", model: str = "llama3") -> dict:
+def create_session(session_id: str, title: str = "New Chat", model: str = "llama3", language: str = "en") -> dict:
     with get_db() as conn:
         conn.execute(
-            "INSERT OR IGNORE INTO sessions (id, title, model) VALUES (?, ?, ?)",
-            (session_id, title, model),
+            "INSERT OR IGNORE INTO sessions (id, title, model, language) VALUES (?, ?, ?, ?)",
+            (session_id, title, model, language),
         )
     return get_session(session_id)
 
@@ -149,12 +154,14 @@ def get_session(session_id: str) -> dict | None:
         return dict(row) if row else None
 
 
-def update_session(session_id: str, title: str = None, model: str = None):
+def update_session(session_id: str, title: str = None, model: str = None, language: str = None):
     with get_db() as conn:
-        if title:
+        if title is not None:
             conn.execute("UPDATE sessions SET title=?, updated_at=datetime('now') WHERE id=?", (title, session_id))
-        if model:
+        if model is not None:
             conn.execute("UPDATE sessions SET model=?, updated_at=datetime('now') WHERE id=?", (model, session_id))
+        if language is not None:
+            conn.execute("UPDATE sessions SET language=?, updated_at=datetime('now') WHERE id=?", (language, session_id))
 
 
 def delete_session(session_id: str):
