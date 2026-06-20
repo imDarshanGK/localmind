@@ -265,14 +265,13 @@ export default function App() {
           onToggleStream={() => setUseStream(p => !p)}
         />
 
-        {panel === "upload" && (
-          <UploadPanel
-            sessionId={sessionId}
-            documents={documents}
-            onUploaded={() => refreshDocuments(sessionId)}
-            onClose={() => setPanel(null)}
-          />
-        )}
+        <UploadPanel
+          show={panel === "upload"}
+          sessionId={sessionId}
+          documents={documents}
+          onUploaded={() => refreshDocuments(sessionId)}
+          onClose={() => setPanel(null)}
+        />
         {panel === "plugins" && (
           <PluginsPanel sessionId={sessionId} onClose={() => setPanel(null)} />
         )}
