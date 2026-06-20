@@ -10,6 +10,45 @@ from contextlib import contextmanager
 import time
 from sqlite3 import OperationalError
 
+# ------------------------Vacuum Scheduling--------------------------------------------------------
+VACUUM_THRESHOLD = int(os.getenv("DB_VACUUM_THRESHOLD", "500"))
+
+def _get_deleted_counter(conn) -> int:
+    row = conn.execute(
+        "SELECT value FROM app_settings WHERE key = 'rows_deleted_since_vacuum'"
+    ).fetchone()
+    return int(row["value"]) if row else 0
+
+def _increment_deleted_counter(conn,count:int) -> int:
+    new_value = _get_deleted_counter(conn) + count
+    conn.execute(
+        "INSERT OR REPLACE INTO app_settings (key,value,updated_at) VALUES (?,?, datetime('now'))",
+        ("rows_deleted_since_vacuum", str(new_value)),
+    )
+    return new_value
+
+def run_vacuum():
+    """ Run VACUUM outside any transaction to reclaim disk space."""
+    conn = sqlite3.connect(DB_PATH, timeout=5, isolation_level = None)
+    try:
+        conn.execute("VACUUM")
+        conn.execute(
+            "INSERT OR REPLACE INTO app_settings (key, value, updated_at) VALUES ('rows_deleted_since_vacuum','0',datetime('now'))"
+        )
+    finally:
+        conn.close()
+
+def _maybe_vacuum(deleted_count: int):
+    """Track deletions and trigger VACUUM once threshold is crossed."""       
+    if deleted_count <= 0:
+        return
+    with get_db() as conn:
+        total = _increment_deleted_counter(conn, deleted_count)
+        if total >= VACUUM_THRESHOLD:
+            run_vacuum()     
+
+
+
 DB_PATH = os.getenv("DB_PATH", "./data/localmind.db")
 os.makedirs(os.path.dirname(DB_PATH) if os.path.dirname(DB_PATH) else ".", exist_ok=True)
 
@@ -112,7 +151,9 @@ def init_db():
                 ('temperature', '0.7'),
                 ('max_history_turns', '10'),
                 ('rag_top_k', '4'),
-                ('theme', '"dark"');
+                ('theme', '"dark"'),
+                ('rows_deleted_since_vacuum','0');         
+                           
 
             CREATE TABLE IF NOT EXISTS prompt_templates(
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -150,7 +191,9 @@ def update_session(session_id: str, title: str = None, model: str = None):
 
 def delete_session(session_id: str):
     with get_db() as conn:
-        conn.execute("DELETE FROM sessions WHERE id=?", (session_id,))
+        cur = conn.execute("DELETE FROM sessions WHERE id=?", (session_id,))
+        deleted = cur.rowcount
+    _maybe_vacuum(deleted)    
 
 
 def get_all_sessions() -> list[dict]:
@@ -211,8 +254,10 @@ def get_messages_full(session_id: str) -> list[dict]:
 
 def clear_messages(session_id: str):
     with get_db() as conn:
-        conn.execute("DELETE FROM messages WHERE session_id=?", (session_id,))
+        cur = conn.execute("DELETE FROM messages WHERE session_id=?", (session_id,))
+        deleted = cur.rowcount
         conn.execute("UPDATE sessions SET message_count=0 WHERE id=?", (session_id,))
+    _maybe_vacuum(deleted)    
 
 
 # ─── Documents ───────────────────────────────────────────────
@@ -235,8 +280,9 @@ def get_documents(session_id: str) -> list[dict]:
 
 def delete_document(doc_id: int):
     with get_db() as conn:
-        conn.execute("DELETE FROM documents WHERE id=?", (doc_id,))
-
+        cur = conn.execute("DELETE FROM documents WHERE id=?", (doc_id,))
+        deleted = cur.rowcount
+    _maybe_vacuum(deleted )    
 
 # ─── Settings ────────────────────────────────────────────────
 def get_settings() -> dict:

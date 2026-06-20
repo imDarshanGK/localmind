@@ -306,6 +306,49 @@ pytest tests/ -v
 
 ---
 
+---
+
+## 🧹 Database Maintenance
+
+[![Auto Vacuum](https://img.shields.io/badge/Auto-VACUUM-7C3AED?style=flat-square)](#-database-maintenance)
+[![SQLite](https://img.shields.io/badge/SQLite-Self_Healing-009688?style=flat-square&logo=sqlite&logoColor=white)](#-database-maintenance)
+
+LocalMind automatically reclaims disk space after large deletions — clearing a chat, deleting a session, removing documents — by running SQLite's `VACUUM` command once enough rows have been deleted.
+
+```text
+┌──────────────────────────────────────────────────┐
+│            Vacuum Scheduling Flow                │
+├──────────────────────────────────────────────────┤
+│  1. Rows deleted (session / messages / docs)     │
+│  2. Deleted count tracked in app_settings        │
+│  3. Threshold crossed? ──No──> wait, keep count  │
+│              │                                    │
+│             Yes                                   │
+│              ▼                                    │
+│  4. VACUUM runs (separate autocommit connection) │
+│  5. Counter resets to 0                          │
+└──────────────────────────────────────────────────┘
+```
+
+| Env Variable | Default | Description |
+|---|---|---|
+| `DB_VACUUM_THRESHOLD` | `500` | Cumulative deleted rows before an automatic VACUUM runs |
+
+**Why threshold-based?** Running VACUUM on every delete would rebuild the entire database file each time — slow and wasteful for small deletes. Batching it keeps the database lean without hurting day-to-day performance.
+
+<details>
+<summary>📊 See it in action (measured locally)</summary>
+
+| Stage | DB File Size |
+|---|---|
+| After inserting 5,000 messages | ~1.22 MB |
+| After deleting them (no vacuum) | ~1.22 MB — unchanged |
+| After VACUUM runs | ~40 KB |
+
+</details>
+
+---
+
 ## 🤝 Contributing
 
 1. Fork → Clone → Create branch (`git checkout -b feature/your-feature`)
