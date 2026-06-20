@@ -9,6 +9,7 @@ import json
 import asyncio
 from typing import AsyncGenerator
 from utils.retry import with_retry
+from utils.cache import TTLCache
 
 logger = logging.getLogger(__name__)
 
@@ -42,12 +43,15 @@ def _build_messages(message: str, context: str, history: list, language: str) ->
     return msgs
 
 
+# Global cache for model metadata (5 minute TTL)
+model_metadata_cache = TTLCache(ttl_seconds=300)
+
 @with_retry(max_attempts=3, initial_backoff=1.0)
 async def chat(
     message: str,
     model: str = "llama3",
     context: str = "",
-    history: list = None,
+    history: list | None = None,
     language: str = "en",
     temperature: float = 0.7,
 ) -> str:
@@ -70,7 +74,7 @@ async def chat_stream(
     message: str,
     model: str = "llama3",
     context: str = "",
-    history: list = None,
+    history: list | None = None,
     language: str = "en",
     temperature: float = 0.7,
 ) -> AsyncGenerator[str, None]:
@@ -90,6 +94,7 @@ async def chat_stream(
     backoff = 1.0
 
     while attempt <= actual_max_attempts:
+        is_transient = False
         try:
             async with httpx.AsyncClient(timeout=TIMEOUT) as client:
                 async with client.stream("POST", f"{OLLAMA_BASE_URL}/api/chat", json=payload) as resp:
@@ -154,6 +159,36 @@ async def list_models() -> list[dict]:
             return []
 
 
+@with_retry(max_attempts=3, initial_backoff=1.0)
+async def get_model_info(model_name: str) -> dict:
+    """Fetch detailed metadata for a specific model, utilizing a local cache."""
+    # Check cache first
+    cached_info = model_metadata_cache.get(model_name)
+    if cached_info is not None:
+        return cached_info
+
+    # Cache miss: fetch from Ollama
+    async with httpx.AsyncClient(timeout=8.0) as client:
+        try:
+            resp = await client.post(
+                f"{OLLAMA_BASE_URL}/api/show",
+                json={"name": model_name}
+            )
+            resp.raise_for_status()
+            info = resp.json()
+            
+            # Populate cache
+            model_metadata_cache.set(model_name, info)
+            return info
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                return {} # Model not found
+            raise
+        except Exception as e:
+            logger.warning(f"Could not fetch metadata for model '{model_name}': {e}")
+            raise
+
+
 async def pull_model(model_name: str) -> AsyncGenerator[str, None]:
     """Pull a model from Ollama registry with progress streaming."""
     max_attempts = 3
@@ -162,6 +197,7 @@ async def pull_model(model_name: str) -> AsyncGenerator[str, None]:
     backoff = 1.0
 
     while attempt <= actual_max_attempts:
+        is_transient = False
         try:
             async with httpx.AsyncClient(timeout=600.0) as client:
                 async with client.stream(

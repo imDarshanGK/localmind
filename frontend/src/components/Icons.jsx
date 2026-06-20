@@ -317,3 +317,15 @@ export function ChartIcon(props) {
     </Icon>
   );
 }
+
+export function PinIcon({ filled, ...props }) {
+  return (
+    <Icon {...props}>
+      <path 
+        d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.36a.5.5 0 0 0 .62.62l4.36-1.32a2 2 0 0 0 .83-.5z" 
+        fill={filled ? "currentColor" : "none"} 
+      />
+      <path d="m15 9 3-3" />
+    </Icon>
+  );
+}
