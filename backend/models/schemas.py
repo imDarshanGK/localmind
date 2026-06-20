@@ -89,7 +89,7 @@ class ModelInfo(BaseModel):
 class SessionCreate(BaseModel):
     title: str = "New Chat"
     model: str = "llama3"
-    lanaguage: str = "en"
+    language: str = "en"
 
 
 class SessionUpdate(BaseModel):
