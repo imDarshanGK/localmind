@@ -21,14 +21,6 @@ repos:
         args: [--pytest-test-first]
         files: ^backend/tests/
 
-  - repo: https://github.com/psf/black
-    rev: 26.5.1
-    hooks:
-      - id: black
-        language_version: python3
-        types: [python]
-        files: ^backend/
-
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.15.18
     hooks:
