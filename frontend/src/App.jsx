@@ -31,10 +31,9 @@ export default function App() {
 
   useEffect(() => { bootstrap(); }, []);
 
-  // ── Global keyboard shortcut: Ctrl+Shift+N (or Cmd+Shift+N on Mac) → New Chat ──
+  // --- Global Keyboard Shortcuts ---
   useEffect(() => {
     const handleKeyDown = (e) => {
-      console.log("Key pressed:", e.key, "Ctrl:", e.ctrlKey, "Shift:", e.shiftKey); // ADD THIS
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "N") {
         e.preventDefault();
         newChat();
@@ -80,19 +79,19 @@ export default function App() {
   }
 
   const refreshSessions = useCallback(async () => {
-
-    try { const s = await api.getSessions(); setSessions((s || []).map(sess => ({ ...sess, color: getSessionColor(sess.id) }))); } catch { }
+    try { 
+      const s = await api.getSessions(); 
+      setSessions((s || []).map(sess => ({ ...sess, color: getSessionColor(sess.id) }))); 
+    } catch { }
   }, []);
-
 
   const refreshDocuments = useCallback(async (sid) => {
     try { const d = await api.getDocuments(sid); setDocuments(d.documents || []); } catch { }
   }, []);
 
-  // --- FEATURE ACTION: CANCEL ONGOING AI RESPONSE REQUESTS ---
   const stopGeneration = useCallback(() => {
     if (abortControllerRef.current) {
-      abortControllerRef.current.abort(); // Cancel the browser's active network transport fetch line
+      abortControllerRef.current.abort();
       abortControllerRef.current = null;
     }
     setStreaming(false);
@@ -109,6 +108,8 @@ export default function App() {
     );
   }, [sessionId]);
 
+  // ─── Core Message Pipelines ───────────────────────────────────────────────
+
   async function sendMessage(text) {
     if (!text.trim() || loading || streaming) return;
     let activeSid = sessionId;
@@ -116,35 +117,37 @@ export default function App() {
       activeSid = uuidv4();
       setSessionId(activeSid);
     }
-    const userMsg = { role: "user", content: text, id: Date.now() };
+    
+    // Temporary ID for rendering while waiting
+    const tempUserId = Date.now();
+    const userMsg = { role: "user", content: text, id: tempUserId };
     setMessages(prev => [...prev, userMsg]);
 
-    // Instantiate a brand new AbortController instance for this conversation round
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
     if (useStream) {
       setStreaming(true);
-      const aiMsg = { role: "assistant", content: "", sources: [], id: Date.now() + 1, streaming: true };
+      const aiMsg = { role: "assistant", content: "", sources: [], id: tempUserId + 1, streaming: true };
       setMessages(prev => [...prev, aiMsg]);
       try {
         await api.streamMessage(
           { message: text, session_id: activeSid, model, use_documents: documents.length > 0, language },
           (token) => setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, content: m.content + token } : m)),
-          (res, maybeBenchmarks) => {
-            let sources = res;
-            let benchmarks = maybeBenchmarks;
-            if (res && typeof res === "object" && !Array.isArray(res)) {
-              sources = res.sources;
-              benchmarks = res.benchmarks;
+          async (resData) => {
+            try {
+              const freshRes = await api.getMessages(activeSid);
+              // Extract from the new .messages dictionary array key wrapper safely
+              const freshMessages = freshRes.messages || freshRes || [];
+              setMessages(freshMessages.map(m => ({ ...m, id: m.id })));
+            } catch {
+              setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, streaming: false } : m));
             }
-            setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, sources, benchmarks, streaming: false } : m));
             refreshSessions();
           },
-          controller.signal // Passing the cancel token into your api client wrapper layer
+          controller.signal
         );
       } catch (e) {
-        // If aborted, don't override the UI content state array with an aggressive crash trace log message
         if (e.name !== 'AbortError') {
           setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, content: e.message, streaming: false } : m));
         }
@@ -155,11 +158,14 @@ export default function App() {
     } else {
       setLoading(true);
       try {
-        const data = await api.sendMessage(
+        await api.sendMessage(
           { message: text, session_id: activeSid, model, use_documents: documents.length > 0, language },
           controller.signal
         );
-        setMessages(prev => [...prev, { role: "assistant", content: data.reply, sources: data.sources || [], id: Date.now() + 1 }]);
+        // Fetch fresh rows with verified primary keys for standard chat too
+        const freshRes = await api.getMessages(activeSid);
+        const freshMessages = freshRes.messages || freshRes || [];
+        setMessages(freshMessages.map(m => ({ ...m, id: m.id })));
         refreshSessions();
       } catch (e) {
         if (e.name !== 'AbortError') {
@@ -195,7 +201,8 @@ export default function App() {
         api.getDocuments(sid),
         api.getSessions(),
       ]);
-      setMessages((msgRes.messages || []).map((m, i) => ({ ...m, id: m.id ?? i })));
+      const freshMessages = msgRes.messages || msgRes || [];
+      setMessages(freshMessages.map(m => ({ ...m, id: m.id })));
       setDocuments(docRes.documents || []);
 
       // Use freshly fetched sessions to avoid stale closure bug
@@ -209,15 +216,11 @@ export default function App() {
 
 
   async function handleDeleteMessage(messageId) {
-    // Optimistically remove from the thread for instant feedback.
     setMessages(prev => prev.filter(m => m.id !== messageId));
     try {
       await api.deleteMessage(sessionId, messageId);
-      refreshSessions(); // keep the sidebar message count in sync
-    } catch {
-      // The message may have been local-only (not yet persisted); it is already
-      // removed from the UI, so nothing more to do.
-    }
+      refreshSessions();
+    } catch { }
   }
 
   async function handleDeleteSession(sid) {
