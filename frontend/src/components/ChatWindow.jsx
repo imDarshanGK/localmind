@@ -13,12 +13,86 @@ export default function ChatWindow({ messages, loading, onSend, onDeleteMessage,
   const textareaRef = useRef(null);
   const plusMenuRef = useRef(null);
 
+  // Local optimization tracking map state for instant UI reaction counts
+  const [localReactions, setLocalReactions] = useState({});
+
   // NEW: state for selected messages and export format
   const [selectedMessages, setSelectedMessages] = useState([]);
   const [exportFormat, setExportFormat] = useState("markdown");
   const [copiedMsgId, setCopiedMsgId] = useState(null);
   const [hoveredStatsId, setHoveredStatsId] = useState(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+
+  // Standard reaction picker configurations
+  const REACTION_EMOJIS = ["👍", "❤️", "🔥", "👏", "💡"];
+
+  // Toggle reaction execution sync handler
+  // Toggle reaction execution sync handler
+  async function handleReactionToggle(messageId, emoji) {
+    // FIX: If messageId is missing, a string, or undefined, stop right here!
+    if (!messageId || typeof messageId === "string") {
+      console.warn("Cannot react: Message ID is not persistently synchronized yet.");
+      return;
+    }
+    try {
+      const res = await toggleMessageReaction(messageId, emoji);
+      if (res.success) {
+        setLocalReactions(prev => ({
+          ...prev,
+          [messageId]: res.reactions
+        }));
+      }
+    } catch (err) {
+      console.error("Failed to toggle reaction:", err);
+    }
+  }
+
+  // Render method for displaying row of interactive emoji options or counters
+  const renderReactionsBar = (msg) => {
+    const activeReactions = localReactions[msg.id] ?? msg.reactions ?? [];
+    
+    return (
+      <div className="flex items-center gap-1.5 mt-1">
+        {/* Render existing active badges */}
+        {activeReactions.length > 0 && (
+          <div className="flex items-center gap-1 flex-wrap mr-1">
+            {Object.entries(
+              activeReactions.reduce((acc, emoji) => {
+                acc[emoji] = (acc[emoji] || 0) + 1;
+                return acc;
+              }, {})
+            ).map(([emoji, count]) => (
+              <button
+                key={emoji}
+                onClick={() => handleReactionToggle(msg.id, emoji)}
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs bg-purple-950/40 border border-purple-500/30 text-purple-300 hover:bg-purple-900/30 transition"
+              >
+                <span>{emoji}</span>
+                <span className="text-[10px] font-bold opacity-80">{count}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Emoji Selector Picker Bar Row */}
+        <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-gray-900 border border-gray-800 rounded-full px-1 py-0.5 shadow-md gap-0.5">
+          {REACTION_EMOJIS.map(emoji => {
+            const isSelected = activeReactions.includes(emoji);
+            return (
+              <button
+                key={emoji}
+                onClick={() => handleReactionToggle(msg.id, emoji)}
+                className={`p-0.5 text-xs hover:scale-125 transition-transform rounded-full ${isSelected ? 'bg-purple-500/20' : 'hover:bg-gray-800'}`}
+                title={`React with ${emoji}`}
+              >
+                {emoji}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
 
   // Inline delete control with a lightweight two-step confirm (no window.confirm).
   const renderDeleteControl = (msgId) =>
@@ -49,6 +123,9 @@ export default function ChatWindow({ messages, loading, onSend, onDeleteMessage,
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
+  // Reset local adjustments layout cache map when active conversation session changes
+  useEffect(() => { setLocalReactions({}); }, [sessionId]);
+
   // Close plus menu on outside click
   useEffect(() => {
     function handleClickOutside(e) {
@@ -73,32 +150,6 @@ export default function ChatWindow({ messages, loading, onSend, onDeleteMessage,
     setTimeout(() => textareaRef.current?.focus(), 0);
   }
 
-  // Parse code blocks for copy button
-  function parseMessageWithCodeBlocks(content) {
-    if (!content) return [{ type: "text", content: "" }];
-    const parts = [];
-    const regex = /```(\w*)\n([\s\S]*?)```/g;
-    let lastIndex = 0;
-    let match;
-    while ((match = regex.exec(content)) !== null) {
-      if (match.index > lastIndex) {
-        parts.push({ type: "text", content: content.slice(lastIndex, match.index) });
-      }
-      parts.push({
-        type: "code",
-        language: match[1] || "text",
-        code: match[2].trim()
-      });
-      lastIndex = match.index + match[0].length;
-    }
-    if (lastIndex < content.length) {
-      parts.push({ type: "text", content: content.slice(lastIndex) });
-    }
-    if (parts.length === 0) {
-      parts.push({ type: "text", content });
-    }
-    return parts;
-  }
   function send() {
     if ((!input.trim() && !selectedTemplate) || loading) return;
 
@@ -167,7 +218,7 @@ export default function ChatWindow({ messages, loading, onSend, onDeleteMessage,
         )}
 
         {messages.map((msg, i) => (
-          <div key={msg.id || i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+          <div key={msg.id || i} className={`flex group ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
             <div className="max-w-2xl">
               {msg.role === "assistant" && (
                 <div className="flex items-center gap-1.5 mb-1.5 ml-1">
@@ -386,14 +437,6 @@ export default function ChatWindow({ messages, loading, onSend, onDeleteMessage,
         )}
         <div ref={bottomRef} />
       </div>
-
-      {/* Prompt Template Dialog */}
-      {showTemplateDialog && (
-        <PromptTemplateDialog
-          onSelect={handleSelectTemplate}
-          onClose={() => { setShowTemplateDialog(false); setShowPlusMenu(false); }}
-        />
-      )}
 
       {/* Input Form Footer */}
       <div className="px-4 pb-4 pt-2 shrink-0">
