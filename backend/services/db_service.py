@@ -214,7 +214,7 @@ def delete_session(session_id: str):
             "SELECT COUNT(*) FROM documents WHERE session_id=?",(session_id,)
         ).fetchone()[0]
         cur = conn.execute("DELETE FROM sessions WHERE id=?", (session_id,))
-        deleted = cur.rowcount
+        deleted = cur.rowcount + msg_count + doc_count
     _maybe_vacuum(deleted)    
 
 
