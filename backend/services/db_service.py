@@ -44,8 +44,8 @@ def _maybe_vacuum(deleted_count: int):
         return
     with get_db() as conn:
         total = _increment_deleted_counter(conn, deleted_count)
-        if total >= VACUUM_THRESHOLD:
-            run_vacuum()     
+    if total >= VACUUM_THRESHOLD:
+        run_vacuum()     
 
 
 
@@ -191,6 +191,12 @@ def update_session(session_id: str, title: str = None, model: str = None):
 
 def delete_session(session_id: str):
     with get_db() as conn:
+        msg_count = conn.execute(
+            "SELECT COUNT(*) FROM messages WHERE session_id=?",(session_id,)
+        ).fetchone()[0]
+        doc_count = conn.execute(
+            "SELECT COUNT(*) FROM documents WHERE session_id=?",(session_id,)
+        ).fetchone()[0]
         cur = conn.execute("DELETE FROM sessions WHERE id=?", (session_id,))
         deleted = cur.rowcount
     _maybe_vacuum(deleted)    
@@ -357,4 +363,6 @@ def update_prompt_template(template_id: int, prompt_title: str = None, prompt: s
 def delete_prompt_template(template_id: int):
     """Delete a prompt template by ID."""
     with get_db() as conn:
-        conn.execute("DELETE FROM prompt_templates WHERE id = ?", (template_id,))
+        cur = conn.execute("DELETE FROM prompt_templates WHERE id = ?", (template_id,))
+        deleted = cur.rowcount
+    _maybe_vacuum(deleted)    
