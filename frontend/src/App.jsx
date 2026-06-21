@@ -26,6 +26,7 @@ export default function App() {
   const [settings,   setSettings]   = useState({});
   const [useStream,  setUseStream]  = useState(true);
 
+  // --- FEATURE REFERENCE: TRACK ACTIVE REQUEST ABORT SIGNAL ---
   const abortControllerRef = useRef(null);
 
   useEffect(() => { bootstrap(); }, []);
@@ -40,6 +41,25 @@ export default function App() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  // Poll Ollama status and refresh models on recovery
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const stRes = await api.getOllamaStatus();
+        const isRunning = stRes.ollama_running;
+        setOllamaOk((prev) => {
+          if (prev === false && isRunning === true) {
+            api.getModels().then(mRes => setModels(mRes.models || []));
+          }
+          return isRunning;
+        });
+      } catch {
+        setOllamaOk(false);
+      }
+    }, 10000);
+    return () => clearInterval(interval);
   }, []);
 
   async function bootstrap() {
@@ -77,10 +97,16 @@ export default function App() {
     setStreaming(false);
     setLoading(false);
 
+    // Call backend to actually stop the ongoing generation task
+    if (sessionId) {
+      api.cancelStream(sessionId).catch(e => console.error("Cancel stream error:", e));
+    }
+
+    // Clean up the trailing 'typing' state bubble indicators in the messages layout array
     setMessages(prev =>
       prev.map(m => m.streaming ? { ...m, streaming: false, content: m.content + "\n\n[Generation Stopped]" } : m)
     );
-  }, []);
+  }, [sessionId]);
 
   // ─── Core Message Pipelines ───────────────────────────────────────────────
 
@@ -155,7 +181,7 @@ export default function App() {
   async function newChat() {
     const sid = uuidv4();
     try {
-      await api.createSession({ title: "New Chat", model });
+      await api.createSession({ title: "New Chat", model, language });
     } catch { }
 
     setSessionId(sid);
@@ -165,22 +191,29 @@ export default function App() {
     refreshSessions();
   }
 
+
   async function loadSession(sid) {
     setSessionId(sid);
     setPanel(null);
     try {
-      const messagesRes = await api.getMessages(sid);
-      const docRes = await api.getDocuments(sid);
-      
-      // FIX: Securely extract from the custom dictionary wrapper array key layout
-      const freshMessages = messagesRes.messages || messagesRes || [];
-      
+      const [msgRes, docRes, freshSessions] = await Promise.all([
+        api.getMessages(sid),
+        api.getDocuments(sid),
+        api.getSessions(),
+      ]);
+      const freshMessages = msgRes.messages || msgRes || [];
       setMessages(freshMessages.map(m => ({ ...m, id: m.id })));
       setDocuments(docRes.documents || []);
-    } catch (err) {
-      console.error("Failed to load historical session details:", err);
-    }
+
+      // Use freshly fetched sessions to avoid stale closure bug
+      const sess = (freshSessions || []).find(s => s.id === sid);
+      if (sess) {
+        setLanguage(sess.language || settings.default_language || "en");
+        setSessions((freshSessions || []).map(s => ({ ...s, color: getSessionColor(s.id) })));
+      }
+    } catch { }
   }
+
 
   async function handleDeleteMessage(messageId) {
     setMessages(prev => prev.filter(m => m.id !== messageId));
@@ -212,6 +245,18 @@ export default function App() {
     setMessages([]);
   }
 
+  const handleLanguageChange = useCallback(async (newLang) => {
+    setLanguage(newLang);
+    if (sessionId) {
+      try {
+        await api.updateSession(sessionId, { language: newLang });
+        setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, language: newLang } : s));
+      } catch (e) {
+        console.error("Failed to update session language:", e);
+      }
+    }
+  }, [sessionId]);
+
   const handleUpdateSessionColor = useCallback((sid, color) => {
     setSessionColor(sid, color);
     setSessions(prev => prev.map(s => s.id === sid ? { ...s, color } : s));
@@ -230,7 +275,7 @@ export default function App() {
         models={models}
         onModelChange={setModel}
         language={language}
-        onLanguageChange={setLanguage}
+        onLanguageChange={handleLanguageChange}
         onUpdateSessionColor={handleUpdateSessionColor}
       />
 
@@ -248,14 +293,13 @@ export default function App() {
           onToggleStream={() => setUseStream(p => !p)}
         />
 
-        {panel === "upload" && (
-          <UploadPanel
-            sessionId={sessionId}
-            documents={documents}
-            onUploaded={() => refreshDocuments(sessionId)}
-            onClose={() => setPanel(null)}
-          />
-        )}
+        <UploadPanel
+          show={panel === "upload"}
+          sessionId={sessionId}
+          documents={documents}
+          onUploaded={() => refreshDocuments(sessionId)}
+          onClose={() => setPanel(null)}
+        />
         {panel === "plugins" && (
           <PluginsPanel sessionId={sessionId} onClose={() => setPanel(null)} />
         )}
@@ -268,9 +312,7 @@ export default function App() {
         )}
 
         {view === "prompts" ? (
-          <div className="flex-1 flex items-center justify-center text-gray-400 bg-gray-950 text-sm">
-            Prompt Registry component view placeholder.
-          </div>
+          <PromptRegistryPage onBack={() => setView("chat")} />
         ) : (
           <ChatWindow
             messages={messages}

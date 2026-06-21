@@ -45,10 +45,11 @@ class StreamBuffer:
         self.listeners = set()
         self.created_at = time.time()
         self.updated_at = time.time()
-        self.completed_at = None
-        self.error = None
+        self.completed_at: float | None = None
+        self.error: str | None = None
         self.sources = []
-
+        self.benchmarks: dict | None = None
+        self.cancelled = False
 
 async def clean_expired_streams():
     while True:
@@ -81,6 +82,9 @@ async def background_generator(buffer: StreamBuffer, req, context, history, sour
             language=req.language,
             temperature=req.temperature,
         ):
+            if buffer.cancelled:
+                break
+            
             if first_token_time is None:
                 first_token_time = time.perf_counter()
             token_count += 1
@@ -89,6 +93,9 @@ async def background_generator(buffer: StreamBuffer, req, context, history, sour
             # Push token to all active listeners
             for listener in list(buffer.listeners):
                 await listener.put({"token": token})
+
+        if buffer.cancelled:
+            buffer.buffer += "\n\n[Generation Stopped]"
 
         end_time = time.perf_counter()
         ttft_ms = round((first_token_time - start_time) * 1000) if first_token_time else 0
@@ -216,7 +223,7 @@ async def chat(req: ChatRequest):
         logger.warning("chat_rejected route=/chat session=%s reason=ollama_down", req.session_id)
         raise HTTPException(503, "Ollama not running. Run: `ollama serve`")
 
-    db_service.create_session(req.session_id, model=req.model)
+    db_service.create_session(req.session_id, model=req.model, language=req.language)
     history = db_service.get_history(req.session_id)
 
     context, sources = "", []
@@ -296,7 +303,7 @@ async def chat_stream(req: ChatRequest):
         elif len(history) >= 2 and history[-1]["role"] == "assistant" and history[-2]["role"] == "user" and history[-2]["content"] == req.message:
             user_msg_exists = True
 
-    db_service.create_session(req.session_id, model=req.model)
+    db_service.create_session(req.session_id, model=req.model, language=req.language)
     if not user_msg_exists:
         db_service.save_message(req.session_id, "user", req.message)
         history = db_service.get_history(req.session_id)
@@ -326,3 +333,14 @@ async def chat_stream(req: ChatRequest):
     ))
 
     return StreamingResponse(stream_from_buffer(buffer, resume_offset), media_type="text/event-stream")
+
+
+@router.post("/cancel/{session_id}")
+async def cancel_stream(session_id: str):
+    """Explicitly cancels an active stream."""
+    buffer = ACTIVE_STREAMS.get(session_id)
+    if buffer and not buffer.completed:
+        buffer.cancelled = True
+        return {"status": "cancelled"}
+    return {"status": "not_found_or_completed"}
+

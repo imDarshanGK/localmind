@@ -30,6 +30,7 @@
 |---------|-------------|
 | Streaming Responses | See AI reply token-by-token in real time |
 | Plugin System | Calculator, Word Counter, JSON Formatter, Code Runner, Summarizer |
+| Audit Log | Track and view history of all plugin executions |
 | 8 Languages | English, Hindi, Tamil, Telugu, Kannada, French, German, Spanish |
 | Export Chats | Download conversations as Markdown, JSON, or TXT |
 | Session Manager | Full CRUD - create, rename, search, delete chat sessions |
@@ -53,6 +54,7 @@
 | Session Manager (CRUD) | Included |
 | Session Search | Included |
 | Plugin System (6 plugins) | Included |
+| Plugin Audit Log | Included |
 | Export (MD / JSON / TXT) | Included |
 | Settings Panel | Included |
 | Docker Compose | Included |
@@ -303,6 +305,47 @@ pip install pytest pytest-asyncio
 pytest tests/ -v
 # 30+ tests covering: sessions, chat, plugins, upload, export, settings
 ```
+---
+
+
+## 🧹 Database Maintenance
+
+[![Auto Vacuum](https://img.shields.io/badge/Auto-VACUUM-7C3AED?style=flat-square)](#-database-maintenance)
+[![SQLite](https://img.shields.io/badge/SQLite-Self_Healing-009688?style=flat-square&logo=sqlite&logoColor=white)](#-database-maintenance)
+
+LocalMind automatically reclaims disk space after large deletions — clearing a chat, deleting a session, removing documents — by running SQLite's `VACUUM` command once enough rows have been deleted.
+
+```text
+┌──────────────────────────────────────────────────┐
+│            Vacuum Scheduling Flow                │
+├──────────────────────────────────────────────────┤
+│  1. Rows deleted (session / messages / docs)     │
+│  2. Deleted count tracked in app_settings        │
+│  3. Threshold crossed? ──No──> wait, keep count  │
+│              │                                    │
+│             Yes                                   │
+│              ▼                                    │
+│  4. VACUUM runs (separate autocommit connection) │
+│  5. Counter resets to 0                          │
+└──────────────────────────────────────────────────┘
+```
+
+| Env Variable | Default | Description |
+|---|---|---|
+| `DB_VACUUM_THRESHOLD` | `500` | Cumulative deleted rows before an automatic VACUUM runs |
+
+**Why threshold-based?** Running VACUUM on every delete would rebuild the entire database file each time — slow and wasteful for small deletes. Batching it keeps the database lean without hurting day-to-day performance.
+
+<details>
+<summary>📊 See it in action (measured locally)</summary>
+
+| Stage | DB File Size |
+|---|---|
+| After inserting 5,000 messages | ~1.22 MB |
+| After deleting them (no vacuum) | ~1.22 MB — unchanged |
+| After VACUUM runs | ~40 KB |
+
+</details>
 
 ---
 
