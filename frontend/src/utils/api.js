@@ -51,6 +51,12 @@ export async function uploadDocument(file, session_id) {
   if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || "Upload failed"); }
   return res.json();
 }
+// Message Reactions API Toggle
+export const toggleMessageReaction = (messageId, emoji) => 
+  req("/chat/messages/toggle-reaction", { 
+    method: "POST", 
+    body: JSON.stringify({ message_id: messageId, emoji }) 
+  });
 
 // NEW: Appended 'signal' parameter right to the tail of your token reader stream
 export function streamMessage(body, onToken, onDone, signal) {
@@ -82,6 +88,7 @@ export function streamMessage(body, onToken, onDone, signal) {
                   doneReceived = true;
                   sourcesList = d.sources || [];
                   onDone({
+                    message_id: d.message_id,
                     sources: sourcesList,
                     benchmarks: d.benchmarks || null
                   });

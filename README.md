@@ -349,12 +349,18 @@ LocalMind automatically reclaims disk space after large deletions — clearing a
 
 ---
 
+---
+
 ## 🚀 Optimization & Performance Utilities
 
 ### Embeddings Cache Warmup
 To prevent cold-start latency when users upload documents for the first time, you can pre-download and warm up the SentenceTransformer inference weights (`all-MiniLM-L6-v2`) before starting the web server.
 
-Run the following command within your active virtual environment i
+Run the following command within your active virtual environment inside the backend directory:
+
+```bash
+cd backend
+python warmup.py
 
 ## 🤝 Contributing
 
