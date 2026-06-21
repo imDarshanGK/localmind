@@ -175,7 +175,7 @@ export default function App() {
   async function newChat() {
     const sid = uuidv4();
     try {
-      await api.createSession({ title: "New Chat", model });
+      await api.createSession({ title: "New Chat", model, language });
     } catch { }
 
     setSessionId(sid);
@@ -185,15 +185,28 @@ export default function App() {
     refreshSessions();
   }
 
+
   async function loadSession(sid) {
     setSessionId(sid);
     setPanel(null);
     try {
-      const [msgRes, docRes] = await Promise.all([api.getMessages(sid), api.getDocuments(sid)]);
+      const [msgRes, docRes, freshSessions] = await Promise.all([
+        api.getMessages(sid),
+        api.getDocuments(sid),
+        api.getSessions(),
+      ]);
       setMessages((msgRes.messages || []).map((m, i) => ({ ...m, id: m.id ?? i })));
       setDocuments(docRes.documents || []);
+
+      // Use freshly fetched sessions to avoid stale closure bug
+      const sess = (freshSessions || []).find(s => s.id === sid);
+      if (sess) {
+        setLanguage(sess.language || settings.default_language || "en");
+        setSessions((freshSessions || []).map(s => ({ ...s, color: getSessionColor(s.id) })));
+      }
     } catch { }
   }
+
 
   async function handleDeleteMessage(messageId) {
     // Optimistically remove from the thread for instant feedback.
@@ -229,6 +242,18 @@ export default function App() {
     setMessages([]);
   }
 
+  const handleLanguageChange = useCallback(async (newLang) => {
+    setLanguage(newLang);
+    if (sessionId) {
+      try {
+        await api.updateSession(sessionId, { language: newLang });
+        setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, language: newLang } : s));
+      } catch (e) {
+        console.error("Failed to update session language:", e);
+      }
+    }
+  }, [sessionId]);
+
   const handleUpdateSessionColor = useCallback((sid, color) => {
     setSessionColor(sid, color);
     setSessions(prev => prev.map(s => s.id === sid ? { ...s, color } : s));
@@ -247,7 +272,7 @@ export default function App() {
         models={models}
         onModelChange={setModel}
         language={language}
-        onLanguageChange={setLanguage}
+        onLanguageChange={handleLanguageChange}
         onUpdateSessionColor={handleUpdateSessionColor}
       />
 
@@ -265,14 +290,13 @@ export default function App() {
           onToggleStream={() => setUseStream(p => !p)}
         />
 
-        {panel === "upload" && (
-          <UploadPanel
-            sessionId={sessionId}
-            documents={documents}
-            onUploaded={() => refreshDocuments(sessionId)}
-            onClose={() => setPanel(null)}
-          />
-        )}
+        <UploadPanel
+          show={panel === "upload"}
+          sessionId={sessionId}
+          documents={documents}
+          onUploaded={() => refreshDocuments(sessionId)}
+          onClose={() => setPanel(null)}
+        />
         {panel === "plugins" && (
           <PluginsPanel sessionId={sessionId} onClose={() => setPanel(null)} />
         )}

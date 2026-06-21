@@ -45,11 +45,11 @@ class StreamBuffer:
         self.listeners = set()
         self.created_at = time.time()
         self.updated_at = time.time()
-        self.completed_at = None
-        self.error = None
+        self.completed_at: float | None = None
+        self.error: str | None = None
         self.sources = []
+        self.benchmarks: dict | None = None
         self.cancelled = False
-
 
 async def clean_expired_streams():
     while True:
@@ -174,7 +174,7 @@ async def chat(req: ChatRequest):
         logger.warning("chat_rejected route=/chat session=%s reason=ollama_down", req.session_id)
         raise HTTPException(503, "Ollama not running. Run: `ollama serve`")
 
-    db_service.create_session(req.session_id, model=req.model)
+    db_service.create_session(req.session_id, model=req.model, language=req.language)
     history = db_service.get_history(req.session_id)
 
     context, sources = "", []
@@ -254,7 +254,7 @@ async def chat_stream(req: ChatRequest):
         elif len(history) >= 2 and history[-1]["role"] == "assistant" and history[-2]["role"] == "user" and history[-2]["content"] == req.message:
             user_msg_exists = True
 
-    db_service.create_session(req.session_id, model=req.model)
+    db_service.create_session(req.session_id, model=req.model, language=req.language)
     if not user_msg_exists:
         db_service.save_message(req.session_id, "user", req.message)
         history = db_service.get_history(req.session_id)

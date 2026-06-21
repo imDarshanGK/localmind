@@ -19,7 +19,7 @@ async def list_sessions():
 @router.post("/")
 async def create_session(body: SessionCreate):
     sid = str(uuid.uuid4())
-    session = db_service.create_session(sid, title=body.title, model=body.model)
+    session = db_service.create_session(sid, title=body.title, model=body.model, language=body.language)
     return session
 
 @router.patch("/bulk-rename")
@@ -79,7 +79,7 @@ async def clone_session(session_id: str):
     if not s:
         raise HTTPException(404, "Session not found")
     new_id = str(uuid.uuid4())
-    db_service.create_session(new_id, title=f"{s['title']} (Copy)", model=s["model"])
+    db_service.create_session(new_id, title=f"{s['title']} (Copy)", model=s["model"], language=s.get("language", "en"))
     messages = db_service.get_messages_full(session_id)
     for msg in messages:
         db_service.save_message(
@@ -92,7 +92,7 @@ async def clone_session(session_id: str):
 
 @router.patch("/{session_id}")
 async def update_session(session_id: str, body: SessionUpdate):
-    db_service.update_session(session_id, title=body.title, model=body.model)
+    db_service.update_session(session_id, title=body.title, model=body.model, language=body.language)
     return db_service.get_session(session_id)
 
 

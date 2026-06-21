@@ -89,17 +89,20 @@ class ModelInfo(BaseModel):
 class SessionCreate(BaseModel):
     title: str = "New Chat"
     model: str = "llama3"
+    language: str = "en"
 
 
 class SessionUpdate(BaseModel):
     title: Optional[str] = None
     model: Optional[str] = None
+    language: Optional[str] = None
 
 
 class SessionOut(BaseModel):
     id: str
     title: str
     model: str
+    language: str="en"
     message_count: int = 0
     created_at: str
     updated_at: str
