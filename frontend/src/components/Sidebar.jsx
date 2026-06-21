@@ -3,6 +3,7 @@ import { AppLogoIcon, ChatIcon, LockIcon, StarIcon, PinIcon } from "./Icons";
 import { PALETTE } from "../utils/colorHelper";
 import { highlightText } from "../utils/search";
 import { getPinnedSessions, toggleSessionPin } from "../utils/pinHelper";
+import DeleteConfirmDialog from "./DeleteConfirmDialog";
 
 const LANGUAGES = [
   {code:"en",label:"English"},{code:"hi",label:"हिन्दी"},{code:"ta",label:"தமிழ்"},
@@ -15,6 +16,7 @@ export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSes
   const [search, setSearch] = useState("");
   const [contextMenu, setContextMenu] = useState(null); // { sessionId, x, y }
   const [pinnedIds, setPinnedIds] = useState(() => getPinnedSessions());
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
 
   const [isResizing, setIsResizing] = useState(false);
   const [width, setWidth] = useState(() => {
@@ -102,10 +104,20 @@ export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSes
           className={`px-1.5 py-2 transition text-xs ${isPinned ? "text-purple-400 opacity-100" : "text-gray-500 opacity-0 group-hover:opacity-100 hover:text-gray-300"}`}>
           <PinIcon className="w-3.5 h-3.5" filled={isPinned} />
         </button>
-        <button onClick={()=>onDeleteSession(s.id)}
+        <button onClick={()=>setDeleteConfirm({sessionId: s.id, sessionName: s.title})}
           className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 px-1.5 py-2 transition text-xs">
           ×
         </button>
+        {deleteConfirm && (
+          <DeleteConfirmDialog
+            sessionName={deleteConfirm.sessionName}
+            onConfirm={() => {
+              onDeleteSession(deleteConfirm.sessionId);
+              setDeleteConfirm(null);
+            }}
+            onClose={() => setDeleteConfirm(null)}
+          />
+        )}
       </div>
     );
   };
