@@ -54,6 +54,18 @@ cd backend && python warmup.py
 - **Two requirements files**: `requirements.txt` (full) and `requirements_fixed.txt` (trimmed). Use `requirements.txt`.
 - **Frontend has no test runner configured** — `package.json` has no test script. Only backend has tests.
 
+## Available Skills
+
+Skills live in `.agents/skills/`. Invoke with `/skill-name`.
+
+| Skill | What it does in this repo |
+|---|---|
+| `conventional-commit` | Inspects your staged changes and writes a properly-formatted `feat:`/`fix:`/`docs:` commit message following Conventional Commits |
+| `docker-expert` | Reviews and improves `Dockerfile` + `docker-compose.yml` — multi-stage builds, layer caching, security hardening, and production readiness |
+| `fastapi-python` | Guides backend work in `backend/` — route design, async patterns, Pydantic v2 schemas, error handling, and PEP 8 style |
+| `langchain-rag` | Helps extend or debug the RAG pipeline — document loaders, chunking, ChromaDB vector store, embeddings, and retrieval tuning |
+| `wcag-audit-patterns` | Audits the React frontend for WCAG 2.2 accessibility violations and provides remediation for components in `frontend/src/` |
+
 ## Conventions
 
 - Python: PEP 8, type hints, docstrings. Commit messages follow Conventional Commits (`feat:`, `fix:`, `docs:`).
