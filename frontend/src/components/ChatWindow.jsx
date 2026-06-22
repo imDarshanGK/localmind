@@ -121,7 +121,23 @@ export default function ChatWindow({ messages, loading, onSend, onDeleteMessage,
       </button>
     );
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
+  const prevSessionId = useRef(sessionId);
+  const prevMessagesLength = useRef(messages.length);
+
+  useEffect(() => {
+    const isNewMessage = messages.length > prevMessagesLength.current;
+    const isSessionChange = sessionId !== prevSessionId.current;
+    const isInitialLoad = prevMessagesLength.current === 0 && messages.length > 0;
+    const lastMessage = messages[messages.length - 1];
+    const isStreaming = lastMessage?.streaming;
+
+    if (isNewMessage || isInitialLoad || isStreaming || isSessionChange) {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+
+    prevMessagesLength.current = messages.length;
+    prevSessionId.current = sessionId;
+  }, [messages, sessionId]);
 
   // Reset local adjustments layout cache map when active conversation session changes
   useEffect(() => { setLocalReactions({}); }, [sessionId]);
