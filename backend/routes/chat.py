@@ -16,7 +16,12 @@ from services import ollama_service, db_service
 import psutil
 
 logger = logging.getLogger(__name__)
+import os
+from pathlib import Path
 
+# Define the absolute or relative path where export files are saved on the server
+EXPORT_DIR = Path(__file__).parent.parent / "localmind_exports"
+os.makedirs(EXPORT_DIR, exist_ok=True)
 
 def _get_memory_usage():
     mem = psutil.virtual_memory()
@@ -343,4 +348,39 @@ async def cancel_stream(session_id: str):
         buffer.cancelled = True
         return {"status": "cancelled"}
     return {"status": "not_found_or_completed"}
+
+@router.delete("/session/{session_id}")
+async def api_delete_session(session_id: str):
+    """Deletes a chat session from the database and removes all associated local export files."""
+    try:
+        # 1. Trigger the database deletion
+        if hasattr(db_service, "delete_session"):
+            db_service.delete_session(session_id)
+        elif hasattr(db_service, "clear_session"):
+            db_service.clear_session(session_id)
+        else:
+            logger.warning("No delete function found on db_service")
+
+        # 2. Scan and remove orphaned export files matching the session_id
+        deleted_files_count = 0
+        if EXPORT_DIR.exists() and EXPORT_DIR.is_dir():
+            for file_path in EXPORT_DIR.iterdir():
+                # Checks if the file name contains our session identity string
+                if session_id in file_path.name:
+                    try:
+                        file_path.unlink()  # Deletes the file off the disk
+                        logger.info("Removed orphaned export file: %s", file_path.name)
+                        deleted_files_count += 1
+                    except Exception as file_err:
+                        logger.error("Failed to delete file %s: %s", file_path.name, str(file_err))
+
+        return {
+            "success": True, 
+            "session_id": session_id, 
+            "orphaned_files_cleaned": deleted_files_count
+        }
+
+    except Exception as e:
+        logger.error("Failed to delete session %s: %s", session_id, str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to delete session: {str(e)}")
 

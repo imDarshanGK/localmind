@@ -406,10 +406,27 @@ def get_documents(session_id: str) -> list[dict]:
 
 
 def delete_document(doc_id: int):
+    """Deletes the physical uploaded file from disk and removes its record entry from SQLite."""
     with get_db() as conn:
+        # 1. Fetch the physical file path before deleting the database reference row
+        row = conn.execute("SELECT file_path FROM documents WHERE id=?", (doc_id,)).fetchone()
+        
+        if row and row["file_path"]:
+            physical_path = row["file_path"]
+            try:
+                # 2. Check if the file exists on the filesystem and wipe it out
+                if os.path.exists(physical_path) and os.path.isfile(physical_path):
+                    os.remove(physical_path)
+                    print(f"Successfully deleted physical file asset: {physical_path}")
+            except Exception as file_err:
+                # Log the error but continue so the database doesn't lock or desync
+                print(f"Warning: Failed to clean up disk file {physical_path}: {str(file_err)}")
+
+        # 3. Clean up the database record entries
         cur = conn.execute("DELETE FROM documents WHERE id=?", (doc_id,))
         deleted = cur.rowcount
-    _maybe_vacuum(deleted )    
+        
+    _maybe_vacuum(deleted)    
 
 # ─── Settings ────────────────────────────────────────────────
 def get_settings() -> dict:
