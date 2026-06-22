@@ -85,14 +85,14 @@ export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSes
             ${isActive ? "opacity-100 animate-pulse" : "opacity-0"}`}
         />
         <button onClick={()=>onLoadSession(s.id)}
-          className="flex-1 text-left text-xs pl-6 pr-1 py-2 truncate text-gray-400 group-hover:text-gray-200">
+          className="flex-1 min-w-0 text-left text-xs pl-6 pr-1 py-2 truncate text-gray-400 group-hover:text-gray-200">
           <span className={isActive ? "text-white" : ""}>
             <span className="inline-flex items-center gap-1.5">
               <ChatIcon className="w-3.5 h-3.5 text-gray-500" />
               <span
                 className="w-2 h-2 rounded-full shrink-0"
                 style={{ backgroundColor: s.color }}
-                title="Tag color"
+                aria-label="Tag color"
               />
               <span>{highlightText(s.title || "New Chat", search)}</span>
             </span>
@@ -102,13 +102,20 @@ export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSes
           )}
         </button>
         <button onClick={(e) => handleTogglePin(e, s.id)}
-          title={isPinned ? "Unpin chat" : "Pin chat"}
-          className={`px-1.5 py-2 transition text-xs ${isPinned ? "text-purple-400 opacity-100" : "text-gray-500 opacity-0 group-hover:opacity-100 hover:text-gray-300"}`}>
+          aria-label={isPinned ? "Unpin chat" : "Pin chat"}
+          className={`relative group/pin px-1.5 py-2 transition text-xs ${isPinned ? "text-purple-400 opacity-100" : "text-gray-500 opacity-0 group-hover:opacity-100 hover:text-gray-300"}`}>
           <PinIcon className="w-3.5 h-3.5" filled={isPinned} />
+          <span className="hidden md:block absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-gray-800 border border-gray-700 text-gray-300 text-[10px] rounded opacity-0 group-hover/pin:opacity-100 pointer-events-none whitespace-nowrap z-50 transition-opacity">
+            {isPinned ? "Unpin chat" : "Pin chat"}
+          </span>
         </button>
         <button onClick={()=>setDeleteConfirm({sessionId: s.id, sessionName: s.title})}
-          className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 px-1.5 py-2 transition text-xs">
+          aria-label="Delete chat"
+          className="relative group/del opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 px-1.5 py-2 transition text-xs">
           ×
+          <span className="hidden md:block absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-gray-800 border border-gray-700 text-gray-300 text-[10px] rounded opacity-0 group-hover/del:opacity-100 pointer-events-none whitespace-nowrap z-50 transition-opacity">
+            Delete
+          </span>
         </button>
         {deleteConfirm && (
           <DeleteConfirmDialog
