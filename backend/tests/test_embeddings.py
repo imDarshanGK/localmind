@@ -12,6 +12,7 @@ sys.modules["chromadb.config"] = MagicMock()
 mock_langchain = MagicMock()
 sys.modules["langchain"] = mock_langchain
 sys.modules["langchain.text_splitter"] = mock_langchain.text_splitter
+sys.modules["langchain_text_splitters"] = mock_langchain.text_splitter
 
 mock_langchain_community = MagicMock()
 sys.modules["langchain_community"] = mock_langchain_community
