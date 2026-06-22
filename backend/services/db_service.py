@@ -215,16 +215,31 @@ def update_session(session_id: str, title: str = None, model: str = None, langua
 
 
 def delete_session(session_id: str):
+    """Deletes a session, clears its physical document assets from disk, and removes database rows."""
     with get_db() as conn:
+        # 1. Fetch all physical file paths for documents bound to this session
+        rows = conn.execute("SELECT file_path FROM documents WHERE session_id=?", (session_id,)).fetchall()
+        for row in rows:
+            if row["file_path"]:
+                physical_path = row["file_path"]
+                try:
+                    if os.path.exists(physical_path) and os.path.isfile(physical_path):
+                        os.remove(physical_path)
+                        print(f"Cleaned up session document asset: {physical_path}")
+                except Exception as file_err:
+                    print(f"Warning: Failed to delete session asset {physical_path}: {str(file_err)}")
+
+        # 2. Gather counts for vacuum scheduling metric tracking
         msg_count = conn.execute(
-            "SELECT COUNT(*) FROM messages WHERE session_id=?",(session_id,)
+            "SELECT COUNT(*) FROM messages WHERE session_id=?", (session_id,)
         ).fetchone()[0]
-        doc_count = conn.execute(
-            "SELECT COUNT(*) FROM documents WHERE session_id=?",(session_id,)
-        ).fetchone()[0]
+        doc_count = len(rows)
+
+        # 3. Delete the session row (triggers cascading drops on remaining dependent rows)
         cur = conn.execute("DELETE FROM sessions WHERE id=?", (session_id,))
         deleted = cur.rowcount + msg_count + doc_count
-    _maybe_vacuum(deleted)    
+
+    _maybe_vacuum(deleted)   
 
 
 def clear_all_sessions():

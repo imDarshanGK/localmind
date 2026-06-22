@@ -1,23 +1,21 @@
 """Chat routes — /api/chat — supports normal + streaming + message reactions"""
 
 import asyncio
-import time
 import json
 import logging
+import os
+import time
+from pathlib import Path
 from types import SimpleNamespace
 
+import psutil
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
-
 from models.schemas import ChatRequest, ChatResponse
-from services import ollama_service, db_service
-
-import psutil
+from pydantic import BaseModel
+from services import db_service, ollama_service
 
 logger = logging.getLogger(__name__)
-import os
-from pathlib import Path
 
 # Define the absolute or relative path where export files are saved on the server
 EXPORT_DIR = Path(__file__).parent.parent / "localmind_exports"
