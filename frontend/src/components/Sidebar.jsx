@@ -14,6 +14,8 @@ const LANGUAGES = [
 
 export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSession, onDeleteSession, onClearAllSessions, model, models, onModelChange, language, onLanguageChange, onUpdateSessionColor }) {
   const [search, setSearch] = useState("");
+  const [isOpen, setIsOpen] = useState(false); // Mobile drawer toggle state
+  
   const [contextMenu, setContextMenu] = useState(null); // { sessionId, x, y }
   const [pinnedIds, setPinnedIds] = useState(() => getPinnedSessions());
   const [deleteConfirm, setDeleteConfirm] = useState(null);
@@ -145,25 +147,50 @@ export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSes
   };
 
   return (
-    <div 
-      className="relative flex flex-col bg-gray-900 border-r border-gray-800 shrink-0 overflow-x-hidden transition-[width] duration-0"
-      style={{ width: `${width}px` }}
-    >
-      {/* Drag handle */}
+    <>
+      {/* --- Mobile Hamburger Toggle Trigger --- */}
+      <button 
+        onClick={() => setIsOpen(!isOpen)}
+        className="md:hidden fixed top-3 left-3 z-50 p-2 rounded-xl bg-gray-800 border border-gray-700 text-gray-300 hover:text-white transition shadow-md"
+        aria-label="Toggle Navigation Sidebar"
+      >
+        {isOpen ? (
+          <span className="text-xl leading-none font-bold block w-5 h-5 flex items-center justify-center">×</span>
+        ) : (
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        )}
+      </button>
+
+      {/* --- Mobile Dim Backdrop Overlay --- */}
+      {isOpen && (
+        <div 
+          onClick={() => setIsOpen(false)}
+          className="md:hidden fixed inset-0 bg-black/60 z-40 backdrop-blur-xs transition"
+        />
+      )}
+
+      {/* --- Responsive Sidebar Shell Container --- */}
       <div 
-        onMouseDown={() => setIsResizing(true)}
-        className="absolute top-0 right-0 w-[5px] h-full cursor-col-resize hover:bg-purple-500/50 z-50 transition-colors"
-      />
-      {/* Logo */}
-      <div className="px-4 pt-5 pb-4 border-b border-gray-800">
-        <div className="flex items-center gap-2 mb-4">
-          <AppLogoIcon className="w-6 h-6 text-purple-400" />
-          <div>
-            <p className="font-bold text-white text-sm">LocalMind</p>
-            <p className="text-xs text-gray-500">v2.0 · Offline AI</p>
+        style={{ width: window.innerWidth >= 768 ? width : undefined }}
+        className={`
+          fixed inset-y-0 left-0 z-40 transform transition-transform duration-300 ease-in-out
+          md:relative md:transform-none md:translate-x-0 md:z-auto
+          flex flex-col bg-gray-900 border-r border-gray-800 shrink-0
+          ${isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
+        `}
+      >
+        {/* Logo Section */}
+        <div className="px-4 pt-16 md:pt-5 pb-4 border-b border-gray-800">
+          <div className="flex items-center gap-2 mb-4">
+            <AppLogoIcon className="w-6 h-6 text-purple-400" />
+            <div>
+              <p className="font-bold text-white text-sm">LocalMind</p>
+              <p className="text-xs text-gray-500">v2.0 · Offline AI</p>
+            </div>
           </div>
-        </div>
-        <button onClick={onNewChat}
+        <button onClick={() => { onNewChat(); setIsOpen(false); }}
           title="New Chat"
           className="w-full text-sm bg-purple-700 hover:bg-purple-600 active:bg-purple-800 text-white py-2 rounded-xl font-medium transition">
           + New Chat
@@ -203,89 +230,51 @@ export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSes
         </select>
       </div>
 
-      {/* Search */}
-      <div className="px-3 py-2 border-b border-gray-800">
-        <input value={search} onChange={e=>setSearch(e.target.value)}
-          placeholder="Search chats..."
-          className="w-full text-xs bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-gray-300 placeholder-gray-600 outline-none focus:border-purple-500" />
-      </div>
+        {/* Search Bar */}
+        <div className="px-3 py-2 border-b border-gray-800">
+          <input value={search} onChange={e=>setSearch(e.target.value)}
+            placeholder="Search chats..."
+            className="w-full text-xs bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-gray-300 placeholder-gray-600 outline-none focus:border-purple-500" />
+        </div>
 
-      {/* Sessions */}
-      <div className="flex-1 overflow-y-auto px-2 py-2">
-        {filtered.length === 0 && (
-          <p className="text-xs text-gray-600 px-2 py-1">
-            {sessions.length === 0 ? "No chats yet. Start one!" : "No results."}
-          </p>
-        )}
-        
-        {pinnedSessions.length > 0 && (
-          <div className="mb-4">
-            <h3 className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider px-2 mb-1.5">Pinned</h3>
-            {pinnedSessions.map(renderSessionRow)}
-          </div>
-        )}
-
-        {unpinnedSessions.length > 0 && (
+       {/* Historical Chat Sessions List */}
+        <div className="flex-1 overflow-y-auto px-2 py-2">
+          {pinnedSessions.length > 0 && (
+            <div className="mb-4">
+              <p className="text-[10px] font-semibold text-gray-500 px-2 mb-1 tracking-wider uppercase">Pinned</p>
+              {pinnedSessions.map(renderSessionRow)}
+            </div>
+          )}
           <div>
-            {pinnedSessions.length > 0 && (
-              <h3 className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider px-2 mb-1.5">Recent</h3>
+            {pinnedSessions.length > 0 && unpinnedSessions.length > 0 && (
+              <p className="text-[10px] font-semibold text-gray-500 px-2 mb-1 tracking-wider uppercase">Recent</p>
+            )}
+            {unpinnedSessions.length === 0 && pinnedSessions.length === 0 && (
+              <p className="text-xs text-gray-600 px-2 py-1">
+                {sessions.length === 0 ? "No chats yet. Start one!" : "No results."}
+              </p>
             )}
             {unpinnedSessions.map(renderSessionRow)}
           </div>
-        )}
-      </div>
-
-      {/* Custom Context Menu Color Picker */}
-      {contextMenu && (
-        <div
-          className="fixed z-50 bg-gray-800 border border-gray-700 rounded-lg shadow-xl p-2 flex gap-1.5"
-          style={{ top: `${contextMenu.y}px`, left: `${contextMenu.x}px` }}
-          onClick={(e) => e.stopPropagation()}
-          onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
-        >
-          {PALETTE.map((color) => (
-            <button
-              key={color.hex}
-              onClick={() => {
-                onUpdateSessionColor(contextMenu.sessionId, color.hex);
-                setContextMenu(null);
-              }}
-              title="Click to change color"
-              className="w-5 h-5 rounded-full border border-gray-600 hover:scale-110 active:scale-95 transition-transform"
-              style={{ backgroundColor: color.hex }}
-            />
-          ))}
         </div>
-      )}
 
-      {sessions.length > 0 && (
-        <div className="px-3 py-2 border-t border-gray-800 shrink-0">
-          <button
-            onClick={() => {
-              if (window.confirm("Delete all sessions? This cannot be undone.")) {
-                onClearAllSessions();
-              }
-            }}
-            className="w-full text-left text-xs text-gray-500 hover:text-red-400 hover:bg-red-950/20 px-3 py-2 rounded-lg transition inline-flex items-center gap-2 font-medium"
-          >
-            <span>🗑</span>
-            <span>Clear all sessions</span>
-          </button>
+        {/* Local Security and Source Attributions Footer */}
+        <div className="px-4 py-3 border-t border-gray-800 flex flex-col gap-1">
+          <p className="text-xs text-gray-600 inline-flex items-center gap-1">
+            <LockIcon className="w-3.5 h-3.5" />
+            <span>100% local · no cloud · MIT</span>
+          </p>
+          <a href="https://github.com/yourusername/localmind" target="_blank" rel="noreferrer"
+            className="text-xs text-purple-500 hover:text-purple-400 transition inline-flex items-center gap-1 w-max">
+            <StarIcon className="w-3.5 h-3.5" />
+            <span>Star on GitHub</span>
+          </a>
         </div>
-      )}
-
-      {/* Footer */}
-      <div className="px-4 py-3 border-t border-gray-800">
-        <p className="text-xs text-gray-600 inline-flex items-center gap-1">
-          <LockIcon className="w-3.5 h-3.5" />
-          <span>100% local · no cloud · MIT</span>
-        </p>
-        <a href="https://github.com/yourusername/localmind" target="_blank" rel="noreferrer"
-          className="text-xs text-purple-500 hover:text-purple-400 transition inline-flex items-center gap-1">
-          <StarIcon className="w-3.5 h-3.5" />
-          <span>Star on GitHub</span>
-        </a>
+        <div 
+          onMouseDown={() => setIsResizing(true)}
+          className="hidden md:block absolute top-0 right-0 bottom-0 w-1 cursor-col-resize bg-transparent hover:bg-purple-500/40 transition-colors"
+        />
       </div>
-    </div>
+    </>
   );
 }
