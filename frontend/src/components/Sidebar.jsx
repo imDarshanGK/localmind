@@ -211,6 +211,17 @@ export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSes
       </div>
 
       {/* Sessions */}
+      {/* Session Summary Card */}
+      <div className="px-3 py-2 border-b border-gray-800">
+        <label className="text-xs text-gray-500 block mb-1">Session Sumary</label>
+          <div className="text-xs text-white-500 block mb-1">
+            Messages count:
+            <br></br>
+            Summary :
+          </div>
+      </div>
+
+      {/* Chat History */}
       <div className="flex-1 overflow-y-auto px-2 py-2">
         {filtered.length === 0 && (
           <p className="text-xs text-gray-600 px-2 py-1">
