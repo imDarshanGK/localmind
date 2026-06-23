@@ -290,3 +290,44 @@ def get_shared_session(share_id: str) -> dict | None:
         "messages": json.loads(row["snapshot_json"]),  # Turn string array back into live json dicts
         "created_at": row["created_at"]
     }
+# ─── Prompt Templates (From main) ────────────────────────────
+
+def create_prompt_template(name: str, prompt: str) -> dict:
+    with get_db() as conn:
+        cursor = conn.execute(
+            "INSERT INTO prompt_templates (name, prompt) VALUES (?, ?)",
+            (name, prompt)
+        )
+        template_id = cursor.lastrowid
+    return get_prompt_template(template_id)
+
+
+def get_prompt_template(template_id: int) -> dict | None:
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT * FROM prompt_templates WHERE id = ?", 
+            (template_id,)
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def get_all_prompt_templates() -> list[dict]:
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT * FROM prompt_templates ORDER BY created_at DESC"
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def update_prompt_template(template_id: int, name: str = None, prompt: str = None) -> dict | None:
+    with get_db() as conn:
+        if name:
+            conn.execute("UPDATE prompt_templates SET name=? WHERE id=?", (name, template_id))
+        if prompt:
+            conn.execute("UPDATE prompt_templates SET prompt=? WHERE id=?", (prompt, template_id))
+    return get_prompt_template(template_id)
+
+
+def delete_prompt_template(template_id: int):
+    with get_db() as conn:
+        conn.execute("DELETE FROM prompt_templates WHERE id=?", (template_id,))
