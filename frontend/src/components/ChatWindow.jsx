@@ -7,22 +7,34 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
   const bottomRef = useRef(null);
   const textareaRef = useRef(null);
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
+  // Auto-scroll to latest messages
+  useEffect(() => { 
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" }); 
+  }, [messages]);
+
+  // Handle auto-resizing smoothly whenever the text content shifts
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    // Reset height before computing scrollHeight to allow textarea contraction
+    textarea.style.height = "auto";
+    
+    // Lock the frame expansion between 24px and 160px bounds
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 160)}px`;
+  }, [input]);
 
   function send() {
     if (!input.trim() || loading) return;
     onSend(input.trim());
     setInput("");
-    if (textareaRef.current) { textareaRef.current.style.height = "auto"; }
   }
 
   function handleKey(e) {
-    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
-  }
-
-  function autoResize(e) {
-    e.target.style.height = "auto";
-    e.target.style.height = Math.min(e.target.scrollHeight, 160) + "px";
+    if (e.key === "Enter" && !e.shiftKey) { 
+      e.preventDefault(); 
+      send(); 
+    }
   }
 
   const SUGGESTIONS = [
@@ -50,7 +62,7 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5">
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center gap-4">
-              <AppLogoIcon className="w-14 h-14 text-purple-400 opacity-70" />
+            <AppLogoIcon className="w-14 h-14 text-purple-400 opacity-70" />
             <div>
               <p className="text-xl font-semibold text-gray-200 mb-1">LocalMind is ready</p>
               <p className="text-sm text-gray-500">100% private · runs offline · no cloud</p>
@@ -129,7 +141,7 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
           <textarea
             ref={textareaRef}
             value={input}
-            onChange={(e) => { setInput(e.target.value); autoResize(e); }}
+            onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKey}
             placeholder="Ask anything... (Enter to send, Shift+Enter for new line)"
             rows={1}
