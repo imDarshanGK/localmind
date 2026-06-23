@@ -8,8 +8,9 @@ import os
 import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
+import time
 
-from fastapi import FastAPI
+from fastapi import FastAPI,Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse
@@ -115,7 +116,29 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+RATE_LIMIT = 100
+RATE_LIMIT_WINDOW = 60
+rate_limits = {}
 
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    current_time = time.time()
+    
+    if client_ip not in rate_limits or current_time > rate_limits[client_ip]["reset_at"]:
+        rate_limits[client_ip] = {"count": 0, "reset_at": current_time + RATE_LIMIT_WINDOW}
+        
+    rate_limits[client_ip]["count"] += 1
+    remaining = max(0, RATE_LIMIT - rate_limits[client_ip]["count"])
+    reset_time = int(rate_limits[client_ip]["reset_at"])
+    
+    response = await call_next(request)
+    
+    response.headers["X-RateLimit-Limit"] = str(RATE_LIMIT)
+    response.headers["X-RateLimit-Remaining"] = str(remaining)
+    response.headers["X-RateLimit-Reset"] = str(reset_time)
+    
+    return response
 app.include_router(chat_router,     prefix="/api/chat",     tags=["Chat"])
 app.include_router(upload_router,   prefix="/api/upload",   tags=["Upload"])
 app.include_router(models_router,   prefix="/api/models",   tags=["Models"])

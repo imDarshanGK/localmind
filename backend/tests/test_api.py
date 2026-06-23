@@ -35,6 +35,16 @@ def test_db_health():
     assert r.status_code == 200
     assert r.json()["status"] == "healthy"
 
+def test_rate_limit_headers():
+    r = client.get("/health")
+    assert r.status_code == 200
+    assert "X-RateLimit-Limit" in r.headers
+    assert "X-RateLimit-Remaining" in r.headers
+    assert "X-RateLimit-Reset" in r.headers
+    
+    assert int(r.headers["X-RateLimit-Limit"]) == 100
+    assert int(r.headers["X-RateLimit-Remaining"]) < 100
+
 # ─── Sessions ────────────────────────────────────────────
 def test_create_session():
     r = client.post("/api/sessions/", json={"title": "Test Chat", "model": "llama3", "language": "hi"})
