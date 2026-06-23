@@ -35,14 +35,49 @@ logger = logging.getLogger(__name__)
 FRONTEND_DIST = Path(os.getenv("FRONTEND_DIST", "/app/frontend/dist"))
 
 
+def run_preflight_checks():
+    logger.info("========== LocalMind Preflight Checklist ==========")
+
+    checks = []
+
+    try:
+        os.makedirs("./data/uploads", exist_ok=True)
+        checks.append(("Uploads directory", True))
+    except Exception:
+        checks.append(("Uploads directory", False))
+
+    try:
+        os.makedirs("./data/chromadb", exist_ok=True)
+        checks.append(("ChromaDB directory", True))
+    except Exception:
+        checks.append(("ChromaDB directory", False))
+
+    try:
+        os.makedirs("./data/exports", exist_ok=True)
+        checks.append(("Exports directory", True))
+    except Exception:
+        checks.append(("Exports directory", False))
+
+    try:
+        init_db()
+        with get_db() as conn:
+            conn.execute("SELECT 1")
+        checks.append(("SQLite database", True))
+    except Exception:
+        checks.append(("SQLite database", False))
+
+    for name, ok in checks:
+        status = "OK" if ok else "WARN"
+        logger.info(f"[{status}] {name}")
+
+    logger.info("=================================================")
+
+
 # Starting lifespan code block
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting LocalMind v2.0...")
-    os.makedirs("./data/uploads", exist_ok=True)
-    os.makedirs("./data/chromadb", exist_ok=True)
-    os.makedirs("./data/exports", exist_ok=True)
-    init_db()
+    run_preflight_checks()
     
     # Start stream cleanup task
     from routes.chat import clean_expired_streams
