@@ -1,4 +1,5 @@
 import ReactMarkdown from "react-markdown";
+import rehypeSanitize from "rehype-sanitize";
 import { useState, useRef, useEffect } from "react";
 import { exportSession } from "../utils/api";
 import { AppLogoIcon, ChartIcon, CloseIcon, CopyIcon, FileIcon, LockIcon, PlusCircleIcon, TemplateIcon } from "./Icons";
@@ -232,6 +233,7 @@ export default function ChatWindow({ messages, loading, onSend, onDeleteMessage,
                   ? "bg-purple-700 text-white rounded-br-sm"
                   : "bg-gray-800 text-gray-100 rounded-bl-sm border border-gray-700"}`}>
                 <ReactMarkdown
+                  rehypePlugins={[rehypeSanitize]}
                   components={{
                     code({ inline, className, children }) {
                       let language = "text";
