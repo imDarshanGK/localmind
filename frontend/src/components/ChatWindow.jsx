@@ -122,7 +122,22 @@ export default function ChatWindow({ messages, loading, onSend, onDeleteMessage,
       </button>
     );
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
+  // Auto-scroll to latest messages
+  useEffect(() => { 
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" }); 
+  }, [messages]);
+
+  // Handle auto-resizing smoothly whenever the text content shifts
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    // Reset height before computing scrollHeight to allow textarea contraction
+    textarea.style.height = "auto";
+    
+    // Lock the frame expansion between 24px and 160px bounds
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 160)}px`;
+  }, [input]);
 
   // Reset local adjustments layout cache map when active conversation session changes
   useEffect(() => { setLocalReactions({}); }, [sessionId]);
@@ -169,12 +184,10 @@ export default function ChatWindow({ messages, loading, onSend, onDeleteMessage,
   }
 
   function handleKey(e) {
-    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
-  }
-
-  function autoResize(e) {
-    e.target.style.height = "auto";
-    e.target.style.height = Math.min(e.target.scrollHeight, 160) + "px";
+    if (e.key === "Enter" && !e.shiftKey) { 
+      e.preventDefault(); 
+      send(); 
+    }
   }
 
   const SUGGESTIONS = [
@@ -445,6 +458,20 @@ export default function ChatWindow({ messages, loading, onSend, onDeleteMessage,
       {/* Input Form Footer */}
       <div className="px-4 pb-4 pt-2 shrink-0">
         <div className="flex items-end gap-2 bg-gray-900 border border-gray-700 rounded-2xl px-4 py-3 focus-within:border-purple-500 transition-colors">
+          <textarea
+            ref={textareaRef}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKey}
+            placeholder="Ask anything... (Enter to send, Shift+Enter for new line)"
+            rows={1}
+            className="flex-1 bg-transparent text-sm text-gray-100 placeholder-gray-500 resize-none outline-none"
+            style={{ minHeight: "24px", maxHeight: "160px" }}
+          />
+          <button onClick={send} disabled={!input.trim() || loading}
+            className="shrink-0 text-sm bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white px-4 py-2 rounded-xl transition font-medium">
+            Send →
+          </button>
           {/* Plus button for prompt templates */}
           <div className="relative shrink-0" ref={plusMenuRef}>
             <button
