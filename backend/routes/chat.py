@@ -20,12 +20,23 @@ def _retrieve_context(*args, **kwargs):
 
 rag_service = SimpleNamespace(retrieve_context=_retrieve_context)
 
+# Global fallback message string
+OLLAMA_OFFLINE_FALLBACK = (
+    "⚠️ I'm currently unable to process your request because the local AI engine (Ollama) is offline. "
+    "Please open your terminal and run `ollama serve` to start it back up!"
+)
+
 
 @router.post("/", response_model=ChatResponse)
 async def chat(req: ChatRequest):
     """Standard (non-streaming) chat endpoint."""
     if not await ollama_service.is_ollama_running():
-        raise HTTPException(503, "Ollama not running. Run: `ollama serve`")
+        # Save interaction to database to preserve conversation state continuity
+        db_service.create_session(req.session_id, model=req.model)
+        db_service.save_message(req.session_id, "user", req.message)
+        db_service.save_message(req.session_id, "assistant", OLLAMA_OFFLINE_FALLBACK)
+        
+        return ChatResponse(reply=OLLAMA_OFFLINE_FALLBACK, session_id=req.session_id, model=req.model, sources=[])
 
     db_service.create_session(req.session_id, model=req.model)
     history = db_service.get_history(req.session_id)
@@ -56,7 +67,17 @@ async def chat(req: ChatRequest):
 async def chat_stream(req: ChatRequest):
     """Streaming chat — returns Server-Sent Events."""
     if not await ollama_service.is_ollama_running():
-        raise HTTPException(503, "Ollama not running. Run: `ollama serve`")
+        # Save conversation history tracking rows
+        db_service.create_session(req.session_id, model=req.model)
+        db_service.save_message(req.session_id, "user", req.message)
+        db_service.save_message(req.session_id, "assistant", OLLAMA_OFFLINE_FALLBACK)
+
+        # Create a generator that simulates the stream over SSE tokens
+        async def fallback_event_stream():
+            yield f"data: {json.dumps({'token': OLLAMA_OFFLINE_FALLBACK})}\n\n"
+            yield f"data: {json.dumps({'done': True, 'sources': []})}\n\n"
+
+        return StreamingResponse(fallback_event_stream(), media_type="text/event-stream")
 
     db_service.create_session(req.session_id, model=req.model)
     history = db_service.get_history(req.session_id)
