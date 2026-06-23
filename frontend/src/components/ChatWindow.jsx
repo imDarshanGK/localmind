@@ -4,7 +4,7 @@ import { exportSession } from "../utils/api";
 import { AppLogoIcon, ChartIcon, CloseIcon, CopyIcon, FileIcon, LockIcon, PlusCircleIcon, TemplateIcon } from "./Icons";
 import PromptTemplateDialog from "./PromptTemplateDialog";
 
-export default function ChatWindow({ messages, loading, onSend, onDeleteMessage, onStop, sessionId }) {
+export default function ChatWindow({ messages, loading, onSend, onDeleteMessage, onStop, sessionId, minimalMode }) {
   const [input, setInput] = useState("");
   const [showPlusMenu, setShowPlusMenu] = useState(false);
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
@@ -206,14 +206,16 @@ export default function ChatWindow({ messages, loading, onSend, onDeleteMessage,
               <p className="text-xl font-semibold text-gray-200 mb-1">LocalMind is ready</p>
               <p className="text-sm text-gray-400">100% private · runs offline · no cloud</p>
             </div>
-            <div className="grid grid-cols-2 gap-2 mt-4 max-w-lg w-full">
-              {SUGGESTIONS.map(s => (
-                <button key={s} onClick={() => onSend(s)}
-                  className="text-xs text-left border border-gray-800 rounded-xl px-3 py-2.5 text-gray-400 hover:border-purple-600 hover:text-purple-300 hover:bg-purple-900/20 transition">
-                  {s}
-                </button>
-              ))}
-            </div>
+            {!minimalMode && (
+              <div className="grid grid-cols-2 gap-2 mt-4 max-w-lg w-full">
+                {SUGGESTIONS.map(s => (
+                  <button key={s} onClick={() => onSend(s)}
+                    className="text-xs text-left border border-gray-800 rounded-xl px-3 py-2.5 text-gray-400 hover:border-purple-600 hover:text-purple-300 hover:bg-purple-900/20 transition">
+                    {s}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

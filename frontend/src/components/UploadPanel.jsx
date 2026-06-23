@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { uploadDocument, deleteDocument } from "../utils/api";
 import { CheckIcon, DocumentsIcon, ErrorIcon, SpinnerIcon, UploadIcon, FileIcon } from "./Icons";
 
-export default function UploadPanel({ sessionId, documents, onUploaded, onClose, show }) {
+export default function UploadPanel({ sessionId, documents, onUploaded, onClose, show, minimalMode }) {
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [result,    setResult]    = useState(null);
@@ -27,6 +27,7 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
 
   // Poll for document status updates if any are queued/processing
   useEffect(() => {
+    if (minimalMode) return;
     const isProcessing = documents.some(d => d.status === "queued" || d.status === "processing");
     if (!isProcessing) return;
     const interval = setInterval(() => {

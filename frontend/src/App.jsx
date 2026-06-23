@@ -24,6 +24,7 @@ export default function App() {
   const [language,   setLanguage]   = useState("en");
   const [ollamaOk,   setOllamaOk]   = useState(null);
   const [settings,   setSettings]   = useState({});
+  const minimalMode = settings?.minimal_mode === true;
   const [useStream,  setUseStream]  = useState(true);
 
   // --- FEATURE REFERENCE: TRACK ACTIVE REQUEST ABORT SIGNAL ---
@@ -45,6 +46,7 @@ export default function App() {
 
   // Poll Ollama status and refresh models on recovery
   useEffect(() => {
+    if (minimalMode) return;
     const interval = setInterval(async () => {
       try {
         const stRes = await api.getOllamaStatus();
@@ -60,7 +62,7 @@ export default function App() {
       }
     }, 10000);
     return () => clearInterval(interval);
-  }, []);
+  }, [minimalMode]);
 
   async function bootstrap() {
     try {
@@ -299,6 +301,7 @@ export default function App() {
           documents={documents}
           onUploaded={() => refreshDocuments(sessionId)}
           onClose={() => setPanel(null)}
+          minimalMode={minimalMode}
         />
         {panel === "plugins" && (
           <PluginsPanel sessionId={sessionId} onClose={() => setPanel(null)} />
@@ -321,6 +324,7 @@ export default function App() {
             onDeleteMessage={handleDeleteMessage}
             onStop={stopGeneration}
             sessionId={sessionId}
+            minimalMode={minimalMode}
           />
         )}
       </div>
