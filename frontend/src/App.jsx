@@ -44,6 +44,11 @@ export default function App() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
+  // Apply the selected theme preset globally (contrast / readability).
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", settings.theme || "dark");
+  }, [settings.theme]);
+
   // Poll Ollama status and refresh models on recovery
   useEffect(() => {
     if (minimalMode) return;
