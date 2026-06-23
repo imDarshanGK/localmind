@@ -7,6 +7,7 @@ import PluginsPanel from "./components/PluginsPanel";
 import SettingsPanel from "./components/SettingsPanel";
 import StatusBar from "./components/StatusBar";
 import * as api from "./utils/api";
+import SharedView from "./components/SharedView";
 
 export default function App() {
   const [sessionId,  setSessionId]  = useState(() => uuidv4());
@@ -23,7 +24,16 @@ export default function App() {
   const [settings,   setSettings]   = useState({});
   const [useStream,  setUseStream]  = useState(true);
 
-  useEffect(() => { bootstrap(); }, []);
+  // Check if the current browser path is for a shared snapshot link
+  const path = window.location.pathname;
+  const isSharedPath = path.startsWith("/shared/");
+
+  useEffect(() => {
+    // Only fetch layout configurations if the user isn't on the public read-only page
+    if (!isSharedPath) {
+      bootstrap();
+    }
+  }, [isSharedPath]);
 
   async function bootstrap() {
     try {
@@ -111,6 +121,11 @@ export default function App() {
   async function handleClearChat() {
     await api.clearMessages(sessionId);
     setMessages([]);
+  }
+
+  // ─── Routing Interceptor ───
+  if (isSharedPath) {
+    return <SharedView />;
   }
 
   return (

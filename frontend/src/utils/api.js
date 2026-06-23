@@ -57,3 +57,8 @@ export function streamMessage(body, onToken, onDone) {
     return pump();
   });
 }
+export const createShareLink = (sessionId) => 
+  req(`/chat/share/${sessionId}`, { method: "POST" });
+
+export const getSharedSnapshot = (shareId) => 
+  req(`/chat/share/${shareId}`);

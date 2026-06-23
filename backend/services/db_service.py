@@ -7,6 +7,7 @@ import sqlite3
 import json
 import os
 from contextlib import contextmanager
+import uuid
 
 DB_PATH = os.getenv("DB_PATH", "./data/localmind.db")
 os.makedirs(os.path.dirname(DB_PATH) if os.path.dirname(DB_PATH) else ".", exist_ok=True)
@@ -75,6 +76,15 @@ def init_db():
                 input TEXT,
                 output TEXT,
                 success INTEGER DEFAULT 1,
+                created_at TEXT DEFAULT (datetime('now'))
+            );
+                           
+            CREATE TABLE IF NOT EXISTS shared_sessions (
+                id TEXT PRIMARY KEY,
+                session_id TEXT NOT NULL,
+                title TEXT NOT NULL,
+                model TEXT NOT NULL,
+                snapshot_json TEXT NOT NULL,
                 created_at TEXT DEFAULT (datetime('now'))
             );
 
@@ -224,3 +234,59 @@ def log_plugin(session_id: str, plugin: str, inp: str, out: str, success: bool =
             "INSERT INTO plugin_logs (session_id, plugin, input, output, success) VALUES (?,?,?,?,?)",
             (session_id, plugin, inp, out, int(success)),
         )
+
+
+# ─── Shareable Sessions (Issue #270) ─────────────────────────
+
+def create_shared_session(session_id: str) -> str:
+    """
+    Captures a frozen snapshot of a chat session's history 
+    and returns a unique, obfuscated sharing ID string.
+    """
+    # 1. Fetch current session parameters
+    session = get_session(session_id)
+    if not session:
+        raise ValueError("Session not found")
+
+    # 2. Extract full historical messages bundled with sources and timelines
+    messages = get_messages_full(session_id)
+
+    # 3. Generate a secure, un-guessable sharing string key
+    share_id = str(uuid.uuid4())
+
+    # 4. Serialize messages list into a clean snapshot string
+    snapshot_str = json.dumps(messages)
+
+    # 5. Commit snapshot configuration records into the DB
+    with get_db() as conn:
+        conn.execute(
+            """
+            INSERT INTO shared_sessions (id, session_id, title, model, snapshot_json)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (share_id, session_id, session["title"], session["model"], snapshot_str)
+        )
+    return share_id
+
+
+def get_shared_session(share_id: str) -> dict | None:
+    """
+    Retrieves a shared session snapshot record and unpacks its historical arrays.
+    """
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT title, model, snapshot_json, created_at FROM shared_sessions WHERE id = ?",
+            (share_id,)
+        )
+        row = row.fetchone()
+
+    if not row:
+        return None
+
+    return {
+        "id": share_id,
+        "title": row["title"],
+        "model": row["model"],
+        "messages": json.loads(row["snapshot_json"]),  # Turn string array back into live json dicts
+        "created_at": row["created_at"]
+    }

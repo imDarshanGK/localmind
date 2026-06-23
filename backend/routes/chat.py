@@ -1,6 +1,7 @@
 """Chat routes — /api/chat — supports normal + streaming"""
 
 import json
+import logging
 from types import SimpleNamespace
 
 from fastapi import APIRouter, HTTPException
@@ -9,6 +10,7 @@ from fastapi.responses import StreamingResponse
 from models.schemas import ChatRequest, ChatResponse
 from services import ollama_service, db_service
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -86,3 +88,40 @@ async def chat_stream(req: ChatRequest):
         yield f"data: {json.dumps({'done': True, 'sources': sources})}\n\n"
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+# ─── Shareable Read-Only Session Links (Issue #270) ───────────
+
+@router.post("/share/{session_id}")
+async def api_create_share_link(session_id: str):
+    """
+    Generates a secure point-in-time public snapshot 
+    for a given local conversation session thread.
+    """
+    try:
+        share_id = db_service.create_shared_session(session_id)
+        return {
+            "success": True,
+            "share_id": share_id,
+            "share_url": f"/shared/{share_id}"  # The relative frontend link path
+        }
+    except ValueError as val_err:
+        raise HTTPException(status_code=404, detail=str(val_err))
+    except Exception as e:
+        logger.error("Failed to generate shared snapshot: %s", str(e))
+        raise HTTPException(status_code=500, detail="Internal server error processing share link request")
+
+
+@router.get("/share/{share_id}")
+async def api_get_shared_snapshot(share_id: str):
+    """
+    Publicly fetches a shared snapshot record to render in read-only view containers.
+    """
+    snapshot = db_service.get_shared_session(share_id)
+    if not snapshot:
+        raise HTTPException(status_code=404, detail="The requested shared chat conversation link does not exist or has expired")
+    
+    return {
+        "success": True,
+        "snapshot": snapshot
+    }
