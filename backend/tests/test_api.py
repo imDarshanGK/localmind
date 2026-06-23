@@ -35,6 +35,16 @@ def test_db_health():
     assert r.status_code == 200
     assert r.json()["status"] == "healthy"
 
+def test_rate_limit_headers():
+    r = client.get("/health")
+    assert r.status_code == 200
+    assert "X-RateLimit-Limit" in r.headers
+    assert "X-RateLimit-Remaining" in r.headers
+    assert "X-RateLimit-Reset" in r.headers
+    
+    assert int(r.headers["X-RateLimit-Limit"]) == 100
+    assert int(r.headers["X-RateLimit-Remaining"]) < 100
+
 # ─── Sessions ────────────────────────────────────────────
 def test_create_session():
     r = client.post("/api/sessions/", json={"title": "Test Chat", "model": "llama3", "language": "hi"})
@@ -338,11 +348,12 @@ def test_models_list(m1, m2):
     assert len(r.json()["models"]) == 1
 
 
-# ─── Chat (mocked Ollama) ────────────────────────────────
 @patch("routes.chat.ollama_service.is_ollama_running", new_callable=AsyncMock, return_value=False)
 def test_chat_ollama_down(mock):
     r = client.post("/api/chat/", json={"message":"hi","session_id":"x","model":"llama3"})
-    assert r.status_code == 503
+    # Expect 200 OK now that we handle this gracefully
+    assert r.status_code == 200
+    assert "⚠️ I'm currently unable to process your request" in r.json()["reply"]
 
 @patch("routes.chat.ollama_service.is_ollama_running", new_callable=AsyncMock, return_value=True)
 @patch("routes.chat.ollama_service.chat", new_callable=AsyncMock, return_value="Hello! I'm LocalMind.")
