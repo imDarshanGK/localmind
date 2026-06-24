@@ -169,17 +169,6 @@ export default function Sidebar({
             Delete
           </span>
         </button>
-
-        {deleteConfirm && (
-          <DeleteConfirmDialog
-            sessionName={deleteConfirm.sessionName}
-            onConfirm={() => {
-              onDeleteSession(deleteConfirm.sessionId);
-              setDeleteConfirm(null);
-            }}
-            onClose={() => setDeleteConfirm(null)}
-          />
-        )}
       </div>
     );
   };
