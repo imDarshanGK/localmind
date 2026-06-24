@@ -1,10 +1,11 @@
 import ReactMarkdown from "react-markdown";
+import rehypeSanitize from "rehype-sanitize";
 import { useState, useRef, useEffect } from "react";
 import { exportSession } from "../utils/api";
 import { AppLogoIcon, ChartIcon, CloseIcon, CopyIcon, FileIcon, LockIcon, PlusCircleIcon, TemplateIcon } from "./Icons";
 import PromptTemplateDialog from "./PromptTemplateDialog";
 
-export default function ChatWindow({ messages, loading, onSend, onDeleteMessage, onStop, sessionId }) {
+export default function ChatWindow({ messages, loading, onSend, onDeleteMessage, onStop, sessionId, minimalMode }) {
   const [input, setInput] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [showPlusMenu, setShowPlusMenu] = useState(false);
@@ -122,7 +123,22 @@ export default function ChatWindow({ messages, loading, onSend, onDeleteMessage,
       </button>
     );
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
+  // Auto-scroll to latest messages
+  useEffect(() => { 
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" }); 
+  }, [messages]);
+
+  // Handle auto-resizing smoothly whenever the text content shifts
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    // Reset height before computing scrollHeight to allow textarea contraction
+    textarea.style.height = "auto";
+    
+    // Lock the frame expansion between 24px and 160px bounds
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 160)}px`;
+  }, [input]);
 
   // Reset local adjustments layout cache map when active conversation session changes
   useEffect(() => { setLocalReactions({}); }, [sessionId]);
@@ -169,12 +185,10 @@ export default function ChatWindow({ messages, loading, onSend, onDeleteMessage,
   }
 
   function handleKey(e) {
-    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
-  }
-
-  function autoResize(e) {
-    e.target.style.height = "auto";
-    e.target.style.height = Math.min(e.target.scrollHeight, 160) + "px";
+    if (e.key === "Enter" && !e.shiftKey) { 
+      e.preventDefault(); 
+      send(); 
+    }
   }
 
   const SUGGESTIONS = [
@@ -230,14 +244,16 @@ export default function ChatWindow({ messages, loading, onSend, onDeleteMessage,
               <p className="text-xl font-semibold text-gray-200 mb-1">LocalMind is ready</p>
               <p className="text-sm text-gray-400">100% private · runs offline · no cloud</p>
             </div>
-            <div className="grid grid-cols-2 gap-2 mt-4 max-w-lg w-full">
-              {SUGGESTIONS.map(s => (
-                <button key={s} onClick={() => onSend(s)}
-                  className="text-xs text-left border border-gray-800 rounded-xl px-3 py-2.5 text-gray-400 hover:border-purple-600 hover:text-purple-300 hover:bg-purple-900/20 transition">
-                  {s}
-                </button>
-              ))}
-            </div>
+            {!minimalMode && (
+              <div className="grid grid-cols-2 gap-2 mt-4 max-w-lg w-full">
+                {SUGGESTIONS.map(s => (
+                  <button key={s} onClick={() => onSend(s)}
+                    className="text-xs text-left border border-gray-800 rounded-xl px-3 py-2.5 text-gray-400 hover:border-purple-600 hover:text-purple-300 hover:bg-purple-900/20 transition">
+                    {s}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
           <div>
@@ -264,7 +280,6 @@ export default function ChatWindow({ messages, loading, onSend, onDeleteMessage,
                       )}
                     </div>
                   )}
-
                   {/* Message bubble */}
                   <div
                     className={`px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words
@@ -301,6 +316,47 @@ export default function ChatWindow({ messages, loading, onSend, onDeleteMessage,
                             ) {
                               language = "cpp";
                             }
+        {messages.map((msg, i) => (
+          <div key={msg.id || i} className={`flex group ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+            <div className="max-w-2xl">
+              {msg.role === "assistant" && (
+                <div className="flex items-center gap-1.5 mb-1.5 ml-1">
+                  <AppLogoIcon className="w-4 h-4 text-purple-400" />
+                  <span className="text-xs font-semibold text-purple-400">LocalMind</span>
+                  {msg.streaming && <span className="text-xs text-gray-400 animate-pulse">typing...</span>}
+                </div>
+              )}
+              <div className={`px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words
+                ${msg.role === "user"
+                  ? "bg-purple-700 text-white rounded-br-sm"
+                  : "bg-gray-800 text-gray-100 rounded-bl-sm border border-gray-700"}`}>
+                <ReactMarkdown
+                  rehypePlugins={[rehypeSanitize]}
+                  components={{
+                    code({ inline, className, children }) {
+                      let language = "text";
+
+                      //  Detect from markdown (```python)
+                      const match = /language-(\w+)/.exec(className || "");
+                      if (match) {
+                        language = match[1];
+                      } 
+                      //  Fallback detection (SMART 🔥)
+                      else {
+                        const codeText = String(children);
+
+                        if (codeText.includes("def ") || codeText.includes("print(")) {
+                          language = "python";
+                        } else if (
+                            codeText.includes("function") ||
+                            codeText.includes("console.log")
+                        ) {
+                            language = "javascript";
+                        } else if (
+                            codeText.includes("#include") ||
+                            codeText.includes("cout")
+                        ) {
+                            language = "cpp";
                           }
 
                           if (inline) {
@@ -429,6 +485,20 @@ export default function ChatWindow({ messages, loading, onSend, onDeleteMessage,
       {/* Input Form Footer */}
       <div className="px-4 pb-4 pt-2 shrink-0">
         <div className="flex items-end gap-2 bg-gray-900 border border-gray-700 rounded-2xl px-4 py-3 focus-within:border-purple-500 transition-colors">
+          <textarea
+            ref={textareaRef}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKey}
+            placeholder="Ask anything... (Enter to send, Shift+Enter for new line)"
+            rows={1}
+            className="flex-1 bg-transparent text-sm text-gray-100 placeholder-gray-500 resize-none outline-none"
+            style={{ minHeight: "24px", maxHeight: "160px" }}
+          />
+          <button onClick={send} disabled={!input.trim() || loading}
+            className="shrink-0 text-sm bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white px-4 py-2 rounded-xl transition font-medium">
+            Send →
+          </button>
           {/* Plus button for prompt templates */}
           <div className="relative shrink-0" ref={plusMenuRef}>
             <button
