@@ -5,9 +5,7 @@ import time
 import statistics
 import uuid
 import pytest
-import sys
 import os
-from pathlib import Path
 
 import chromadb
 from chromadb.config import Settings
