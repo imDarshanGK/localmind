@@ -43,6 +43,7 @@ export default function Sidebar({
   const [pinnedIds, setPinnedIds] = useState(() => getPinnedSessions() || []);
   const [contextMenu, setContextMenu] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [clearAllConfirm, setClearAllConfirm] = useState(false);
 
   // Issue #226 states for inline editing
   const [editingId, setEditingId] = useState(null);
@@ -188,7 +189,7 @@ export default function Sidebar({
           </button>
 
           <button
-            onClick={() => setDeleteConfirm({ sessionId: s.id, sessionName: s.title })}
+            onClick={() => {setDeleteConfirm({ sessionId: s.id, sessionName: s.title }); setClearAllConfirm(false); }}
             aria-label="Delete chat"
             className="relative group/del opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 px-1.5 py-2 transition text-sm font-medium shrink-0"
           >
@@ -335,6 +336,18 @@ export default function Sidebar({
           </div>
         </div>
 
+        { sessions.length > 0 && (
+          <div className="px-3 py-2 border-t border-gray-800 shrink-0">
+            <button
+              onClick={() => {setClearAllConfirm(true); setDeleteConfirm(null); }}
+              className="w-full text-left text-xs text-gray-500 hover:text-red-400 hover:bg-red-950/20 px-3 py-2 rounded-lg transition inline-flex items-center gap-2 font-medium"
+            >
+              <span>🗑</span>
+              <span>Clear all sessions</span>
+            </button>
+          </div>
+        )}
+
         {/* Local Security and Source Attributions Footer */}
         <div className="px-4 py-3 border-t border-gray-800 flex flex-col gap-1">
           <p className="text-xs text-gray-600 inline-flex items-center gap-1">
@@ -352,19 +365,6 @@ export default function Sidebar({
           </a>
         </div>
       </div>
-
-      {/* Delete Confirmation Portal Overlay */}
-      {deleteConfirm && (
-        <DeleteConfirmDialog
-          sessionName={deleteConfirm.sessionName}
-          onConfirm={() => {
-            onDeleteSession(deleteConfirm.sessionId);
-            setDeleteConfirm(null);
-          }}
-          onClose={() => setDeleteConfirm(null)}
-        />
-      )}
-
       {/* Context Menu Utilities portals */}
       {contextMenu && (
         <div
@@ -382,6 +382,25 @@ export default function Sidebar({
           </button>
         </div>
       )}
+
+      {clearAllConfirm && (
+        <DeleteConfirmDialog
+          title="Clear all sessions"
+          onConfirm={() => { onClearAllSessions(); setClearAllConfirm(false); }}
+          onClose={() => setClearAllConfirm(false)}
+        />
+      )}
+      {deleteConfirm && (
+          <DeleteConfirmDialog
+            title="Delete session"
+            sessionName={deleteConfirm.sessionName}
+            onConfirm={() => {
+              onDeleteSession(deleteConfirm.sessionId);
+              setDeleteConfirm(null);
+            }}
+            onClose={() => setDeleteConfirm(null)}
+          />
+        )}
     </>
   );
 }
