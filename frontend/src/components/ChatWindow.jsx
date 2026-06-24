@@ -5,6 +5,7 @@ import PromptTemplateDialog from "./PromptTemplateDialog";
 
 export default function ChatWindow({ messages, loading, onSend, sessionId }) {
   const [input, setInput] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
   const [showPlusMenu, setShowPlusMenu] = useState(false);
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
@@ -61,6 +62,10 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
     "List the main topics",
   ];
 
+  const filteredMessages = messages.filter((msg) =>
+  msg.content?.toLowerCase().includes(searchTerm.toLowerCase())
+);
+
   return (
     <div className="flex flex-col flex-1 overflow-hidden bg-gray-950">
       {/* Export bar */}
@@ -74,6 +79,25 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
           ))}
         </div>
       )}
+      {/* Search Bar */}
+      <div className="px-4 pt-2">
+        <input
+          type="text"
+          placeholder="Search messages..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full px-3 py-2 rounded-lg bg-gray-900 border border-gray-700 text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:border-purple-500"
+        />
+
+        {searchTerm && (
+          <button
+            onClick={() => setSearchTerm("")}
+            className="text-xs text-purple-400 mt-1"
+          >
+            Clear search
+          </button>
+        )}
+      </div>
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5">
@@ -127,11 +151,172 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
               {msg.role === "user" && (
                 <div className="text-right mt-1 mr-1">
                   <span className="text-xs text-gray-600">You</span>
+          <div>
+            {filteredMessages.map((msg, i) => (
+              <div
+                key={msg.id || i}
+                className={`flex group ${
+                  msg.role === "user" ? "justify-end" : "justify-start"
+                }`}
+              >
+                <div className="max-w-2xl">
+          
+                  {/* Assistant header */}
+                  {msg.role === "assistant" && (
+                    <div className="flex items-center gap-1.5 mb-1.5 ml-1">
+                      <AppLogoIcon className="w-4 h-4 text-purple-400" />
+                      <span className="text-xs font-semibold text-purple-400">
+                        LocalMind
+                      </span>
+                      {msg.streaming && (
+                        <span className="text-xs text-gray-400 animate-pulse">
+                          typing...
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Message bubble */}
+                  <div
+                    className={`px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words
+                    ${
+                      msg.role === "user"
+                        ? "bg-purple-700 text-white rounded-br-sm"
+                        : "bg-gray-800 text-gray-100 rounded-bl-sm border border-gray-700"
+                    }`}
+                  >
+                    <ReactMarkdown
+                      components={{
+                        code({ inline, className, children }) {
+                          let language = "text";
+
+                          const match = /language-(\w+)/.exec(className || "");
+                          if (match) {
+                            language = match[1];
+                          } else {
+                            const codeText = String(children);
+
+                            if (
+                              codeText.includes("def ") ||
+                              codeText.includes("print(")
+                            ) {
+                              language = "python";
+                            } else if (
+                              codeText.includes("function") ||
+                              codeText.includes("console.log")
+                            ) {
+                              language = "javascript";
+                            } else if (
+                              codeText.includes("#include") ||
+                              codeText.includes("cout")
+                            ) {
+                              language = "cpp";
+                            }
+                          }
+
+                          if (inline) {
+                            return <code>{children}</code>;
+                          }
+
+                          return (
+                            <div className="relative bg-gray-900 rounded-lg mt-2">
+                              <div className="absolute top-2 right-2 text-xs bg-gray-700 px-2 py-1 rounded text-white">
+                                {language.toUpperCase()}
+                              </div>
+
+                              <pre className="p-4 overflow-x-auto">
+                                <code>{children}</code>
+                              </pre>
+                            </div>
+                          );
+                        },
+                      }}
+                    >
+                      {msg.content}
+                    </ReactMarkdown>
+
+                    {msg.streaming && (
+                      <span className="inline-block w-1.5 h-4 bg-purple-400 ml-1 animate-pulse rounded" />
+                    )}
+                  </div>
+
+                  {/* Sources */}
+                  {msg.sources?.length > 0 &&
+                    (() => {
+                      const normalizeSrc = (s) =>
+                        typeof s === "string"
+                          ? { source: s, chunk: null, preview: null }
+                          : s;
+
+                      return (
+                        <div className="mt-1.5 ml-1 flex flex-wrap gap-1.5">
+                          {msg.sources.map((raw, i) => {
+                            const s = normalizeSrc(raw);
+                            const hasPreview =
+                              s.preview && s.preview.trim().length > 0;
+
+                            return (
+                              <span key={i} className="relative group inline-flex">
+                                <span className="text-xs bg-gray-800 text-blue-400 px-2 py-0.5 rounded-full border border-gray-700">
+                                  <FileIcon className="w-3 h-3 inline mr-1" />
+                                  {s.source}
+                                  {s.chunk !== null && (
+                                    <span className="text-gray-500 text-[10px] ml-1">
+                                      #{s.chunk + 1}
+                                    </span>
+                                  )}
+                                </span>
+
+                                {hasPreview && (
+                                  <div className="absolute bottom-full left-0 mb-2 z-50 w-72 opacity-0 group-hover:opacity-100 transition">
+                                    <div className="bg-gray-700 border border-gray-600 rounded-xl shadow-xl px-3 py-2.5">
+                                      <p className="text-xs text-gray-300">
+                                       {s.preview}
+                                      </p>
+                                    </div>
+                                  </div>
+                                )}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
+
+                  {/* User footer */}
+                  {msg.role === "user" && (
+                    <div className="flex justify-end items-center gap-1 mt-1 mr-1">
+                      {renderDeleteControl(msg.id)}
+                      <span className="text-xs text-gray-400">You</span>
+                    </div>
+                  )}
+
+                  {/* Assistant actions */}
+                  {msg.role === "assistant" && !msg.streaming && (
+                    <div className="flex justify-end mt-1.5 mr-1 items-center gap-1">
+                      <button
+                        onClick={() => copyToClipboard(msg.id, msg.content)}
+                        className="p-1 rounded hover:bg-gray-800"
+                      >
+                        <CopyIcon className="w-4 h-4" />
+                      </button>
+
+                      {renderDeleteControl(msg.id)}
+
+                      <ChartIcon className="w-4 h-4 text-gray-400" />
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
+              </div>
+            ))}
+
+            {filteredMessages.length === 0 && messages.length > 0 && (
+              <p className="text-center text-gray-500 text-sm">
+                No messages found
+              </p>
+            )}
           </div>
-        ))}
+        );
 
         {loading && !messages.find(m => m.streaming) && (
           <div className="flex justify-start">
