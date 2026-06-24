@@ -37,6 +37,7 @@ export default function Sidebar({
   const [contextMenu, setContextMenu] = useState(null); // { sessionId, x, y }
   const [pinnedIds, setPinnedIds] = useState(() => getPinnedSessions());
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [clearAllConfirm, setClearAllConfirm] = useState(false);
 
   const [isResizing, setIsResizing] = useState(false);
   const [width, setWidth] = useState(() => {
@@ -88,7 +89,6 @@ export default function Sidebar({
     const newPinned = toggleSessionPin(sessionId);
     setPinnedIds(newPinned);
   };
-
   useEffect(() => {
     const closeMenu = () => setContextMenu(null);
     window.addEventListener("click", closeMenu);
@@ -320,6 +320,18 @@ export default function Sidebar({
           </div>
         </div>
 
+        { sessions.length > 0 && (
+          <div className="px-3 py-2 border-t border-gray-800 shrink-0">
+            <button
+              onClick={() => setClearAllConfirm(true)}
+              className="w-full text-left text-xs text-gray-500 hover:text-red-400 hover:bg-red-950/20 px-3 py-2 rounded-lg transition inline-flex items-center gap-2 font-medium"
+            >
+              <span>🗑</span>
+              <span>Clear all sessions</span>
+            </button>
+          </div>
+        )}
+
         {/* Local Security and Source Attributions Footer */}
         <div className="px-4 py-3 border-t border-gray-800 flex flex-col gap-1">
           <p className="text-xs text-gray-600 inline-flex items-center gap-1">
@@ -343,7 +355,6 @@ export default function Sidebar({
           className="hidden md:block absolute top-0 right-0 bottom-0 w-1 cursor-col-resize bg-transparent hover:bg-purple-500/40 transition-colors"
         />
       </div>
-
       {/* Context Menu Utilities portals */}
       {contextMenu && (
         <div
@@ -361,6 +372,25 @@ export default function Sidebar({
           </button>
         </div>
       )}
+
+      {clearAllConfirm && (
+        <DeleteConfirmDialog
+          title="Clear all sessions"
+          onConfirm={() => { onClearAllSessions(); setClearAllConfirm(false); }}
+          onClose={() => setClearAllConfirm(false)}
+        />
+      )}
+      {deleteConfirm && (
+          <DeleteConfirmDialog
+            title="Delete session"
+            sessionName={deleteConfirm.sessionName}
+            onConfirm={() => {
+              onDeleteSession(deleteConfirm.sessionId);
+              setDeleteConfirm(null);
+            }}
+            onClose={() => setDeleteConfirm(null)}
+          />
+        )}
     </>
   );
 }
