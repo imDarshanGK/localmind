@@ -139,6 +139,13 @@ async def rate_limit_middleware(request: Request, call_next):
     response.headers["X-RateLimit-Reset"] = str(reset_time)
     
     return response
+
+@app.middleware("http")
+async def api_version_middleware(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-API-Version"] = app.version
+    return response
+
 app.include_router(chat_router,     prefix="/api/chat",     tags=["Chat"])
 app.include_router(upload_router,   prefix="/api/upload",   tags=["Upload"])
 app.include_router(models_router,   prefix="/api/models",   tags=["Models"])
@@ -157,7 +164,7 @@ async def root():
     index_file = FRONTEND_DIST / "index.html"
     if index_file.exists():
         return FileResponse(index_file)
-    return {"app": "LocalMind", "version": "2.0.0", "status": "running"}
+    return {"app": "LocalMind", "version": app.version, "status": "running"}
 
 
 @app.get("/health", tags=["Health"])

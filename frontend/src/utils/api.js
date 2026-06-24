@@ -16,6 +16,11 @@ async function req(path, opts = {}) {
     }));
   }
 
+  const apiVersion = res.headers.get("X-API-Version");
+  if (apiVersion) {
+    window.dispatchEvent(new CustomEvent("apiversion-update", { detail: apiVersion }));
+  }
+
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
     throw new Error(err.detail || "Request failed");
@@ -23,7 +28,6 @@ async function req(path, opts = {}) {
   return res.json();
 }
 
-// NEW: sendMessage can now accept an optional trailing signal parameter
 export const sendMessage = (b, signal) => req("/chat/", { method: "POST", body: JSON.stringify(b), signal });
 export const cancelStream = (id) => req(`/chat/cancel/${id}`, { method: "POST" });
 export const getSessions = () => req("/sessions/");
@@ -66,8 +70,6 @@ export const toggleMessageReaction = (messageId, emoji) =>
     body: JSON.stringify({ message_id: messageId, emoji }) 
   });
 
-// NEW: Appended 'signal' parameter right to the tail of your token reader stream
-// NEW: Appended 'signal' parameter right to the tail of your token reader stream
 export function streamMessage(body, onToken, onDone, signal) {
   return fetch(`${BASE}/chat/stream`, {
     method: "POST", 
@@ -82,6 +84,11 @@ export function streamMessage(body, onToken, onDone, signal) {
       window.dispatchEvent(new CustomEvent("ratelimit-update", { detail: { limit, remaining } }));
     }
 
+   const apiVersion = res.headers.get("X-API-Version");
+    if (apiVersion) {
+      window.dispatchEvent(new CustomEvent("apiversion-update", { detail: apiVersion }));
+    }
+
     if (!res.ok) {
       throw new Error(`Stream request failed with status ${res.status}`);
     }
@@ -89,6 +96,10 @@ export function streamMessage(body, onToken, onDone, signal) {
     const reader = res.body.getReader(); 
     const decoder = new TextDecoder();
     
+    let accumulatedText = "";
+    let doneReceived = false;
+    let sourcesList = [];
+   
     function pump() {
       return reader.read().then(({ done, value }) => {
         if (done) return;
@@ -96,7 +107,7 @@ export function streamMessage(body, onToken, onDone, signal) {
         const text = decoder.decode(value, { stream: true });
         text.split("\n").forEach(line => {
           if (line.startsWith("data: ")) {
-            try { 
+           try { 
               const d = JSON.parse(line.slice(6)); 
               if (d.token) {
                 onToken(d.token);

@@ -22,7 +22,7 @@ client = TestClient(app)
 def test_root():
     r = client.get("/")
     assert r.status_code == 200
-    assert r.json()["version"] == "2.0.0"
+    assert r.json()["version"] == app.version
 
 
 def test_health():
@@ -44,6 +44,12 @@ def test_rate_limit_headers():
     
     assert int(r.headers["X-RateLimit-Limit"]) == 100
     assert int(r.headers["X-RateLimit-Remaining"]) < 100
+
+def test_api_version_header():
+    r = client.get("/health")
+    assert r.status_code == 200
+    assert "X-API-Version" in r.headers
+    assert r.headers["X-API-Version"] == app.version
 
 # ─── Sessions ────────────────────────────────────────────
 def test_create_session():
@@ -509,5 +515,3 @@ def test_clear_all_sessions():
     r_list = client.get("/api/sessions/")
     assert r_list.status_code == 200
     assert len(r_list.json()) == 0
-
-
