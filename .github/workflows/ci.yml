@@ -50,7 +50,8 @@ jobs:
       - name: Install & build
         run: |
           cd frontend
-          npm ci
+          rm -rf node_modules package-lock.json
+          npm install
           npm run build
       # --- ADDED FRONTEND LINT CHECK FOR ISSUE #306 ---
       - name: Run frontend linter
