@@ -6,6 +6,7 @@ import PromptTemplateDialog from "./PromptTemplateDialog";
 
 export default function ChatWindow({ messages, loading, onSend, onDeleteMessage, onStop, sessionId }) {
   const [input, setInput] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
   const [showPlusMenu, setShowPlusMenu] = useState(false);
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
@@ -183,6 +184,10 @@ export default function ChatWindow({ messages, loading, onSend, onDeleteMessage,
     "List the main topics",
   ];
 
+  const filteredMessages = messages.filter((msg) =>
+  msg.content?.toLowerCase().includes(searchTerm.toLowerCase())
+);
+
   return (
     <div className="flex flex-col flex-1 overflow-hidden bg-gray-950 text-gray-100">
       {/* Export bar */}
@@ -196,6 +201,25 @@ export default function ChatWindow({ messages, loading, onSend, onDeleteMessage,
           ))}
         </div>
       )}
+      {/* Search Bar */}
+      <div className="px-4 pt-2">
+        <input
+          type="text"
+          placeholder="Search messages..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full px-3 py-2 rounded-lg bg-gray-900 border border-gray-700 text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:border-purple-500"
+        />
+
+        {searchTerm && (
+          <button
+            onClick={() => setSearchTerm("")}
+            className="text-xs text-purple-400 mt-1"
+          >
+            Clear search
+          </button>
+        )}
+      </div>
 
       {/* Messages viewport */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5">
@@ -216,208 +240,172 @@ export default function ChatWindow({ messages, loading, onSend, onDeleteMessage,
             </div>
           </div>
         )}
-
-        {messages.map((msg, i) => (
-          <div key={msg.id || i} className={`flex group ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-            <div className="max-w-2xl">
-              {msg.role === "assistant" && (
-                <div className="flex items-center gap-1.5 mb-1.5 ml-1">
-                  <AppLogoIcon className="w-4 h-4 text-purple-400" />
-                  <span className="text-xs font-semibold text-purple-400">LocalMind</span>
-                  {msg.streaming && <span className="text-xs text-gray-400 animate-pulse">typing...</span>}
-                </div>
-              )}
-              <div className={`px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words
-                ${msg.role === "user"
-                  ? "bg-purple-700 text-white rounded-br-sm"
-                  : "bg-gray-800 text-gray-100 rounded-bl-sm border border-gray-700"}`}>
-                <ReactMarkdown
-                  components={{
-                    code({ inline, className, children }) {
-                      let language = "text";
-
-                      //  Detect from markdown (```python)
-                      const match = /language-(\w+)/.exec(className || "");
-                      if (match) {
-                        language = match[1];
-                      } 
-                      //  Fallback detection (SMART 🔥)
-                      else {
-                        const codeText = String(children);
-
-                        if (codeText.includes("def ") || codeText.includes("print(")) {
-                          language = "python";
-                        } else if (
-                            codeText.includes("function") ||
-                            codeText.includes("console.log")
-                        ) {
-                            language = "javascript";
-                        } else if (
-                            codeText.includes("#include") ||
-                            codeText.includes("cout")
-                        ) {
-                            language = "cpp";
-                          }
-                        }
-
-                        // Inline code (no badge)
-                        if (inline) {
-                          return <code>{children}</code>;
-                        }
-
-                        return (
-                          <div className="relative bg-gray-900 rounded-lg mt-2">
+          <div>
+            {filteredMessages.map((msg, i) => (
+              <div
+                key={msg.id || i}
+                className={`flex group ${
+                  msg.role === "user" ? "justify-end" : "justify-start"
+                }`}
+              >
+                <div className="max-w-2xl">
           
-                            {/* 🔥 LANGUAGE BADGE */}
-                            <div className="absolute top-2 right-2 text-xs bg-gray-700 px-2 py-1 rounded text-white">
-                              {language.toUpperCase()}
-                            </div>
-
-                            <pre className="p-4 overflow-x-auto">
-                              <code>{children}</code>
-                            </pre>
-                          </div>
-                        );
-                      }
-                    }}
-                  >
-                    {msg.content}
-                  </ReactMarkdown>
-                {msg.streaming && <span className="inline-block w-1.5 h-4 bg-purple-400 ml-1 animate-pulse rounded" />}
-              </div>
-              {msg.sources?.length > 0 && (() => {
-                // Normalize: legacy string sources ("file.pdf") → structured object.
-                // New sources already arrive as {source, chunk, preview}.
-                // This single path handles both without any database migration.
-                const normalizeSrc = (s) =>
-                  typeof s === "string"
-                    ? { source: s, chunk: null, preview: null }
-                    : s;
-
-                return (
-                  <div className="mt-1.5 ml-1 flex flex-wrap gap-1.5">
-                    {msg.sources.map((raw, i) => {
-                      const s = normalizeSrc(raw);
-                      const hasPreview = s.preview && s.preview.trim().length > 0;
-                      return (
-                        <span key={i} className="relative group inline-flex">
-                          {/* Badge */}
-                          <span className="text-xs bg-gray-800 text-blue-400 px-2 py-0.5 rounded-full border border-gray-700 cursor-default inline-flex items-center gap-1 group-hover:border-blue-500 group-hover:bg-gray-750 transition-colors">
-                            <FileIcon className="w-3 h-3 shrink-0" />
-                            <span>{s.source}</span>
-                            {s.chunk !== null && (
-                              <span className="text-gray-500 text-[10px]">#{s.chunk + 1}</span>
-                            )}
-                          </span>
-
-                          {/* Hover tooltip — only rendered when a preview exists (new sessions) */}
-                          {hasPreview && (
-                            <div className="
-                              absolute bottom-full left-0 mb-2 z-50 w-72
-                              invisible opacity-0 group-hover:visible group-hover:opacity-100
-                              transition-all duration-150 pointer-events-none
-                            ">
-                              {/* Arrow */}
-                              <div className="absolute left-3 -bottom-1.5 w-3 h-3 rotate-45 bg-gray-700 border-r border-b border-gray-600" />
-                              {/* Card */}
-                              <div className="relative bg-gray-700 border border-gray-600 rounded-xl shadow-xl px-3 py-2.5">
-                                <div className="flex items-center gap-1.5 mb-1.5 border-b border-gray-600 pb-1.5">
-                                  <FileIcon className="w-3 h-3 text-blue-400 shrink-0" />
-                                  <span className="text-xs font-semibold text-blue-400 truncate">{s.source}</span>
-                                  <span className="ml-auto text-[10px] text-gray-400 shrink-0">chunk {s.chunk + 1}</span>
-                                </div>
-                                <p className="text-xs text-gray-300 leading-relaxed line-clamp-5 whitespace-pre-wrap break-words">
-                                  {s.preview}
-                                </p>
-                              </div>
-                            </div>
-                          )}
+                  {/* Assistant header */}
+                  {msg.role === "assistant" && (
+                    <div className="flex items-center gap-1.5 mb-1.5 ml-1">
+                      <AppLogoIcon className="w-4 h-4 text-purple-400" />
+                      <span className="text-xs font-semibold text-purple-400">
+                        LocalMind
+                      </span>
+                      {msg.streaming && (
+                        <span className="text-xs text-gray-400 animate-pulse">
+                          typing...
                         </span>
-                      );
-                    })}
-                  </div>
-                );
-              })()}
-              {msg.role === "user" && (
-                <div className="flex justify-end items-center gap-1 mt-1 mr-1">
-                  {renderDeleteControl(msg.id)}
-                  <span className="text-xs text-gray-400">You</span>
-                </div>
-              )}
-              {msg.role === "assistant" && !msg.streaming && (
-                <div className="flex justify-end mt-1.5 mr-1 items-center gap-1">
-                  {/* Copy button */}
-                  <button
-                    onClick={() => copyToClipboard(msg.id, msg.content)}
-                    className="p-1 rounded hover:bg-gray-800 text-gray-500 hover:text-gray-300 transition"
-                    title="Copy response"
-                  >
-                    {copiedMsgId === msg.id ? (
-                      <svg className="w-4 h-4 text-green-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
-                    ) : (
-                      <CopyIcon className="w-4 h-4" />
-                    )}
-                  </button>
+                      )}
+                    </div>
+                  )}
 
-                  {/* Delete button */}
-                  {renderDeleteControl(msg.id)}
-
-                  {/* Stats hover button */}
+                  {/* Message bubble */}
                   <div
-                    className="relative"
-                    onMouseEnter={() => setHoveredStatsId(msg.id)}
-                    onMouseLeave={() => setHoveredStatsId(null)}
+                    className={`px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words
+                    ${
+                      msg.role === "user"
+                        ? "bg-purple-700 text-white rounded-br-sm"
+                        : "bg-gray-800 text-gray-100 rounded-bl-sm border border-gray-700"
+                    }`}
                   >
-                    <button
-                      className="p-1 rounded hover:bg-gray-800 text-gray-500 hover:text-gray-300 transition"
-                      title="Performance stats"
-                    >
-                      <ChartIcon className="w-4 h-4" />
-                    </button>
+                    <ReactMarkdown
+                      components={{
+                        code({ inline, className, children }) {
+                          let language = "text";
 
-                    {hoveredStatsId === msg.id && msg.benchmarks && Object.keys(msg.benchmarks).length > 0 && (
-                      <div className="absolute right-0 bottom-0 translate-x-full pl-2 z-50">
-                        <div className="bg-gray-900 border border-gray-700 rounded-lg p-3 shadow-xl min-w-[220px]">
-                        <p className="text-xs font-semibold text-gray-300 mb-2">Performance</p>
-                        <div className="space-y-1.5 text-xs text-gray-400">
-                          <div className="flex justify-between">
-                            <span>Time to first token</span>
-                            <span className="text-gray-300">{(msg.benchmarks.ttft_ms / 1000).toFixed(2)}s</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Total duration</span>
-                            <span className="text-gray-300">{(msg.benchmarks.total_duration_ms / 1000).toFixed(2)}s</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Tokens generated</span>
-                            <span className="text-gray-300">{msg.benchmarks.token_count}</span>
-                          </div>
-                          {msg.benchmarks.memory_used_gb && (
-                            <div>
-                              <div className="flex justify-between items-center">
-                                <span>RAM usage</span>
-                                <span className="inline-flex items-center gap-1 text-gray-300">
-                                  {msg.benchmarks.memory_used_gb} / {msg.benchmarks.memory_total_gb} GB
-                                  <span className="group relative">
-                                    <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full border border-gray-600 text-gray-500 text-[9px] font-bold cursor-help leading-none">i</span>
-                                    <span className="hidden group-hover:block absolute right-0 top-full mt-1 bg-gray-800 border border-gray-600 rounded-md px-2 py-1.5 text-[10px] text-gray-400 w-[180px] leading-tight z-50 shadow-lg">
-                                      Total system memory in use across all processes, not just the LLM.
-                                    </span>
-                                  </span>
-                                </span>
+                          const match = /language-(\w+)/.exec(className || "");
+                          if (match) {
+                            language = match[1];
+                          } else {
+                            const codeText = String(children);
+
+                            if (
+                              codeText.includes("def ") ||
+                              codeText.includes("print(")
+                            ) {
+                              language = "python";
+                            } else if (
+                              codeText.includes("function") ||
+                              codeText.includes("console.log")
+                            ) {
+                              language = "javascript";
+                            } else if (
+                              codeText.includes("#include") ||
+                              codeText.includes("cout")
+                            ) {
+                              language = "cpp";
+                            }
+                          }
+
+                          if (inline) {
+                            return <code>{children}</code>;
+                          }
+
+                          return (
+                            <div className="relative bg-gray-900 rounded-lg mt-2">
+                              <div className="absolute top-2 right-2 text-xs bg-gray-700 px-2 py-1 rounded text-white">
+                                {language.toUpperCase()}
                               </div>
+
+                              <pre className="p-4 overflow-x-auto">
+                                <code>{children}</code>
+                              </pre>
                             </div>
-                          )}
-                        </div>
-                        </div>
-                      </div>
+                          );
+                        },
+                      }}
+                    >
+                      {msg.content}
+                    </ReactMarkdown>
+
+                    {msg.streaming && (
+                      <span className="inline-block w-1.5 h-4 bg-purple-400 ml-1 animate-pulse rounded" />
                     )}
                   </div>
+
+                  {/* Sources */}
+                  {msg.sources?.length > 0 &&
+                    (() => {
+                      const normalizeSrc = (s) =>
+                        typeof s === "string"
+                          ? { source: s, chunk: null, preview: null }
+                          : s;
+
+                      return (
+                        <div className="mt-1.5 ml-1 flex flex-wrap gap-1.5">
+                          {msg.sources.map((raw, i) => {
+                            const s = normalizeSrc(raw);
+                            const hasPreview =
+                              s.preview && s.preview.trim().length > 0;
+
+                            return (
+                              <span key={i} className="relative group inline-flex">
+                                <span className="text-xs bg-gray-800 text-blue-400 px-2 py-0.5 rounded-full border border-gray-700">
+                                  <FileIcon className="w-3 h-3 inline mr-1" />
+                                  {s.source}
+                                  {s.chunk !== null && (
+                                    <span className="text-gray-500 text-[10px] ml-1">
+                                      #{s.chunk + 1}
+                                    </span>
+                                  )}
+                                </span>
+
+                                {hasPreview && (
+                                  <div className="absolute bottom-full left-0 mb-2 z-50 w-72 opacity-0 group-hover:opacity-100 transition">
+                                    <div className="bg-gray-700 border border-gray-600 rounded-xl shadow-xl px-3 py-2.5">
+                                      <p className="text-xs text-gray-300">
+                                       {s.preview}
+                                      </p>
+                                    </div>
+                                  </div>
+                                )}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
+
+                  {/* User footer */}
+                  {msg.role === "user" && (
+                    <div className="flex justify-end items-center gap-1 mt-1 mr-1">
+                      {renderDeleteControl(msg.id)}
+                      <span className="text-xs text-gray-400">You</span>
+                    </div>
+                  )}
+
+                  {/* Assistant actions */}
+                  {msg.role === "assistant" && !msg.streaming && (
+                    <div className="flex justify-end mt-1.5 mr-1 items-center gap-1">
+                      <button
+                        onClick={() => copyToClipboard(msg.id, msg.content)}
+                        className="p-1 rounded hover:bg-gray-800"
+                      >
+                        <CopyIcon className="w-4 h-4" />
+                      </button>
+
+                      {renderDeleteControl(msg.id)}
+
+                      <ChartIcon className="w-4 h-4 text-gray-400" />
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
+              </div>
+            ))}
+
+            {filteredMessages.length === 0 && messages.length > 0 && (
+              <p className="text-center text-gray-500 text-sm">
+                No messages found
+              </p>
+            )}
           </div>
-        ))}
+        );
 
         {loading && !messages.find(m => m.streaming) && (
           <div className="flex justify-start">
