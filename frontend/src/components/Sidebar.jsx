@@ -58,22 +58,26 @@ export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSes
           </p>
         )}
         {filtered.map(s => (
-          <div key={s.id} className={`group flex items-center gap-1 rounded-lg mb-0.5 transition
+          <div key={s.id} className={`group flex items-center justify-between rounded-lg mb-0.5 transition pl-1 pr-1
             ${currentSession === s.id ? "bg-gray-700" : "hover:bg-gray-800"}`}>
+            
+            {/* min-w-0 forces the parent flex item to allow text truncation */}
             <button onClick={()=>onLoadSession(s.id)}
-              className="flex-1 text-left text-xs px-3 py-2 truncate text-gray-400 group-hover:text-gray-200">
-              <span className={currentSession === s.id ? "text-white" : ""}>
-                <span className="inline-flex items-center gap-1.5">
-                  <ChatIcon className="w-3.5 h-3.5 text-gray-500" />
-                  <span>{s.title || "New Chat"}</span>
-                </span>
+              className="flex-1 text-left text-xs px-2 py-2 text-gray-400 group-hover:text-gray-200 min-w-0">
+              <span className={`inline-flex items-center gap-1.5 w-full ${currentSession === s.id ? "text-white" : ""}`}>
+                <ChatIcon className="w-3.5 h-3.5 text-gray-500 shrink-0" />
+                {/* Truncate directly applied to the title string text block wrapper */}
+                <span className="truncate flex-1">{s.title || "New Chat"}</span>
+                {s.message_count > 0 && (
+                  <span className="ml-1 text-gray-500 text-[10px] bg-gray-800/60 px-1.5 py-0.5 rounded-full shrink-0">
+                    {s.message_count}
+                  </span>
+                )}
               </span>
-              {s.message_count > 0 && (
-                <span className="ml-1 text-gray-600">{s.message_count}</span>
-              )}
             </button>
+
             <button onClick={()=>onDeleteSession(s.id)}
-              className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 px-2 py-2 transition text-xs">
+              className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 px-2 py-2 transition text-sm font-medium shrink-0">
               ×
             </button>
           </div>
