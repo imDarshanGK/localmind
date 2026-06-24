@@ -297,13 +297,13 @@ def get_shared_session(share_id: str) -> dict | None:
         "messages": json.loads(row["snapshot_json"]),  # Turn string array back into live json dicts
         "created_at": row["created_at"]
     }
-# ─── Prompt Templates (From main) ────────────────────────────
+# ─── Prompt Templates (Updated Signatures) ───────────────────
 
-def create_prompt_template(name: str, prompt: str) -> dict:
+def create_prompt_template(prompt_title: str, prompt: str) -> dict:
     with get_db() as conn:
         cursor = conn.execute(
             "INSERT INTO prompt_templates (name, prompt) VALUES (?, ?)",
-            (name, prompt)
+            (prompt_title, prompt)
         )
         template_id = cursor.lastrowid
     return get_prompt_template(template_id)
@@ -312,7 +312,7 @@ def create_prompt_template(name: str, prompt: str) -> dict:
 def get_prompt_template(template_id: int) -> dict | None:
     with get_db() as conn:
         row = conn.execute(
-            "SELECT * FROM prompt_templates WHERE id = ?", 
+            "SELECT id, name AS prompt_title, prompt, created_at FROM prompt_templates WHERE id = ?", 
             (template_id,)
         ).fetchone()
         return dict(row) if row else None
@@ -321,15 +321,15 @@ def get_prompt_template(template_id: int) -> dict | None:
 def get_all_prompt_templates() -> list[dict]:
     with get_db() as conn:
         rows = conn.execute(
-            "SELECT * FROM prompt_templates ORDER BY created_at DESC"
+            "SELECT id, name AS prompt_title, prompt, created_at FROM prompt_templates ORDER BY created_at DESC"
         ).fetchall()
         return [dict(r) for r in rows]
 
 
-def update_prompt_template(template_id: int, name: str = None, prompt: str = None) -> dict | None:
+def update_prompt_template(template_id: int, prompt_title: str = None, prompt: str = None) -> dict | None:
     with get_db() as conn:
-        if name:
-            conn.execute("UPDATE prompt_templates SET name=? WHERE id=?", (name, template_id))
+        if prompt_title:
+            conn.execute("UPDATE prompt_templates SET name=? WHERE id=?", (prompt_title, template_id))
         if prompt:
             conn.execute("UPDATE prompt_templates SET prompt=? WHERE id=?", (prompt, template_id))
     return get_prompt_template(template_id)
