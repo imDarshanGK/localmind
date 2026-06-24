@@ -8,6 +8,7 @@ import SettingsPanel from "./components/SettingsPanel";
 import PromptRegistryPage from "./components/PromptRegistryPage";
 import StatusBar from "./components/StatusBar";
 import * as api from "./utils/api";
+import SharedView from "./components/SharedView";
 import { getSessionColor, setSessionColor } from "./utils/colorHelper";
 
 export default function App() {
@@ -27,6 +28,16 @@ export default function App() {
   const minimalMode = settings?.minimal_mode === true;
   const [useStream,  setUseStream]  = useState(true);
 
+  // Check if the current browser path is for a shared snapshot link
+  const path = window.location.pathname;
+  const isSharedPath = path.startsWith("/shared/");
+
+  useEffect(() => {
+    // Only fetch layout configurations if the user isn't on the public read-only page
+    if (!isSharedPath) {
+      bootstrap();
+    }
+  }, [isSharedPath]);
   // --- FEATURE REFERENCE: TRACK ACTIVE REQUEST ABORT SIGNAL ---
   const abortControllerRef = useRef(null);
 
@@ -252,6 +263,10 @@ export default function App() {
     setMessages([]);
   }
 
+  // ─── Routing Interceptor ───
+  if (isSharedPath) {
+    return <SharedView />;
+  }
   const handleLanguageChange = useCallback(async (newLang) => {
     setLanguage(newLang);
     if (sessionId) {
