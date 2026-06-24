@@ -46,7 +46,69 @@ def _maybe_vacuum(deleted_count: int):
     with get_db() as conn:
         total = _increment_deleted_counter(conn, deleted_count)
     if total >= VACUUM_THRESHOLD:
-        run_vacuum()     
+        run_vacuum()
+
+
+# ─── Backup / Restore ────────────────────────────────────────────────────────
+
+def backup_db(dest_path: str) -> None:
+    """Create a consistent backup of the live database at *dest_path*.
+
+    Uses SQLite's native online-backup API (``sqlite3.Connection.backup``) so
+    the copy is safe to make while the database is open.  The destination
+    directory is created automatically when it does not exist.
+
+    Raises:
+        RuntimeError: When the backup cannot be created (e.g. disk full,
+            permission denied).
+    """
+    dest_path = str(dest_path)
+    dest_dir = os.path.dirname(dest_path)
+    try:
+        if dest_dir:
+            os.makedirs(dest_dir, exist_ok=True)
+        src = sqlite3.connect(DB_PATH, timeout=5)
+        dst = sqlite3.connect(dest_path, timeout=5)
+        try:
+            src.backup(dst)
+        finally:
+            dst.close()
+            src.close()
+    except Exception as exc:
+        raise RuntimeError(
+            f"backup_db: failed to write backup to '{dest_path}': {exc}"
+        ) from exc
+
+
+def restore_db(src_path: str) -> None:
+    """Restore the live database from a backup file at *src_path*.
+
+    The live database at ``DB_PATH`` is **overwritten** with the contents of
+    the backup using SQLite's online-backup API, so the restore is safe even
+    while other connections hold a read lock.
+
+    Raises:
+        FileNotFoundError: When *src_path* does not exist.
+        RuntimeError: When the restore operation fails.
+    """
+    src_path = str(src_path)
+    if not os.path.exists(src_path):
+        raise FileNotFoundError(
+            f"restore_db: backup file not found at '{src_path}'"
+        )
+
+    try:
+        src = sqlite3.connect(src_path, timeout=5)
+        dst = sqlite3.connect(DB_PATH, timeout=5)
+        try:
+            src.backup(dst)
+        finally:
+            dst.close()
+            src.close()
+    except Exception as exc:
+        raise RuntimeError(
+            f"restore_db: failed to restore from '{src_path}': {exc}"
+        ) from exc
 
 
 

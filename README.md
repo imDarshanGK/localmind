@@ -305,6 +305,13 @@ pip install pytest pytest-asyncio
 pytest tests/ -v
 # 30+ tests covering: sessions, chat, plugins, upload, export, settings
 ```
+
+### Local Backup Verification
+
+```bash
+# Verify backup and restore round-trip works correctly
+pytest backend/tests/test_backup.py -v
+```
 ---
 
 
