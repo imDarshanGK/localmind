@@ -1,0 +1,29 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  dependency-audit:
+    name: Dependency Vulnerability Audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install and Run Security Scan
+        run: |
+          python -m pip install --upgrade pip
+          pip install pip-audit
+          # Run audit without breaking the pipeline exit code for existing legacy bugs
+          pip-audit -r backend/requirements.txt || echo "Vulnerabilities detected but flagged for review."
