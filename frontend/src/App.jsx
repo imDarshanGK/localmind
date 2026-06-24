@@ -255,6 +255,7 @@ export default function App() {
     } catch (e) {
       console.error("Failed to rename session:", e);
     }
+  }
   async function handleClearAllSessions() {
     try {
       await api.clearAllSessions();
