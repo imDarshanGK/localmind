@@ -84,16 +84,22 @@ export function streamMessage(body, onToken, onDone, signal) {
       window.dispatchEvent(new CustomEvent("ratelimit-update", { detail: { limit, remaining } }));
     }
 
-    const apiVersion = res.headers.get("X-API-Version");
+   const apiVersion = res.headers.get("X-API-Version");
     if (apiVersion) {
       window.dispatchEvent(new CustomEvent("apiversion-update", { detail: apiVersion }));
     }
 
-    const reader = res.body.getReader(); const decoder = new TextDecoder();
+    if (!res.ok) {
+      throw new Error(`Stream request failed with status ${res.status}`);
+    }
+
+    const reader = res.body.getReader(); 
+    const decoder = new TextDecoder();
+    
     let accumulatedText = "";
     let doneReceived = false;
     let sourcesList = [];
-
+   
     function pump() {
       return reader.read().then(({ done, value }) => {
         if (done) return;
@@ -101,22 +107,20 @@ export function streamMessage(body, onToken, onDone, signal) {
         const text = decoder.decode(value, { stream: true });
         text.split("\n").forEach(line => {
           if (line.startsWith("data: ")) {
-            try {
-              const d = JSON.parse(line.slice(6));
+           try { 
+              const d = JSON.parse(line.slice(6)); 
               if (d.token) {
-                accumulatedText += d.token;
                 onToken(d.token);
               }
               if (d.done) {
-                doneReceived = true;
-                sourcesList = d.sources || [];
                 onDone({
                   message_id: d.message_id,
-                  sources: sourcesList,
+                  sources: d.sources || [],
                   benchmarks: d.benchmarks || null
                 });
               }
-            } catch (e) {
+            } catch (e) { 
+              // Ignore partial chunk parse errors
             }
           }
         });
@@ -126,3 +130,9 @@ export function streamMessage(body, onToken, onDone, signal) {
     return pump();
   });
 }
+
+export const createShareLink = (sessionId) => 
+  req(`/chat/share/${sessionId}`, { method: "POST" });
+
+export const getSharedSnapshot = (shareId) => 
+  req(`/chat/share/${shareId}`);
