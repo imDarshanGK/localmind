@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { AppLogoIcon, ChatIcon, LockIcon, StarIcon } from "./Icons";
 
 const LANGUAGES = [
@@ -7,10 +7,31 @@ const LANGUAGES = [
   {code:"de",label:"Deutsch"},{code:"es",label:"Español"},
 ];
 
-export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSession, onDeleteSession, model, models, onModelChange, language, onLanguageChange }) {
+export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSession, onDeleteSession, model, models, onModelChange, language, onLanguageChange, onRenameSession }) {
   const [search, setSearch] = useState("");
+  
+  // Issue #226 states for inline editing
+  const [editingId, setEditingId] = useState(null);
+  const [editTitle, setEditTitle] = useState("");
+  const inputRef = useRef(null);
+
+  // Auto-focus mechanic: triggers the exact millisecond the input mounts
+  useEffect(() => {
+    if (editingId && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select(); // Highlight existing text for quick typing
+    }
+  }, [editingId]);
+
   const modelList = models.length > 0 ? models.map(m=>m.name) : ["llama3","mistral","phi3","gemma2"];
   const filtered  = sessions.filter(s => s.title?.toLowerCase().includes(search.toLowerCase()));
+
+  const handleSaveRename = (id) => {
+    if (editTitle.trim() && onRenameSession) {
+      onRenameSession(id, editTitle.trim());
+    }
+    setEditingId(null);
+  };
 
   return (
     <div className="w-64 flex flex-col bg-gray-900 border-r border-gray-800 shrink-0">
@@ -58,22 +79,44 @@ export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSes
           </p>
         )}
         {filtered.map(s => (
-          <div key={s.id} className={`group flex items-center gap-1 rounded-lg mb-0.5 transition
+          <div key={s.id} className={`group flex items-center justify-between rounded-lg mb-0.5 transition pl-1 pr-1
             ${currentSession === s.id ? "bg-gray-700" : "hover:bg-gray-800"}`}>
-            <button onClick={()=>onLoadSession(s.id)}
-              className="flex-1 text-left text-xs px-3 py-2 truncate text-gray-400 group-hover:text-gray-200">
-              <span className={currentSession === s.id ? "text-white" : ""}>
-                <span className="inline-flex items-center gap-1.5">
-                  <ChatIcon className="w-3.5 h-3.5 text-gray-500" />
-                  <span>{s.title || "New Chat"}</span>
+            
+            {/* Issue #96: min-w-0 forces flex bounding context */}
+            <div 
+              onDoubleClick={() => {
+                setEditingId(s.id);
+                setEditTitle(s.title || "New Chat");
+              }}
+              className="flex-1 text-left text-xs px-2 py-2 text-gray-400 group-hover:text-gray-200 min-w-0 cursor-pointer"
+            >
+              {editingId === s.id ? (
+                // Issue #226: Focus-targeted input field
+                <input
+                  ref={inputRef}
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  onBlur={() => handleSaveRename(s.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleSaveRename(s.id);
+                    if (e.key === "Escape") setEditingId(null);
+                  }}
+                  className="w-full bg-gray-800 border border-purple-500 text-white rounded px-1 outline-none text-xs"
+                />
+              ) : (
+                <span className={`inline-flex items-center gap-1.5 w-full ${currentSession === s.id ? "text-white" : ""}`}>
+                  <ChatIcon className="w-3.5 h-3.5 text-gray-500 shrink-0" />
+                  {/* Issue #96: Bounded truncation context wrapper */}
+                  <span className="truncate flex-1" title="Double click to rename">{s.title || "New Chat"}</span>
+                  {s.message_count > 0 && (
+                    <span className="ml-1 text-gray-500 text-[10px] shrink-0">{s.message_count}</span>
+                  )}
                 </span>
-              </span>
-              {s.message_count > 0 && (
-                <span className="ml-1 text-gray-600">{s.message_count}</span>
               )}
-            </button>
+            </div>
+
             <button onClick={()=>onDeleteSession(s.id)}
-              className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 px-2 py-2 transition text-xs">
+              className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 px-2 py-2 transition text-sm font-medium shrink-0">
               ×
             </button>
           </div>

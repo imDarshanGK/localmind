@@ -10,8 +10,8 @@ import * as api from "./utils/api";
 
 export default function App() {
   const [sessionId,  setSessionId]  = useState(() => uuidv4());
-  const [messages,   setMessages]   = useState([]);
-  const [sessions,   setSessions]   = useState([]);
+  const [messages,    setMessages]   = useState([]);
+  const [sessions,    setSessions]   = useState([]);
   const [model,      setModel]      = useState("llama3");
   const [models,     setModels]     = useState([]);
   const [documents,  setDocuments]  = useState([]);
@@ -108,6 +108,16 @@ export default function App() {
     refreshSessions();
   }
 
+  // Issue #226 sync hook handler
+  async function handleRenameSession(sid, newTitle) {
+    try {
+      await api.updateSession(sid, { title: newTitle });
+      refreshSessions();
+    } catch (e) {
+      console.error("Failed to rename session:", e);
+    }
+  }
+
   async function handleClearChat() {
     await api.clearMessages(sessionId);
     setMessages([]);
@@ -121,6 +131,7 @@ export default function App() {
         onNewChat={newChat}
         onLoadSession={loadSession}
         onDeleteSession={handleDeleteSession}
+        onRenameSession={handleRenameSession} // Passed down prop successfully
         model={model}
         models={models}
         onModelChange={setModel}
