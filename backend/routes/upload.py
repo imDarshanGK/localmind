@@ -1,10 +1,12 @@
 """Upload routes — /api/upload"""
-
 import os
 from pathlib import Path
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks
 from models.schemas import UploadResponse
+import logging
 from services import db_service
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -15,20 +17,37 @@ ALLOWED = {
     "text/markdown": ".md",
     "text/html": ".html",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
+    "text/vtt": ".vtt",                 # WebVTT Transcript Format
+    "application/x-subrip": ".srt",     # SubRip Transcript Format
+    "text/srt": ".srt",                 # Fallback alternative header for SRT
 }
 MAX_BYTES = 50 * 1024 * 1024  # 50 MB
 
 
 @router.post("/", response_model=UploadResponse)
-async def upload(file: UploadFile = File(...), session_id: str = Form(...)):
+async def upload(file: UploadFile = File(...), session_id: str = Form(...), background_tasks: BackgroundTasks = None):
+    # FastAPI dependency injection handles background_tasks automatically when type hinted
+    # We use None default for test compatibility if needed, but FastAPI injects it properly.
     content_type = file.content_type or ""
+    logger.info(
+        "upload_request route=/upload session=%s filename=%s content_type=%s",
+        session_id, file.filename, content_type or "unknown",
+    )
     # Be lenient — also allow by extension
     ext = Path(file.filename).suffix.lower()
     if content_type not in ALLOWED and ext not in ALLOWED.values():
-        raise HTTPException(400, "Unsupported file. Allowed: PDF, TXT, CSV, DOCX, MD, HTML")
+        logger.warning(
+            "upload_rejected route=/upload session=%s filename=%s reason=unsupported_type",
+            session_id, file.filename,
+        )
+        raise HTTPException(400, "Unsupported file. Allowed: PDF, TXT, CSV, DOCX, MD, HTML, SRT, VTT")
 
     content = await file.read()
     if len(content) > MAX_BYTES:
+        logger.warning(
+            "upload_rejected route=/upload session=%s filename=%s reason=too_large bytes=%d",
+            session_id, file.filename, len(content),
+        )
         raise HTTPException(413, "File too large (max 50 MB)")
 
     upload_dir = f"./data/uploads/{session_id}"
@@ -40,20 +59,45 @@ async def upload(file: UploadFile = File(...), session_id: str = Form(...)):
 
     size_kb = round(len(content) / 1024, 1)
 
-    from services import rag_service
-
-    chunks  = rag_service.index_document(file_path, session_id)
-
     db_service.create_session(session_id)
-    db_service.save_document(session_id, file.filename, file_path, chunks, size_kb)
+    doc_id = db_service.save_document(session_id, file.filename, file_path, 0, size_kb, status="queued")
+
+    logger.info(
+        "upload_queued route=/upload session=%s filename=%s doc_id=%s size_kb=%s",
+        session_id, file.filename, doc_id, size_kb,
+    )
+
+    if background_tasks:
+        background_tasks.add_task(process_document_task, doc_id, file_path, session_id)
+    else:
+        # Fallback if somehow not injected
+        process_document_task(doc_id, file_path, session_id)
 
     return UploadResponse(
         filename=file.filename,
-        status="success",
-        chunks_indexed=chunks,
-        message=f"'{file.filename}' indexed — {chunks} chunks ready for Q&A.",
+        status="queued",
+        chunks_indexed=0,
+        message=f"'{file.filename}' queued for background indexing.",
         file_size_kb=size_kb,
     )
+
+def process_document_task(doc_id: int, file_path: str, session_id: str):
+    try:
+        from services import rag_service
+        db_service.update_document_status(doc_id, "processing")
+        chunks = rag_service.index_document(file_path, session_id, doc_id=doc_id)
+        db_service.update_document_status(doc_id, "completed", chunks_indexed=chunks)
+        logger.info(
+            "document_indexed route=/upload session=%s doc_id=%s chunks=%s",
+            session_id, doc_id, chunks,
+        )
+    except Exception as e:
+        logger.error(
+            "document_failed route=/upload session=%s doc_id=%s error=%s",
+            session_id, doc_id, e,
+        )
+        db_service.update_document_status(doc_id, "failed")
+
 
 
 @router.delete("/{doc_id}")
