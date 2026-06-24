@@ -1,12 +1,14 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { v4 as uuidv4 } from "uuid";
 import Sidebar from "./components/Sidebar";
 import ChatWindow from "./components/ChatWindow";
 import UploadPanel from "./components/UploadPanel";
 import PluginsPanel from "./components/PluginsPanel";
 import SettingsPanel from "./components/SettingsPanel";
+import PromptRegistryPage from "./components/PromptRegistryPage";
 import StatusBar from "./components/StatusBar";
 import * as api from "./utils/api";
+import { getSessionColor, setSessionColor } from "./utils/colorHelper";
 
 export default function App() {
   const [sessionId,  setSessionId]  = useState(() => uuidv4());
@@ -18,12 +20,54 @@ export default function App() {
   const [loading,    setLoading]    = useState(false);
   const [streaming,  setStreaming]  = useState(false);
   const [panel,      setPanel]      = useState(null); // "upload"|"plugins"|"settings"|null
+  const [view,       setView]       = useState("chat"); // "chat"|"prompts"
   const [language,   setLanguage]   = useState("en");
   const [ollamaOk,   setOllamaOk]   = useState(null);
   const [settings,   setSettings]   = useState({});
+  const minimalMode = settings?.minimal_mode === true;
   const [useStream,  setUseStream]  = useState(true);
 
+  // --- FEATURE REFERENCE: TRACK ACTIVE REQUEST ABORT SIGNAL ---
+  const abortControllerRef = useRef(null);
+
   useEffect(() => { bootstrap(); }, []);
+
+  // --- Global Keyboard Shortcuts ---
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "N") {
+        e.preventDefault();
+        newChat();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  // Apply the selected theme preset globally (contrast / readability).
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", settings.theme || "dark");
+  }, [settings.theme]);
+
+  // Poll Ollama status and refresh models on recovery
+  useEffect(() => {
+    if (minimalMode) return;
+    const interval = setInterval(async () => {
+      try {
+        const stRes = await api.getOllamaStatus();
+        const isRunning = stRes.ollama_running;
+        setOllamaOk((prev) => {
+          if (prev === false && isRunning === true) {
+            api.getModels().then(mRes => setModels(mRes.models || []));
+          }
+          return isRunning;
+        });
+      } catch {
+        setOllamaOk(false);
+      }
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [minimalMode]);
 
   async function bootstrap() {
     try {
@@ -31,60 +75,122 @@ export default function App() {
         api.getModels(), api.getSessions(), api.getSettings(), api.getOllamaStatus(),
       ]);
       if (mRes.status === "fulfilled") setModels(mRes.value.models || []);
-      if (sRes.status === "fulfilled") setSessions(sRes.value || []);
+      if (sRes.status === "fulfilled") setSessions((sRes.value || []).map(s => ({ ...s, color: getSessionColor(s.id) })));
       if (settRes.status === "fulfilled") {
         setSettings(settRes.value);
         if (settRes.value.default_model) setModel(settRes.value.default_model);
         if (settRes.value.default_language) setLanguage(settRes.value.default_language);
       }
       if (stRes.status === "fulfilled") setOllamaOk(stRes.value.ollama_running);
-    } catch {}
+    } catch { }
   }
 
   const refreshSessions = useCallback(async () => {
-    try { const s = await api.getSessions(); setSessions(s || []); } catch {}
+    try { 
+      const s = await api.getSessions(); 
+      setSessions((s || []).map(sess => ({ ...sess, color: getSessionColor(sess.id) }))); 
+    } catch { }
   }, []);
 
   const refreshDocuments = useCallback(async (sid) => {
-    try { const d = await api.getDocuments(sid); setDocuments(d.documents || []); } catch {}
+    try { const d = await api.getDocuments(sid); setDocuments(d.documents || []); } catch { }
   }, []);
+
+  const stopGeneration = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setStreaming(false);
+    setLoading(false);
+
+    // Call backend to actually stop the ongoing generation task
+    if (sessionId) {
+      api.cancelStream(sessionId).catch(e => console.error("Cancel stream error:", e));
+    }
+
+    // Clean up the trailing 'typing' state bubble indicators in the messages layout array
+    setMessages(prev =>
+      prev.map(m => m.streaming ? { ...m, streaming: false, content: m.content + "\n\n[Generation Stopped]" } : m)
+    );
+  }, [sessionId]);
+
+  // ─── Core Message Pipelines ───────────────────────────────────────────────
 
   async function sendMessage(text) {
     if (!text.trim() || loading || streaming) return;
-    const userMsg = { role: "user", content: text, id: Date.now() };
+    let activeSid = sessionId;
+    if (!activeSid) {
+      activeSid = uuidv4();
+      setSessionId(activeSid);
+    }
+    
+    // Temporary ID for rendering while waiting
+    const tempUserId = Date.now();
+    const userMsg = { role: "user", content: text, id: tempUserId };
     setMessages(prev => [...prev, userMsg]);
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
     if (useStream) {
       setStreaming(true);
-      const aiMsg = { role: "assistant", content: "", sources: [], id: Date.now() + 1, streaming: true };
+      const aiMsg = { role: "assistant", content: "", sources: [], id: tempUserId + 1, streaming: true };
       setMessages(prev => [...prev, aiMsg]);
       try {
         await api.streamMessage(
-          { message: text, session_id: sessionId, model, use_documents: documents.length > 0, language },
+          { message: text, session_id: activeSid, model, use_documents: documents.length > 0, language },
           (token) => setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, content: m.content + token } : m)),
-          (sources) => {
-            setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, sources, streaming: false } : m));
+          async (resData) => {
+            try {
+              const freshRes = await api.getMessages(activeSid);
+              // Extract from the new .messages dictionary array key wrapper safely
+              const freshMessages = freshRes.messages || freshRes || [];
+              setMessages(freshMessages.map(m => ({ ...m, id: m.id })));
+            } catch {
+              setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, streaming: false } : m));
+            }
             refreshSessions();
-          }
+          },
+          controller.signal
         );
       } catch (e) {
-        setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, content: e.message, streaming: false } : m));
-      } finally { setStreaming(false); }
+        if (e.name !== 'AbortError') {
+          setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, content: e.message, streaming: false } : m));
+        }
+      } finally {
+        if (abortControllerRef.current === controller) abortControllerRef.current = null;
+        setStreaming(false);
+      }
     } else {
       setLoading(true);
       try {
-        const data = await api.sendMessage({ message: text, session_id: sessionId, model, use_documents: documents.length > 0, language });
-        setMessages(prev => [...prev, { role: "assistant", content: data.reply, sources: data.sources || [], id: Date.now() + 1 }]);
+        await api.sendMessage(
+          { message: text, session_id: activeSid, model, use_documents: documents.length > 0, language },
+          controller.signal
+        );
+        // Fetch fresh rows with verified primary keys for standard chat too
+        const freshRes = await api.getMessages(activeSid);
+        const freshMessages = freshRes.messages || freshRes || [];
+        setMessages(freshMessages.map(m => ({ ...m, id: m.id })));
         refreshSessions();
       } catch (e) {
-        setMessages(prev => [...prev, { role: "assistant", content: e.message, id: Date.now() + 1 }]);
-      } finally { setLoading(false); }
+        if (e.name !== 'AbortError') {
+          setMessages(prev => [...prev, { role: "assistant", content: e.message, id: Date.now() + 1 }]);
+        }
+      } finally {
+        if (abortControllerRef.current === controller) abortControllerRef.current = null;
+        setLoading(false);
+      }
     }
   }
 
   async function newChat() {
     const sid = uuidv4();
-    await api.createSession({ title: "New Chat", model });
+    try {
+      await api.createSession({ title: "New Chat", model, language });
+    } catch { }
+
     setSessionId(sid);
     setMessages([]);
     setDocuments([]);
@@ -92,14 +198,36 @@ export default function App() {
     refreshSessions();
   }
 
+
   async function loadSession(sid) {
     setSessionId(sid);
     setPanel(null);
     try {
-      const [msgRes, docRes] = await Promise.all([api.getMessages(sid), api.getDocuments(sid)]);
-      setMessages((msgRes.messages || []).map((m, i) => ({ ...m, id: i })));
+      const [msgRes, docRes, freshSessions] = await Promise.all([
+        api.getMessages(sid),
+        api.getDocuments(sid),
+        api.getSessions(),
+      ]);
+      const freshMessages = msgRes.messages || msgRes || [];
+      setMessages(freshMessages.map(m => ({ ...m, id: m.id })));
       setDocuments(docRes.documents || []);
-    } catch {}
+
+      // Use freshly fetched sessions to avoid stale closure bug
+      const sess = (freshSessions || []).find(s => s.id === sid);
+      if (sess) {
+        setLanguage(sess.language || settings.default_language || "en");
+        setSessions((freshSessions || []).map(s => ({ ...s, color: getSessionColor(s.id) })));
+      }
+    } catch { }
+  }
+
+
+  async function handleDeleteMessage(messageId) {
+    setMessages(prev => prev.filter(m => m.id !== messageId));
+    try {
+      await api.deleteMessage(sessionId, messageId);
+      refreshSessions();
+    } catch { }
   }
 
   async function handleDeleteSession(sid) {
@@ -108,10 +236,38 @@ export default function App() {
     refreshSessions();
   }
 
+  async function handleClearAllSessions() {
+    try {
+      await api.clearAllSessions();
+      setSessions([]);
+      setSessionId(null);
+      setMessages([]);
+      setDocuments([]);
+      setPanel(null);
+    } catch { }
+  }
+
   async function handleClearChat() {
     await api.clearMessages(sessionId);
     setMessages([]);
   }
+
+  const handleLanguageChange = useCallback(async (newLang) => {
+    setLanguage(newLang);
+    if (sessionId) {
+      try {
+        await api.updateSession(sessionId, { language: newLang });
+        setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, language: newLang } : s));
+      } catch (e) {
+        console.error("Failed to update session language:", e);
+      }
+    }
+  }, [sessionId]);
+
+  const handleUpdateSessionColor = useCallback((sid, color) => {
+    setSessionColor(sid, color);
+    setSessions(prev => prev.map(s => s.id === sid ? { ...s, color } : s));
+  }, []);
 
   return (
     <div className={`flex h-screen overflow-hidden ${settings.theme === "light" ? "bg-gray-100" : "bg-gray-950"} text-gray-100`}>
@@ -121,11 +277,13 @@ export default function App() {
         onNewChat={newChat}
         onLoadSession={loadSession}
         onDeleteSession={handleDeleteSession}
+        onClearAllSessions={handleClearAllSessions}
         model={model}
         models={models}
         onModelChange={setModel}
         language={language}
-        onLanguageChange={setLanguage}
+        onLanguageChange={handleLanguageChange}
+        onUpdateSessionColor={handleUpdateSessionColor}
       />
 
       <div className="flex flex-col flex-1 overflow-hidden relative">
@@ -134,6 +292,7 @@ export default function App() {
           model={model}
           docCount={documents.length}
           onUpload={() => setPanel(panel === "upload" ? null : "upload")}
+          onPrompts={() => { setView("prompts"); setPanel(null); }}
           onPlugins={() => setPanel(panel === "plugins" ? null : "plugins")}
           onSettings={() => setPanel(panel === "settings" ? null : "settings")}
           onClear={handleClearChat}
@@ -141,14 +300,14 @@ export default function App() {
           onToggleStream={() => setUseStream(p => !p)}
         />
 
-        {panel === "upload" && (
-          <UploadPanel
-            sessionId={sessionId}
-            documents={documents}
-            onUploaded={() => refreshDocuments(sessionId)}
-            onClose={() => setPanel(null)}
-          />
-        )}
+        <UploadPanel
+          show={panel === "upload"}
+          sessionId={sessionId}
+          documents={documents}
+          onUploaded={() => refreshDocuments(sessionId)}
+          onClose={() => setPanel(null)}
+          minimalMode={minimalMode}
+        />
         {panel === "plugins" && (
           <PluginsPanel sessionId={sessionId} onClose={() => setPanel(null)} />
         )}
@@ -160,12 +319,19 @@ export default function App() {
           />
         )}
 
-        <ChatWindow
-          messages={messages}
-          loading={loading || streaming}
-          onSend={sendMessage}
-          sessionId={sessionId}
-        />
+        {view === "prompts" ? (
+          <PromptRegistryPage onBack={() => setView("chat")} />
+        ) : (
+          <ChatWindow
+            messages={messages}
+            loading={loading || streaming}
+            onSend={sendMessage}
+            onDeleteMessage={handleDeleteMessage}
+            onStop={stopGeneration}
+            sessionId={sessionId}
+            minimalMode={minimalMode}
+          />
+        )}
       </div>
     </div>
   );
