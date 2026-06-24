@@ -1,6 +1,5 @@
 const BASE = (import.meta.env.VITE_API_BASE_URL || "/api").replace(/\/$/, "");
 
-// NEW: Handed 'signal' into options unpacking to attach it straight onto fetch
 async function req(path, opts = {}) {
   const { signal, ...restOpts } = opts; // Separate signal from rest of parameters
   const res = await fetch(`${BASE}${path}`, {
@@ -8,6 +7,15 @@ async function req(path, opts = {}) {
     signal, // <--- Attaches the AbortController listener to normal HTTP requests
     ...restOpts,
   });
+
+  const limit = res.headers.get("X-RateLimit-Limit");
+  const remaining = res.headers.get("X-RateLimit-Remaining");
+  if (limit && remaining) {
+    window.dispatchEvent(new CustomEvent("ratelimit-update", { 
+      detail: { limit, remaining } 
+    }));
+  }
+
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
     throw new Error(err.detail || "Request failed");
@@ -66,6 +74,13 @@ export function streamMessage(body, onToken, onDone, signal) {
     body: JSON.stringify(body),
     signal // <--- Attaches the cancel token listener directly to your chunk stream reader
   }).then(res => {
+
+    const limit = res.headers.get("X-RateLimit-Limit");
+    const remaining = res.headers.get("X-RateLimit-Remaining");
+    if (limit && remaining) {
+      window.dispatchEvent(new CustomEvent("ratelimit-update", { detail: { limit, remaining } }));
+    }
+
     const reader = res.body.getReader(); const decoder = new TextDecoder();
     function pump() {
       return reader.read().then(({ done, value }) => {

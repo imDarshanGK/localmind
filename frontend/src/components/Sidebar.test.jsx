@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import Sidebar from "./Sidebar";
 import * as pinHelper from "../utils/pinHelper";
 
@@ -16,6 +16,10 @@ const mockSessions = [
 ];
 
 describe("Sidebar Session Pinning", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     pinHelper.getPinnedSessions.mockReturnValue([]);
@@ -35,7 +39,7 @@ describe("Sidebar Session Pinning", () => {
     expect(pins).toHaveLength(3); // One for each session
 
     // Click to unpin session 1
-    const unpinButton = screen.getByTitle("Unpin chat");
+    const unpinButton = screen.getByLabelText("Unpin chat");
     fireEvent.click(unpinButton);
 
     expect(pinHelper.toggleSessionPin).toHaveBeenCalledWith("1");

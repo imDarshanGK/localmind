@@ -20,6 +20,7 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
     rag_top_k:        settings?.rag_top_k        || 4,
     rag_chunk_overlap: settings?.rag_chunk_overlap ?? 50,
     theme:            settings?.theme            || "dark",
+    minimal_mode:     settings?.minimal_mode ?? false,
   });
 
   const [errors, setErrors] = useState({});
@@ -118,7 +119,21 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
           <select value={form.theme} onChange={e => set("theme", e.target.value)} className={`sel ${errors.theme ? "border-red-500" : ""}`}>
             <option value="dark">Dark</option>
             <option value="light">Light</option>
+            <option value="high-contrast">High Contrast</option>
+            <option value="sepia">Sepia (Warm)</option>
+            <option value="comfort">Comfort (Large Text)</option>
           </select>
+        </Field>
+
+        <Field label="Minimal Mode">
+          <label className="flex items-center gap-2 text-gray-300">
+            <input
+              type="checkbox"
+              checked={form.minimal_mode}
+              onChange={e => set("minimal_mode", e.target.checked)}
+            />
+            Low-bandwidth mode
+          </label>
         </Field>
       </div>
 
