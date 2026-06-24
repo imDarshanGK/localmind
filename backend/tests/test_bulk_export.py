@@ -1,6 +1,4 @@
-import json
 import tempfile
-import pytest
 from fastapi.testclient import TestClient
 import services.db_service as db
 from app import app
@@ -15,8 +13,8 @@ client = TestClient(app)
 
 def test_bulk_export_json_success():
     # 1. Create two test sessions
-    s1 = db.create_session("sess_1", title="Session One", model="llama3", language="en")
-    s2 = db.create_session("sess_2", title="Session Two", model="mistral", language="fr")
+    db.create_session("sess_1", title="Session One", model="llama3", language="en")
+    db.create_session("sess_2", title="Session Two", model="mistral", language="fr")
 
     db.save_message("sess_1", "user", "Hello from user 1")
     db.save_message("sess_1", "assistant", "Response 1")
