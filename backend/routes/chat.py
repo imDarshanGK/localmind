@@ -402,7 +402,6 @@ async def api_delete_session(session_id: str):
         logger.error("Failed to delete session %s: %s", session_id, str(e))
         raise HTTPException(status_code=500, detail=f"Failed to delete session: {str(e)}")
 
-    return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 
 # ─── Shareable Read-Only Session Links (Issue #270) ───────────
