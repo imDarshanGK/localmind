@@ -78,13 +78,20 @@ def init_db():
                 success INTEGER DEFAULT 1,
                 created_at TEXT DEFAULT (datetime('now'))
             );
-                           
+                            
             CREATE TABLE IF NOT EXISTS shared_sessions (
                 id TEXT PRIMARY KEY,
                 session_id TEXT NOT NULL,
                 title TEXT NOT NULL,
                 model TEXT NOT NULL,
                 snapshot_json TEXT NOT NULL,
+                created_at TEXT DEFAULT (datetime('now'))
+            );
+
+            CREATE TABLE IF NOT EXISTS prompt_templates (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                prompt TEXT NOT NULL,
                 created_at TEXT DEFAULT (datetime('now'))
             );
 
