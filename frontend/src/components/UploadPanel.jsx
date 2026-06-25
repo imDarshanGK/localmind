@@ -46,6 +46,7 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
 
       {/* Drop zone */}
       <div
+        onDragEnter={e=>e.preventDefault()}
         onDragOver={e=>{e.preventDefault();setDragging(true)}}
         onDragLeave={()=>setDragging(false)}
         onDrop={onDrop}
