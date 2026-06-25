@@ -30,6 +30,7 @@
 |---------|-------------|
 | Streaming Responses | See AI reply token-by-token in real time |
 | Plugin System | Calculator, Word Counter, JSON Formatter, Code Runner, Summarizer |
+| Audit Log | Track and view history of all plugin executions |
 | 8 Languages | English, Hindi, Tamil, Telugu, Kannada, French, German, Spanish |
 | Export Chats | Download conversations as Markdown, JSON, or TXT |
 | Session Manager | Full CRUD - create, rename, search, delete chat sessions |
@@ -53,6 +54,7 @@
 | Session Manager (CRUD) | Included |
 | Session Search | Included |
 | Plugin System (6 plugins) | Included |
+| Plugin Audit Log | Included |
 | Export (MD / JSON / TXT) | Included |
 | Settings Panel | Included |
 | Docker Compose | Included |
@@ -293,6 +295,53 @@ localmind/
 | Code Runner | Run Python snippets in a sandbox |
 | Translator | Language detection + translation via LocalMind |
 
+## 📤 Bulk Session Export API
+
+Export multiple chat sessions in a single payload.
+
+**Endpoint:** `POST /api/export/sessions`
+
+**Request Headers:** `Content-Type: application/json`
+
+**Request Body:**
+```json
+{
+  "session_ids": ["sess_1", "sess_2"],
+  "format": "json"
+}
+```
+
+**Response (JSON format):**
+```json
+{
+  "exported_at": "2026-06-24 19:30",
+  "sessions": [
+    {
+      "session": {
+        "id": "sess_1",
+        "title": "LocalMind Chat",
+        "model": "llama3",
+        "language": "en",
+        "message_count": 2,
+        "created_at": "2026-06-24 19:00:00",
+        "updated_at": "2026-06-24 19:05:00"
+      },
+      "messages": [
+        {
+          "id": 1,
+          "role": "user",
+          "content": "Hello",
+          "sources": [],
+          "created_at": "2026-06-24 19:00:05",
+          "benchmarks": {}
+        }
+      ]
+    }
+  ]
+}
+```
+Supported formats: `json`, `markdown`, `txt`.
+
 ---
 
 ## Running Tests
@@ -303,8 +352,62 @@ pip install pytest pytest-asyncio
 pytest tests/ -v
 # 30+ tests covering: sessions, chat, plugins, upload, export, settings
 ```
+---
+
+
+## 🧹 Database Maintenance
+
+[![Auto Vacuum](https://img.shields.io/badge/Auto-VACUUM-7C3AED?style=flat-square)](#-database-maintenance)
+[![SQLite](https://img.shields.io/badge/SQLite-Self_Healing-009688?style=flat-square&logo=sqlite&logoColor=white)](#-database-maintenance)
+
+LocalMind automatically reclaims disk space after large deletions — clearing a chat, deleting a session, removing documents — by running SQLite's `VACUUM` command once enough rows have been deleted.
+
+```text
+┌──────────────────────────────────────────────────┐
+│            Vacuum Scheduling Flow                │
+├──────────────────────────────────────────────────┤
+│  1. Rows deleted (session / messages / docs)     │
+│  2. Deleted count tracked in app_settings        │
+│  3. Threshold crossed? ──No──> wait, keep count  │
+│              │                                    │
+│             Yes                                   │
+│              ▼                                    │
+│  4. VACUUM runs (separate autocommit connection) │
+│  5. Counter resets to 0                          │
+└──────────────────────────────────────────────────┘
+```
+
+| Env Variable | Default | Description |
+|---|---|---|
+| `DB_VACUUM_THRESHOLD` | `500` | Cumulative deleted rows before an automatic VACUUM runs |
+
+**Why threshold-based?** Running VACUUM on every delete would rebuild the entire database file each time — slow and wasteful for small deletes. Batching it keeps the database lean without hurting day-to-day performance.
+
+<details>
+<summary>📊 See it in action (measured locally)</summary>
+
+| Stage | DB File Size |
+|---|---|
+| After inserting 5,000 messages | ~1.22 MB |
+| After deleting them (no vacuum) | ~1.22 MB — unchanged |
+| After VACUUM runs | ~40 KB |
+
+</details>
 
 ---
+
+---
+
+## 🚀 Optimization & Performance Utilities
+
+### Embeddings Cache Warmup
+To prevent cold-start latency when users upload documents for the first time, you can pre-download and warm up the SentenceTransformer inference weights (`all-MiniLM-L6-v2`) before starting the web server.
+
+Run the following command within your active virtual environment inside the backend directory:
+
+```bash
+cd backend
+python warmup.py
 
 ## 🤝 Contributing
 
@@ -321,8 +424,38 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide.
 ## License
 
 MIT © 2026
+
 <div align="center">
 
 If LocalMind helped you, please star the repo. ⭐✨🚀
 
+</div>
+
+---
+
+## 🌟 Community Showcase
+
+Built something cool with LocalMind? We'd love to see it! Open a Pull Request to add your project, tutorial, or integration to this list.
+
+### 🛠️ Projects & Integrations
+* **[Community projects will appear here.]** - A brief 1-2 sentence description of what your integration does. (By [@yourusername](https://github.com/yourusername))
+* *Contributions welcome! Add your tool here.*
+
+### 📚 Community Articles & Tutorials
+* *Have you written a blog post or recorded a video setup guide? Share it with the community here!*
+
+---
+
+### 🛡️ Dependency Security Scanning
+
+Our CI pipeline automatically audits backend dependencies for known vulnerabilities (CVEs) on every push and pull request using `pip-audit`.
+
+To scan your dependencies locally before pushing code, run the following commands inside your virtual environment:
+
+```bash
+# Install the security scanner
+pip install pip-audit
+
+# Run the vulnerability audit against your requirements file
+pip-audit -r requirements.txt
 </div>
