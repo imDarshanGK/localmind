@@ -14,14 +14,13 @@ from langchain_community.document_loaders import (
     PyPDFLoader, TextLoader, CSVLoader, UnstructuredHTMLLoader,
 )
 from services.docx_loader import DocxWithTablesLoader
-from sentence_transformers import SentenceTransformer
+from services.embeddings import get_embedding_provider
 
 from services.citation_utils import build_sources
 
 logger = logging.getLogger(__name__)
 
 CHROMA_PATH = os.getenv("CHROMADB_DIR", "./data/chromadb")
-EMBED_MODEL  = "all-MiniLM-L6-v2"
 
 os.makedirs(CHROMA_PATH, exist_ok=True)
 
@@ -29,7 +28,6 @@ chroma_client = chromadb.PersistentClient(
     path=CHROMA_PATH,
     settings=Settings(anonymized_telemetry=False),
 )
-embedder = SentenceTransformer(EMBED_MODEL)
 
 LOADERS = {
     ".pdf":  PyPDFLoader,
@@ -79,6 +77,7 @@ def index_document(file_path: str, session_id: str, doc_id: int = None) -> int:
     metadatas = [{"source": Path(file_path).name, "chunk": i} for i in range(len(texts))]
 
     col = _collection(session_id)
+    provider = get_embedding_provider()
     
     batch_size = 200
     for i in range(0, len(texts), batch_size):
@@ -86,7 +85,7 @@ def index_document(file_path: str, session_id: str, doc_id: int = None) -> int:
         batch_ids = ids[i:i + batch_size]
         batch_metas = metadatas[i:i + batch_size]
         
-        batch_embeddings = embedder.encode(batch_texts, show_progress_bar=False).tolist()
+        batch_embeddings = provider.embed_documents(batch_texts)
         col.upsert(ids=batch_ids, documents=batch_texts, embeddings=batch_embeddings, metadatas=batch_metas)
         if doc_id is not None:
             from services import db_service
@@ -102,7 +101,8 @@ def retrieve_context(query: str, session_id: str, top_k: int = 4) -> tuple[str, 
     if col.count() == 0:
         return "", []
 
-    q_emb   = embedder.encode([query]).tolist()
+    provider = get_embedding_provider()
+    q_emb    = [provider.embed_query(query)]
     results = col.query(
         query_embeddings=q_emb,
         n_results=min(top_k, col.count()),
