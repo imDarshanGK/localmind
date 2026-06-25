@@ -182,8 +182,9 @@ def init_db():
                 ('max_history_turns', '10'),
                 ('rag_top_k', '4'),
                 ('theme', '"dark"'),
-                ('rows_deleted_since_vacuum','0');         
-                           
+                ('embedding_provider', '"sentence-transformers"'),
+                ('embedding_model', '"all-MiniLM-L6-v2"'),
+                ('rows_deleted_since_vacuum', '0');
 
         """)
         try:

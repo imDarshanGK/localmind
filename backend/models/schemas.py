@@ -129,8 +129,9 @@ class AppSettings(BaseModel):
     rag_top_k: int = 4
     rag_chunk_overlap: int = 50
     theme: str = "dark"
+    embedding_provider: str = "sentence-transformers"
+    embedding_model: str = "all-MiniLM-L6-v2"
     minimal_mode: bool = False
-
 
 class ExportFormat(str, Enum):
     markdown = "markdown"

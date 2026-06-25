@@ -13,6 +13,9 @@ export default function ChatWindow({ messages, loading, onSend, onDeleteMessage,
   const bottomRef = useRef(null);
   const textareaRef = useRef(null);
   const plusMenuRef = useRef(null);
+  const prevMsgCountRef = useRef(0);        // tracks previous message count
+  const prevSessionIdRef = useRef(sessionId); // tracks previous session
+  const isInitialLoadRef = useRef(true);    // tracks first load
 
   // Local optimization tracking map state for instant UI reaction counts
   const [localReactions, setLocalReactions] = useState({});
@@ -121,11 +124,6 @@ export default function ChatWindow({ messages, loading, onSend, onDeleteMessage,
       </button>
     );
 
-  // Auto-scroll to latest messages
-  useEffect(() => { 
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" }); 
-  }, [messages]);
-
   // Handle auto-resizing smoothly whenever the text content shifts
   useEffect(() => {
     const textarea = textareaRef.current;
@@ -137,6 +135,22 @@ export default function ChatWindow({ messages, loading, onSend, onDeleteMessage,
     // Lock the frame expansion between 24px and 160px bounds
     textarea.style.height = `${Math.min(textarea.scrollHeight, 160)}px`;
   }, [input]);
+
+  // New: only scrolls when it truly makes sense
+  useEffect(() => {
+    const isNewSession = prevSessionIdRef.current !== sessionId;
+    const isNewMessage = messages.length > prevMsgCountRef.current;
+    const isInitialLoad = isInitialLoadRef.current;
+    const isStreaming = messages.length > 0 && messages[messages.length - 1].streaming;
+
+    if (isNewSession || isNewMessage || isInitialLoad || isStreaming) {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+
+    prevMsgCountRef.current = messages.length;
+    prevSessionIdRef.current = sessionId;
+    isInitialLoadRef.current = false;
+  }, [messages, sessionId]);
 
   // Reset local adjustments layout cache map when active conversation session changes
   useEffect(() => { setLocalReactions({}); }, [sessionId]);
@@ -165,7 +179,6 @@ export default function ChatWindow({ messages, loading, onSend, onDeleteMessage,
     setTimeout(() => textareaRef.current?.focus(), 0);
   }
 
-  type: unallocated_context
   function send() {
     if ((!input.trim() && !selectedTemplate) || loading) return;
 

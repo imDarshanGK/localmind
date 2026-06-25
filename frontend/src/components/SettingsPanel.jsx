@@ -13,14 +13,16 @@ const LANGUAGES = [
 
 export default function SettingsPanel({ settings, onSave, onClose }) {
   const [form, setForm] = useState({
-    default_model:    settings?.default_model    || "llama3",
-    default_language: settings?.default_language || "en",
-    temperature:      settings?.temperature      ?? 0.7,
-    max_history_turns:settings?.max_history_turns|| 10,
-    rag_top_k:        settings?.rag_top_k        || 4,
-    rag_chunk_overlap: settings?.rag_chunk_overlap ?? 50,
-    theme:            settings?.theme            || "dark",
-    minimal_mode:     settings?.minimal_mode ?? false,
+default_model:      settings?.default_model      || "llama3",
+    default_language:   settings?.default_language   || "en",
+    temperature:        settings?.temperature        ?? 0.7,
+    max_history_turns:  settings?.max_history_turns  || 10,
+    rag_top_k:          settings?.rag_top_k          || 4,
+    rag_chunk_overlap:  settings?.rag_chunk_overlap  ?? 50,
+    theme:              settings?.theme              || "dark",
+    embedding_provider: settings?.embedding_provider || "sentence-transformers",
+    embedding_model:    settings?.embedding_model    || "all-MiniLM-L6-v2",
+    minimal_mode:       settings?.minimal_mode       ?? false,
   });
 
   const [errors, setErrors] = useState({});
@@ -123,6 +125,18 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
             <option value="sepia">Sepia (Warm)</option>
             <option value="comfort">Comfort (Large Text)</option>
           </select>
+        </Field>
+<Field label="Embedding Provider">
+          <select value={form.embedding_provider} onChange={e=>set("embedding_provider",e.target.value)} className="sel">
+            <option value="sentence-transformers">Sentence Transformers (Local)</option>
+            <option value="ollama">Ollama (Local API)</option>
+          </select>
+        </Field>
+
+        <Field label="Embedding Model">
+          <input type="text" value={form.embedding_model}
+            onChange={e=>set("embedding_model",e.target.value)}
+            className="sel" />
         </Field>
 
         <Field label="Minimal Mode">

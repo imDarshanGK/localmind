@@ -1,6 +1,6 @@
 import pytest
 import httpx
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, patch, MagicMock
 
 from services.ollama_service import chat, chat_stream
 
@@ -77,6 +77,7 @@ async def test_chat_stream_retry_success():
                 yield '{"message": {"content": "done!"}, "done": true}'
                 
             mock_resp.aiter_lines = mock_aiter_lines
+            mock_resp.raise_for_status = MagicMock()
             return mock_resp
             
         async def __aexit__(self, exc_type, exc_val, exc_tb):
