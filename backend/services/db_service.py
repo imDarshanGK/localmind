@@ -7,6 +7,7 @@ import sqlite3
 import json
 import os
 from contextlib import contextmanager
+import uuid
 import time
 from sqlite3 import OperationalError
 import grapheme
@@ -157,6 +158,22 @@ def init_db():
                 success INTEGER DEFAULT 1,
                 created_at TEXT DEFAULT (datetime('now'))
             );
+                            
+            CREATE TABLE IF NOT EXISTS shared_sessions (
+                id TEXT PRIMARY KEY,
+                session_id TEXT NOT NULL,
+                title TEXT NOT NULL,
+                model TEXT NOT NULL,
+                snapshot_json TEXT NOT NULL,
+                created_at TEXT DEFAULT (datetime('now'))
+            );
+
+            CREATE TABLE IF NOT EXISTS prompt_templates (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                prompt TEXT NOT NULL,
+                created_at TEXT DEFAULT (datetime('now'))
+            );
 
             INSERT OR IGNORE INTO app_settings (key, value) VALUES
                 ('default_model', '"llama3"'),
@@ -167,13 +184,6 @@ def init_db():
                 ('theme', '"dark"'),
                 ('rows_deleted_since_vacuum','0');         
                            
-
-            CREATE TABLE IF NOT EXISTS prompt_templates(
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                prompt_title TEXT NOT NULL,
-                prompt TEXT NOT NULL,
-                created_at TEXT DEFAULT (datetime('now'))
-            );
 
         """)
         try:
@@ -476,72 +486,98 @@ def log_plugin(session_id: str, plugin: str, inp: str, out: str, success: bool =
         )
 
 
-def get_messages_by_ids(message_ids: list):
-    """Fetch messages by list of message IDs (used for batch export)."""
-    if not message_ids:
-        return []
-    placeholders = ','.join('?' for _ in message_ids)
-    with get_db() as conn:
-        rows = conn.execute(f"""
-            SELECT id, role, content, sources, created_at as timestamp
-            FROM messages
-            WHERE id IN ({placeholders})
-        """, message_ids).fetchall()
-        return [dict(row) for row in rows]
+# ─── Shareable Sessions (Issue #270) ─────────────────────────
 
+def create_shared_session(session_id: str) -> str:
+    """
+    Captures a frozen snapshot of a chat session's history 
+    and returns a unique, obfuscated sharing ID string.
+    """
+    # 1. Fetch current session parameters
+    session = get_session(session_id)
+    if not session:
+        raise ValueError("Session not found")
 
-# ─── Prompt Template Registry ───────────────────────────────────────────────
-def create_prompt_template(prompt_title: str, prompt: str) -> dict:
-    """Create a new prompt template."""
+    # 2. Extract full historical messages bundled with sources and timelines
+    messages = get_messages_full(session_id)
+
+    # 3. Generate a secure, un-guessable sharing string key
+    share_id = str(uuid.uuid4())
+
+    # 4. Serialize messages list into a clean snapshot string
+    snapshot_str = json.dumps(messages)
+
+    # 5. Commit snapshot configuration records into the DB
     with get_db() as conn:
         conn.execute(
-            "INSERT INTO prompt_templates (prompt_title, prompt) VALUES (?, ?)",
-            (prompt_title, prompt),
+            """
+            INSERT INTO shared_sessions (id, session_id, title, model, snapshot_json)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (share_id, session_id, session["title"], session["model"], snapshot_str)
         )
-        row = conn.execute(
-            "SELECT * FROM prompt_templates WHERE id = last_insert_rowid()"
-        ).fetchone()
-        return dict(row)
+    return share_id
 
 
-def get_all_prompt_templates() -> list[dict]:
-    """Fetch all prompt templates."""
+def get_shared_session(share_id: str) -> dict | None:
+    """
+    Retrieves a shared session snapshot record and unpacks its historical arrays.
+    """
     with get_db() as conn:
-        rows = conn.execute(
-            "SELECT * FROM prompt_templates ORDER BY created_at DESC"
-        ).fetchall()
-        return [dict(r) for r in rows]
+        row = conn.execute(
+            "SELECT title, model, snapshot_json, created_at FROM shared_sessions WHERE id = ?",
+            (share_id,)
+        )
+        row = row.fetchone()
+
+    if not row:
+        return None
+
+    return {
+        "id": share_id,
+        "title": row["title"],
+        "model": row["model"],
+        "messages": json.loads(row["snapshot_json"]),  # Turn string array back into live json dicts
+        "created_at": row["created_at"]
+    }
+# ─── Prompt Templates (Updated Signatures) ───────────────────
+
+def create_prompt_template(prompt_title: str, prompt: str) -> dict:
+    with get_db() as conn:
+        cursor = conn.execute(
+            "INSERT INTO prompt_templates (name, prompt) VALUES (?, ?)",
+            (prompt_title, prompt)
+        )
+        template_id = cursor.lastrowid
+    return get_prompt_template(template_id)
 
 
 def get_prompt_template(template_id: int) -> dict | None:
-    """Fetch a single prompt template by ID."""
     with get_db() as conn:
         row = conn.execute(
-            "SELECT * FROM prompt_templates WHERE id = ?", (template_id,)
+            "SELECT id, name AS prompt_title, prompt, created_at FROM prompt_templates WHERE id = ?", 
+            (template_id,)
         ).fetchone()
         return dict(row) if row else None
 
 
-def update_prompt_template(template_id: int, prompt_title: str = None, prompt: str = None):
-    """Update an existing prompt template."""
+def get_all_prompt_templates() -> list[dict]:
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT id, name AS prompt_title, prompt, created_at FROM prompt_templates ORDER BY created_at DESC"
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def update_prompt_template(template_id: int, prompt_title: str = None, prompt: str = None) -> dict | None:
     with get_db() as conn:
         if prompt_title:
-            conn.execute(
-                "UPDATE prompt_templates SET prompt_title = ? WHERE id = ?",
-                (prompt_title, template_id),
-            )
+            conn.execute("UPDATE prompt_templates SET name=? WHERE id=?", (prompt_title, template_id))
         if prompt:
-            conn.execute(
-                "UPDATE prompt_templates SET prompt = ? WHERE id = ?",
-                (prompt, template_id),
-            )
+            conn.execute("UPDATE prompt_templates SET prompt=? WHERE id=?", (prompt, template_id))
+    return get_prompt_template(template_id)
 
 
 def delete_prompt_template(template_id: int):
-    """Delete a prompt template by ID."""
     with get_db() as conn:
-        cur = conn.execute("DELETE FROM prompt_templates WHERE id = ?", (template_id,))
-        deleted = cur.rowcount
-    _maybe_vacuum(deleted)    
-        
-
+        conn.execute("DELETE FROM prompt_templates WHERE id=?", (template_id,))
