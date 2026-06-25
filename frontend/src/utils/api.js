@@ -1,9 +1,17 @@
 const BASE = (import.meta.env.VITE_API_BASE_URL || "/api").replace(/\/$/, "");
 
+// Helper utility to generate or append consistent headers with tracking IDs
+function getTrackingHeaders(customHeaders = {}) {
+  return {
+    "X-Correlation-ID": crypto.randomUUID(), // Generates a unique track string millisecond request fires
+    ...customHeaders,
+  };
+}
+
 async function req(path, opts = {}) {
   const res = await fetch(`${BASE}${path}`, {
-    headers: { "Content-Type": "application/json", ...opts.headers },
     ...opts,
+    headers: getTrackingHeaders({ "Content-Type": "application/json", ...opts.headers }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
@@ -32,14 +40,19 @@ export const deleteDocument = (docId) => req(`/upload/${docId}`, { method: "DELE
 export async function uploadDocument(file, session_id) {
   const fd = new FormData();
   fd.append("file", file); fd.append("session_id", session_id);
-  const res = await fetch(`${BASE}/upload/`, { method: "POST", body: fd });
+  const res = await fetch(`${BASE}/upload/`, { 
+    method: "POST", 
+    body: fd,
+    headers: getTrackingHeaders() // Appends tracking token alongside the raw file payload form data
+  });
   if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e.detail||"Upload failed"); }
   return res.json();
 }
 
 export function streamMessage(body, onToken, onDone) {
   return fetch(`${BASE}/chat/stream`, {
-    method: "POST", headers: { "Content-Type": "application/json" },
+    method: "POST", 
+    headers: getTrackingHeaders({ "Content-Type": "application/json" }), // Attaches token to chat stream
     body: JSON.stringify(body),
   }).then(res => {
     const reader = res.body.getReader(); const decoder = new TextDecoder();

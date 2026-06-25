@@ -5,10 +5,11 @@ Backend: FastAPI + Ollama + LangChain + ChromaDB + WebSockets
 
 import logging
 import os
+import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse
@@ -23,10 +24,21 @@ from routes.export import router as export_router
 from routes.settings import router as settings_router
 from services.db_service import init_db
 
+# Custom Formatter to append Correlation IDs dynamically to server console logs
+class CorrelationFilter(logging.Filter):
+    def filter(self, record):
+        record.correlation_id = getattr(record, "correlation_id", "GLOBAL")
+        return True
+
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+    format="%(asctime)s | %(levelname)s | [%(correlation_id)s] | %(name)s | %(message)s",
 )
+
+root_logger = logging.getLogger()
+filter_instance = CorrelationFilter()
+root_logger.addFilter(filter_instance)
+
 logger = logging.getLogger(__name__)
 FRONTEND_DIST = Path(os.getenv("FRONTEND_DIST", "/app/frontend/dist"))
 
@@ -50,6 +62,18 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# --- Issue #284: Custom Correlation Tracking Middleware Interceptor ---
+@app.middleware("http")
+async def add_request_correlation_id(request: Request, call_next):
+    correlation_id = request.headers.get("X-Correlation-ID", f"gen-{uuid.uuid4()}")
+    extra = {"correlation_id": correlation_id}
+    logger.info(f"Incoming Request: {request.method} {request.url.path}", extra=extra)
+    
+    response = await call_next(request)
+    response.headers["X-Correlation-ID"] = correlation_id
+    return response
+
+
 default_cors_origins = "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173"
 cors_origins = [
     origin.strip()
@@ -64,6 +88,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-Correlation-ID"],
 )
 
 app.include_router(chat_router,     prefix="/api/chat",     tags=["Chat"])
