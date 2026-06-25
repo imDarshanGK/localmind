@@ -417,8 +417,9 @@ export default function Sidebar({
             {unpinnedSessions.map((s) => renderSessionRow(s))}
           </div>
 
-
+        
           {/* Render Archived Items Block */}
+          {/*
           {archivedSessions.length > 0 && (
             <div className="mt-4">
               <button
@@ -435,6 +436,7 @@ export default function Sidebar({
               )}
             </div>
           )}
+          */}    
 
         </div>
 
