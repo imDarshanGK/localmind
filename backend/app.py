@@ -24,25 +24,30 @@ from routes.sessions import router as sessions_router
 from routes.plugins import router as plugins_router
 from routes.export import router as export_router
 from routes.settings import router as settings_router
-
 from routes.prompt_templates import router as prompt_templates_router
+
 from middleware.csrf import OriginValidationMiddleware
 from services.db_service import init_db, get_db
 
-# Custom Formatter to append Correlation IDs dynamically to server console logs
-class CorrelationFilter(logging.Filter):
-    def filter(self, record):
-        record.correlation_id = getattr(record, "correlation_id", "GLOBAL")
-        return True
+# --- Issue #284 Engine Stability: Contextual Thread-Safe Log Formatter ---
+class CorrelationIdFormatter(logging.Formatter):
+    def format(self, record):
+        # Safely defaults to GLOBAL without colliding with factory dictionary keys
+        if not hasattr(record, "correlation_id"):
+            record.correlation_id = "GLOBAL"
+        return super().format(record)
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s | %(levelname)s | [%(correlation_id)s] | %(name)s | %(message)s",
+# Initialize a standard console stream log handler
+stream_handler = logging.StreamHandler()
+stream_handler.setFormatter(
+    CorrelationIdFormatter("%(asctime)s | %(levelname)s | [%(correlation_id)s] | %(name)s | %(message)s")
 )
 
+# Apply our stream configuration directly onto the base application root logger scope
 root_logger = logging.getLogger()
-filter_instance = CorrelationFilter()
-root_logger.addFilter(filter_instance)
+root_logger.setLevel(logging.INFO)
+# Clear out any default pre-existing basic handlers to prevent duplicate printouts
+root_logger.handlers = [stream_handler]
 
 logger = logging.getLogger(__name__)
 FRONTEND_DIST = Path(os.getenv("FRONTEND_DIST", "/app/frontend/dist"))
@@ -50,7 +55,6 @@ FRONTEND_DIST = Path(os.getenv("FRONTEND_DIST", "/app/frontend/dist"))
 
 def run_preflight_checks():
     logger.info("========== LocalMind Preflight Checklist ==========")
-
     checks = []
 
     try:
@@ -86,7 +90,6 @@ def run_preflight_checks():
     logger.info("=================================================")
 
 
-# Starting lifespan code block
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting LocalMind v2.0...")
@@ -116,6 +119,10 @@ app = FastAPI(
 @app.middleware("http")
 async def add_request_correlation_id(request: Request, call_next):
     correlation_id = request.headers.get("X-Correlation-ID", f"gen-{uuid.uuid4()}")
+    
+    # Safely attach tracking state directly onto the request state context loop
+    request.state.correlation_id = correlation_id
+    
     extra = {"correlation_id": correlation_id}
     logger.info(f"Incoming Request: {request.method} {request.url.path}", extra=extra)
     
@@ -124,7 +131,6 @@ async def add_request_correlation_id(request: Request, call_next):
     return response
 
 
-default_cors_origins = "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173"
 default_cors_origins = "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://localhost:8000" 
 cors_origins = [
     origin.strip()
@@ -142,6 +148,7 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["X-Correlation-ID"],
 )
+
 RATE_LIMIT = 100
 RATE_LIMIT_WINDOW = 60
 rate_limits = {}
@@ -165,6 +172,7 @@ async def rate_limit_middleware(request: Request, call_next):
     response.headers["X-RateLimit-Reset"] = str(reset_time)
     
     return response
+
 app.include_router(chat_router,     prefix="/api/chat",     tags=["Chat"])
 app.include_router(upload_router,   prefix="/api/upload",   tags=["Upload"])
 app.include_router(models_router,   prefix="/api/models",   tags=["Models"])
@@ -189,6 +197,7 @@ async def root():
 @app.get("/health", tags=["Health"])
 async def health():
     return {"status": "healthy"}
+
 
 @app.get("/health/db", tags=["Health"])
 async def db_health():
