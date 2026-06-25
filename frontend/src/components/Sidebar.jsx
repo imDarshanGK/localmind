@@ -110,6 +110,19 @@ export default function Sidebar({
     setPinnedIds(newPinned);
   };
 
+
+  const handleArchive = (sessionId) => {
+    const newArchived = archiveSession(sessionId);
+    setArchivedIds(newArchived);
+    setContextMenu(null);
+  };
+
+  const handleRestore = (e, sessionId) => {
+    e.stopPropagation();
+    const newArchived = restoreSession(sessionId);
+    setArchivedIds(newArchived);
+  };
+
   useEffect(() => {
     const closeMenu = () => setContextMenu(null);
     window.addEventListener("click", closeMenu);
@@ -136,8 +149,11 @@ export default function Sidebar({
     const isActive = currentSession === s.id;
     const isPinned = pinnedIds.includes(s.id);
     return (
-      <div
-        key={s.id}
+
+
+
+      <div key={s.id}
+
         onContextMenu={(e) => handleContextMenu(e, s.id)}
         className={`relative group flex items-center justify-between rounded-lg mb-0.5 transition pl-1 pr-1
           ${isActive ? "bg-gray-700" : "hover:bg-gray-800"}`}
@@ -147,9 +163,9 @@ export default function Sidebar({
           className={`absolute left-1 top-1/2 -translate-y-1/2 w-1 h-1 rounded-full bg-purple-400 transition-opacity duration-300
             ${isActive ? "opacity-100 animate-pulse" : "opacity-0"}`}
         />
-        
+
         {/* Issue #96 & #226: Interactive element boundary area wrapper */}
-        <div 
+        <div
           onDoubleClick={() => {
             setEditingId(s.id);
             setEditTitle(s.title || "New Chat");
@@ -170,8 +186,8 @@ export default function Sidebar({
               onClick={(e) => e.stopPropagation()}
             />
           ) : (
-            <span 
-              onClick={() => onLoadSession(s.id)} 
+            <span
+              onClick={() => onLoadSession(s.id)}
               className={`inline-flex items-center gap-1.5 w-full ${isActive ? "text-white" : ""}`}
             >
               <ChatIcon className="w-3.5 h-3.5 text-gray-500 shrink-0" />
@@ -192,31 +208,77 @@ export default function Sidebar({
           )}
         </div>
 
-        <div className="flex items-center shrink-0">
-          <button
-            onClick={(e) => handleTogglePin(e, s.id)}
-            aria-label={isPinned ? "Unpin chat" : "Pin chat"}
-            className={`relative group/pin px-1 py-2 transition text-xs ${
-              isPinned ? "text-purple-400 opacity-100" : "text-gray-500 opacity-0 group-hover:opacity-100 hover:text-gray-300"
+        <button
+          onClick={(e) => handleTogglePin(e, s.id)}
+          aria-label={isPinned ? "Unpin chat" : "Pin chat"}
+          className={`relative group/pin px-1 py-2 transition text-xs ${isPinned ? "text-purple-400 opacity-100" : "text-gray-500 opacity-0 group-hover:opacity-100 hover:text-gray-300"
             }`}
-          >
-            <PinIcon className="w-3.5 h-3.5 shrink-0" filled={isPinned} />
-            <span className="hidden md:block absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-gray-800 border border-gray-700 text-gray-300 text-[10px] rounded opacity-0 group-hover/pin:opacity-100 pointer-events-none whitespace-nowrap z-50 transition-opacity">
-              {isPinned ? "Unpin chat" : "Pin chat"}
-            </span>
-          </button>
+        >
+          <PinIcon className="w-3.5 h-3.5 shrink-0" filled={isPinned} />
+          <span className="hidden md:block absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-gray-800 border border-gray-700 text-gray-300 text-[10px] rounded opacity-0 group-hover/pin:opacity-100 pointer-events-none whitespace-nowrap z-50 transition-opacity">
+            {isPinned ? "Unpin chat" : "Pin chat"}
+          </span>
+        </button>
 
-          <button
-            onClick={() => setDeleteConfirm({ sessionId: s.id, sessionName: s.title })}
-            aria-label="Delete chat"
-            className="relative group/del opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 px-1.5 py-2 transition text-sm font-medium shrink-0"
-          >
-            ×
-            <span className="hidden md:block absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-gray-800 border border-gray-700 text-gray-300 text-[10px] rounded opacity-0 group-hover/del:opacity-100 pointer-events-none whitespace-nowrap z-50 transition-opacity">
-              Delete
-            </span>
-          </button>
+        <button
+          onClick={() => setDeleteConfirm({ sessionId: s.id, sessionName: s.title })}
+          aria-label="Delete chat"
+          className="relative group/del opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 px-1.5 py-2 transition text-sm font-medium shrink-0"
+        >
+          ×
+          <span className="hidden md:block absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-gray-800 border border-gray-700 text-gray-300 text-[10px] rounded opacity-0 group-hover/del:opacity-100 pointer-events-none whitespace-nowrap z-50 transition-opacity">
+            Delete
+          </span>
+        </button>
+
+
+        {deleteConfirm && deleteConfirm.sessionId === s.id && (
+          <DeleteConfirmDialog
+            sessionName={deleteConfirm.sessionName}
+            onConfirm={() => {
+              onDeleteSession(deleteConfirm.sessionId);
+              setDeleteConfirm(null);
+            }}
+            onClose={() => setDeleteConfirm(null)}
+          />
+        )}
+      </div>
+    );
+  };
+
+  const renderArchivedSessionRow = (s) => {
+    return (
+      <div
+        key={s.id}
+        className="relative group flex items-center justify-between rounded-lg mb-0.5 transition pl-1 pr-1 hover:bg-gray-800"
+      >
+        <div className="flex-1 min-w-0 text-left text-xs pl-3 pr-1 py-2 truncate text-gray-500 group-hover:text-gray-400">
+          {highlightText(s.title || "Archived Chat", search)}
         </div>
+        <button
+          onClick={(e) => handleRestore(e, s.id)}
+          title="Restore session"
+          className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-purple-400 px-1.5 py-2 transition text-xs shrink-0"
+        >
+          <RestoreIcon className="w-3.5 h-3.5" />
+        </button>
+        <button
+          onClick={() => setDeleteConfirm({ sessionId: s.id, sessionName: s.title })}
+          className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 px-1.5 py-2 transition text-xs shrink-0"
+        >
+          ×
+        </button>
+        {deleteConfirm && deleteConfirm.sessionId === s.id && (
+
+          <DeleteConfirmDialog
+            sessionName={deleteConfirm.sessionName}
+            onConfirm={() => {
+              onDeleteSession(deleteConfirm.sessionId);
+              setDeleteConfirm(null);
+            }}
+            onClose={() => setDeleteConfirm(null)}
+          />
+        )}
       </div>
     );
   };
@@ -354,6 +416,26 @@ export default function Sidebar({
             )}
             {unpinnedSessions.map((s) => renderSessionRow(s))}
           </div>
+
+
+          {/* Render Archived Items Block */}
+          {archivedSessions.length > 0 && (
+            <div className="mt-4">
+              <button
+                onClick={() => setShowArchived(!showArchived)}
+                className="w-full flex items-center justify-between text-[10px] font-semibold text-gray-500 uppercase tracking-wider px-2 mb-1.5 hover:text-gray-300 transition"
+              >
+                <span>Archived</span>
+                <ChevronDownIcon className={`w-3.5 h-3.5 transition-transform ${showArchived ? "rotate-180" : ""}`} />
+              </button>
+              {showArchived && (
+                <div>
+                  {archivedSessions.map(renderArchivedSessionRow)}
+                </div>
+              )}
+            </div>
+          )}
+
         </div>
 
         {/* Local Security and Source Attributions Footer */}
@@ -391,21 +473,61 @@ export default function Sidebar({
           onClose={() => setDeleteConfirm(null)}
         />
       )}
-
       {/* Context Menu Utilities portals */}
       {contextMenu && (
         <div
           style={{ top: contextMenu.y, left: contextMenu.x }}
-          className="fixed bg-gray-800 border border-gray-700 text-gray-200 text-xs rounded-lg shadow-xl py-1 z-50 min-w-[140px]"
+
+
+          className="fixed bg-gray-800 border border-gray-700 text-gray-200 text-xs rounded-lg shadow-xl py-1 z-50 min-w-[160px] flex flex-col gap-1"
+          onClick={(e) => e.stopPropagation()}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
         >
+          {/* Color Picker Row */}
+          <div className="flex gap-1.5 px-3 py-1.5 justify-center">
+            {PALETTE.map((color) => (
+              <button
+                key={color.name}
+                onClick={() => {
+                  onUpdateSessionColor(contextMenu.sessionId, color.hex);
+                  setContextMenu(null);
+                }}
+                title={color.name}
+                className="w-4 h-4 rounded-full border border-gray-600 hover:scale-110 active:scale-95 transition"
+                style={{ backgroundColor: color.hex }}
+              />
+            ))}
+          </div>
+
+          <div className="h-px bg-gray-700 my-0.5" />
+
+          {/* Pin/Unpin Action */}
+
           <button
             onClick={(e) => {
               handleTogglePin(e, contextMenu.sessionId);
               setContextMenu(null);
             }}
-            className="w-full text-left px-3 py-2 hover:bg-gray-700 transition"
+
+            className="w-full text-left px-3 py-2 hover:bg-gray-700 transition flex items-center gap-2"
           >
-            {pinnedIds.includes(contextMenu.sessionId) ? "📍 Unpin Conversation" : "📌 Pin Conversation"}
+            <PinIcon className="w-3.5 h-3.5 shrink-0" filled={pinnedIds.includes(contextMenu.sessionId)} />
+            <span>{pinnedIds.includes(contextMenu.sessionId) ? "Unpin Conversation" : "Pin Conversation"}</span>
+          </button>
+
+          {/* Archive Action */}
+          <button
+            onClick={() => {
+              handleArchive(contextMenu.sessionId);
+            }}
+            className="w-full text-left px-3 py-2 hover:bg-gray-700 text-gray-300 hover:text-white transition flex items-center gap-2"
+          >
+            <ArchiveIcon className="w-3.5 h-3.5 shrink-0" />
+            <span>Archive Conversation</span>
+
           </button>
         </div>
       )}
