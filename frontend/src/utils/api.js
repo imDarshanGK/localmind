@@ -1,11 +1,20 @@
 const BASE = (import.meta.env.VITE_API_BASE_URL || "/api").replace(/\/$/, "");
 
+// Helper utility to generate or append consistent headers with tracking IDs
+function getTrackingHeaders(customHeaders = {}) {
+  return {
+    "X-Correlation-ID": crypto.randomUUID(), // Generates a unique track string millisecond request fires
+    ...customHeaders,
+  };
+}
+
 async function req(path, opts = {}) {
   const { signal, ...restOpts } = opts; // Separate signal from rest of parameters
   const res = await fetch(`${BASE}${path}`, {
-    headers: { "Content-Type": "application/json", ...opts.headers },
-    signal, // <--- Attaches the AbortController listener to normal HTTP requests
     ...restOpts,
+    // FIXED: Now properly calls getTrackingHeaders to inject the tracking UUID token!
+    headers: getTrackingHeaders({ "Content-Type": "application/json", ...opts.headers }),
+    signal, // <--- Attaches the AbortController listener to normal HTTP requests
   });
 
   const limit = res.headers.get("X-RateLimit-Limit");
@@ -55,10 +64,15 @@ export const deletePromptTemplate    = (id)   => req(`/prompt-templates/${id}`, 
 export async function uploadDocument(file, session_id) {
   const fd = new FormData();
   fd.append("file", file); fd.append("session_id", session_id);
-  const res = await fetch(`${BASE}/upload/`, { method: "POST", body: fd });
-  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || "Upload failed"); }
+  const res = await fetch(`${BASE}/upload/`, { 
+    method: "POST", 
+    body: fd,
+    headers: getTrackingHeaders() // Appends tracking token alongside the raw file payload form data
+  });
+  if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e.detail||"Upload failed"); }
   return res.json();
 }
+
 // Message Reactions API Toggle
 export const toggleMessageReaction = (messageId, emoji) => 
   req("/chat/messages/toggle-reaction", { 
@@ -70,7 +84,7 @@ export const toggleMessageReaction = (messageId, emoji) =>
 export function streamMessage(body, onToken, onDone, signal) {
   return fetch(`${BASE}/chat/stream`, {
     method: "POST", 
-    headers: { "Content-Type": "application/json" },
+    headers: getTrackingHeaders({ "Content-Type": "application/json" }), // Attaches token to chat stream
     body: JSON.stringify(body),
     signal // <--- Attaches the cancel token listener directly to your chunk stream reader
   }).then(res => {
@@ -81,39 +95,36 @@ export function streamMessage(body, onToken, onDone, signal) {
       window.dispatchEvent(new CustomEvent("ratelimit-update", { detail: { limit, remaining } }));
     }
 
-    const reader = res.body.getReader(); const decoder = new TextDecoder();
+    if (!res.ok) {
+      throw new Error(`Stream request failed with status ${res.status}`);
+    }
+
+    const reader = res.body.getReader(); 
+    const decoder = new TextDecoder();
+    
     function pump() {
       return reader.read().then(({ done, value }) => {
         if (done) return;
-        decoder.decode(value).split("\n").forEach(line => {
+        
+        const text = decoder.decode(value, { stream: true });
+        text.split("\n").forEach(line => {
           if (line.startsWith("data: ")) {
-            try { const d = JSON.parse(line.slice(6)); if (d.token) onToken(d.token); if (d.done) onDone(d.sources || [], d.benchmarks || null); } catch { }
-          }
-          
-          const text = decoder.decode(value, { stream: true });
-          text.split("\n").forEach(line => {
-            if (line.startsWith("data: ")) {
-              try {
-                const d = JSON.parse(line.slice(6));
-                if (d.token) {
-                  accumulatedText += d.token;
-                  onToken(d.token);
-                }
-                if (d.done) {
-                  doneReceived = true;
-                  sourcesList = d.sources || [];
-                  onDone({
-                    message_id: d.message_id,
-                    sources: sourcesList,
-                    benchmarks: d.benchmarks || null
-                  });
-                }
-              } catch (e) {
-                // Ignore parse errors
+            try { 
+              const d = JSON.parse(line.slice(6)); 
+              if (d.token) {
+                onToken(d.token);
               }
+              if (d.done) {
+                onDone({
+                  message_id: d.message_id,
+                  sources: d.sources || [],
+                  benchmarks: d.benchmarks || null
+                });
+              }
+            } catch (e) { 
+              // Ignore partial chunk parse errors
             }
-          });
-          return pump();
+          }
         });
         return pump();
       });
@@ -121,3 +132,9 @@ export function streamMessage(body, onToken, onDone, signal) {
     return pump();
   });
 }
+
+export const createShareLink = (sessionId) => 
+  req(`/chat/share/${sessionId}`, { method: "POST" });
+
+export const getSharedSnapshot = (shareId) => 
+  req(`/chat/share/${shareId}`);

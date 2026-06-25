@@ -295,6 +295,53 @@ localmind/
 | Code Runner | Run Python snippets in a sandbox |
 | Translator | Language detection + translation via LocalMind |
 
+## 📤 Bulk Session Export API
+
+Export multiple chat sessions in a single payload.
+
+**Endpoint:** `POST /api/export/sessions`
+
+**Request Headers:** `Content-Type: application/json`
+
+**Request Body:**
+```json
+{
+  "session_ids": ["sess_1", "sess_2"],
+  "format": "json"
+}
+```
+
+**Response (JSON format):**
+```json
+{
+  "exported_at": "2026-06-24 19:30",
+  "sessions": [
+    {
+      "session": {
+        "id": "sess_1",
+        "title": "LocalMind Chat",
+        "model": "llama3",
+        "language": "en",
+        "message_count": 2,
+        "created_at": "2026-06-24 19:00:00",
+        "updated_at": "2026-06-24 19:05:00"
+      },
+      "messages": [
+        {
+          "id": 1,
+          "role": "user",
+          "content": "Hello",
+          "sources": [],
+          "created_at": "2026-06-24 19:00:05",
+          "benchmarks": {}
+        }
+      ]
+    }
+  ]
+}
+```
+Supported formats: `json`, `markdown`, `txt`.
+
 ---
 
 ## Running Tests
