@@ -52,10 +52,9 @@ export default function App() {
       bootstrap();
     }
   }, [isSharedPath]);
+
   // --- FEATURE REFERENCE: TRACK ACTIVE REQUEST ABORT SIGNAL ---
   const abortControllerRef = useRef(null);
-
-  useEffect(() => { bootstrap(); }, []);
 
   // --- Global Keyboard Shortcuts ---
   useEffect(() => {
@@ -129,12 +128,10 @@ export default function App() {
     setStreaming(false);
     setLoading(false);
 
-    // Call backend to actually stop the ongoing generation task
     if (sessionId) {
       api.cancelStream(sessionId).catch(e => console.error("Cancel stream error:", e));
     }
 
-    // Clean up the trailing 'typing' state bubble indicators in the messages layout array
     setMessages(prev =>
       prev.map(m => m.streaming ? { ...m, streaming: false, content: m.content + "\n\n[Generation Stopped]" } : m)
     );
@@ -150,7 +147,6 @@ export default function App() {
       setSessionId(activeSid);
     }
     
-    // Temporary ID for rendering while waiting
     const tempUserId = Date.now();
     const userMsg = { role: "user", content: text, id: tempUserId };
     setMessages(prev => [...prev, userMsg]);
@@ -169,7 +165,6 @@ export default function App() {
           async (resData) => {
             try {
               const freshRes = await api.getMessages(activeSid);
-              // Extract from the new .messages dictionary array key wrapper safely
               const freshMessages = freshRes.messages || freshRes || [];
               setMessages(freshMessages.map(m => ({ ...m, id: m.id })));
             } catch {
@@ -194,7 +189,6 @@ export default function App() {
           { message: text, session_id: activeSid, model, use_documents: documents.length > 0, language },
           controller.signal
         );
-        // Fetch fresh rows with verified primary keys for standard chat too
         const freshRes = await api.getMessages(activeSid);
         const freshMessages = freshRes.messages || freshRes || [];
         setMessages(freshMessages.map(m => ({ ...m, id: m.id })));
@@ -223,7 +217,6 @@ export default function App() {
     refreshSessions();
   }
 
-
   async function loadSession(sid) {
     setSessionId(sid);
     setPanel(null);
@@ -237,7 +230,6 @@ export default function App() {
       setMessages(freshMessages.map(m => ({ ...m, id: m.id })));
       setDocuments(docRes.documents || []);
 
-      // Use freshly fetched sessions to avoid stale closure bug
       const sess = (freshSessions || []).find(s => s.id === sid);
       if (sess) {
         setLanguage(sess.language || settings.default_language || "en");
@@ -245,7 +237,6 @@ export default function App() {
       }
     } catch { }
   }
-
 
   async function handleDeleteMessage(messageId) {
     setMessages(prev => prev.filter(m => m.id !== messageId));
@@ -257,7 +248,6 @@ export default function App() {
 
   // --- Issue #261: Updated Non-Blocking Delete Flow handler ---
   async function handleDeleteSession(sid) {
-    // If a previous delete is pending, commit it immediately before processing the new one
     if (deleteTimeoutRef.current) {
       clearTimeout(deleteTimeoutRef.current);
       if (deletedSessionCache) {
@@ -270,7 +260,6 @@ export default function App() {
 
     const sessionToBackup = sessions[targetIndex];
 
-    // Cache it locally so we can restore later if requested
     setDeletedSessionCache({
       id: sid,
       title: sessionToBackup.title,
@@ -278,7 +267,6 @@ export default function App() {
       sessionObj: sessionToBackup
     });
 
-    // Optimistically update the layout arrays immediately for UI snappiness
     const filteredSessions = sessions.filter(s => s.id !== sid);
     setSessions(filteredSessions);
 
@@ -294,7 +282,6 @@ export default function App() {
 
     setShowUndoToast(true);
 
-    // Set a 5-second countdown timer before hitting the persistence database
     deleteTimeoutRef.current = setTimeout(async () => {
       try {
         await api.deleteSession(sid);
@@ -312,24 +299,20 @@ export default function App() {
   const handleUndoDelete = () => {
     if (!deletedSessionCache) return;
 
-    // Clear the database execution timer block
     if (deleteTimeoutRef.current) {
       clearTimeout(deleteTimeoutRef.current);
       deleteTimeoutRef.current = null;
     }
 
-    // Re-insert the item back into its exact historical position in the state loop
     setSessions(prev => {
       const updated = [...prev];
       updated.splice(deletedSessionCache.index, 0, deletedSessionCache.sessionObj);
       return updated;
     });
 
-    // Fall back to making the restored session the active window panel view
     setSessionId(deletedSessionCache.id);
     loadSession(deletedSessionCache.id);
 
-    // Wipe layout toast triggers clean
     setShowUndoToast(false);
     setDeletedSessionCache(null);
   };
@@ -344,15 +327,6 @@ export default function App() {
     }
   }
 
-  // Issue #226 sync hook handler
-  async function handleRenameSession(sid, newTitle) {
-    try {
-      await api.updateSession(sid, { title: newTitle });
-      refreshSessions();
-    } catch (e) {
-      console.error("Failed to rename session:", e);
-    }
-  }
   async function handleClearAllSessions() {
     try {
       await api.clearAllSessions();
@@ -373,6 +347,7 @@ export default function App() {
   if (isSharedPath) {
     return <SharedView />;
   }
+
   const handleLanguageChange = useCallback(async (newLang) => {
     setLanguage(newLang);
     if (sessionId) {
@@ -398,7 +373,7 @@ export default function App() {
         onNewChat={newChat}
         onLoadSession={loadSession}
         onDeleteSession={handleDeleteSession}
-        onRenameSession={handleRenameSession} // Passed down prop successfully
+        onRenameSession={handleRenameSession}
         onClearAllSessions={handleClearAllSessions}
         model={model}
         models={models}
@@ -441,38 +416,35 @@ export default function App() {
           />
         )}
 
-        <ChatWindow
-          messages={messages}
-          loading={loading || streaming}
-          onSend={sendMessage}
-          sessionId={sessionId}
-        />
-
-        {/* --- Issue #261: Dynamic Absolute Positioned Undo Toast Element --- */}
-        {showUndoToast && deletedSessionCache && (
-          <div className="fixed bottom-5 right-5 z-50 flex items-center justify-between gap-4 bg-gray-900 border border-purple-500/40 text-gray-200 text-xs rounded-xl shadow-2xl px-4 py-3 animate-fade-in min-w-[240px]">
-            <p className="truncate max-w-[160px]">
-              Deleted <span className="text-purple-400 font-medium">"{deletedSessionCache.title}"</span>
-            </p>
-            <button
-              onClick={handleUndoDelete}
-              className="text-purple-400 hover:text-purple-300 font-semibold underline underline-offset-2 transition active:scale-95 shrink-0"
-            >
-              Undo
-            </button>
-          </div>
         {view === "prompts" ? (
           <PromptRegistryPage onBack={() => setView("chat")} />
         ) : (
-          <ChatWindow
-            messages={messages}
-            loading={loading || streaming}
-            onSend={sendMessage}
-            onDeleteMessage={handleDeleteMessage}
-            onStop={stopGeneration}
-            sessionId={sessionId}
-            minimalMode={minimalMode}
-          />
+          <>
+            <ChatWindow
+              messages={messages}
+              loading={loading || streaming}
+              onSend={sendMessage}
+              onDeleteMessage={handleDeleteMessage}
+              onStop={stopGeneration}
+              sessionId={sessionId}
+              minimalMode={minimalMode}
+            />
+
+            {/* --- Issue #261: Dynamic Absolute Positioned Undo Toast Element --- */}
+            {showUndoToast && deletedSessionCache && (
+              <div className="fixed bottom-5 right-5 z-50 flex items-center justify-between gap-4 bg-gray-900 border border-purple-500/40 text-gray-200 text-xs rounded-xl shadow-2xl px-4 py-3 animate-fade-in min-w-[240px]">
+                <p className="truncate max-w-[160px]">
+                  Deleted <span className="text-purple-400 font-medium">"{deletedSessionCache.title}"</span>
+                </p>
+                <button
+                  onClick={handleUndoDelete}
+                  className="text-purple-400 hover:text-purple-300 font-semibold underline underline-offset-2 transition active:scale-95 shrink-0"
+                >
+                  Undo
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
