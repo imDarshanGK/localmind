@@ -6,6 +6,7 @@ import UploadPanel from "./components/UploadPanel";
 import PluginsPanel from "./components/PluginsPanel";
 import SettingsPanel from "./components/SettingsPanel";
 import StatusBar from "./components/StatusBar";
+import TroubleshootingPage from "./components/TroubleshootingPage"; 
 import * as api from "./utils/api";
 
 export default function App() {
@@ -18,6 +19,7 @@ export default function App() {
   const [loading,    setLoading]    = useState(false);
   const [streaming,  setStreaming]  = useState(false);
   const [panel,      setPanel]      = useState(null); // "upload"|"plugins"|"settings"|null
+  const [view,       setView]       = useState("chat"); // "chat"|"troubleshoot" state initialized
   const [language,   setLanguage]   = useState("en");
   const [ollamaOk,   setOllamaOk]   = useState(null);
   const [settings,   setSettings]   = useState({});
@@ -82,19 +84,27 @@ export default function App() {
     }
   }
 
+  // --- Issue #95: Always bind explicitly using the created Session context payload token ---
   async function newChat() {
-    const sid = uuidv4();
-    await api.createSession({ title: "New Chat", model });
-    setSessionId(sid);
-    setMessages([]);
-    setDocuments([]);
-    setPanel(null);
-    refreshSessions();
+    try {
+      const data = await api.createSession({ title: "New Chat", model });
+      // Use the actual ID returned from database creation records
+      const activeId = data.id || data.session_id;
+      setSessionId(activeId);
+      setMessages([]);
+      setDocuments([]);
+      setPanel(null);
+      setView("chat"); 
+      refreshSessions();
+    } catch (err) {
+      console.error("Failed to establish new clean session architecture:", err);
+    }
   }
 
   async function loadSession(sid) {
     setSessionId(sid);
     setPanel(null);
+    setView("chat"); 
     try {
       const [msgRes, docRes] = await Promise.all([api.getMessages(sid), api.getDocuments(sid)]);
       setMessages((msgRes.messages || []).map((m, i) => ({ ...m, id: i })));
@@ -104,7 +114,17 @@ export default function App() {
 
   async function handleDeleteSession(sid) {
     await api.deleteSession(sid);
-    if (sid === sessionId) { setSessionId(uuidv4()); setMessages([]); setDocuments([]); }
+    if (sid === sessionId) { 
+      try {
+        const data = await api.createSession({ title: "New Chat", model });
+        const activeId = data.id || data.session_id;
+        setSessionId(activeId);
+        setMessages([]);
+        setDocuments([]);
+      } catch {
+        setSessionId(uuidv4());
+      }
+    }
     refreshSessions();
   }
 
@@ -139,6 +159,7 @@ export default function App() {
           onClear={handleClearChat}
           useStream={useStream}
           onToggleStream={() => setUseStream(p => !p)}
+          onTroubleshoot={() => { setView("troubleshoot"); setPanel(null); }} 
         />
 
         {panel === "upload" && (
@@ -160,12 +181,16 @@ export default function App() {
           />
         )}
 
-        <ChatWindow
-          messages={messages}
-          loading={loading || streaming}
-          onSend={sendMessage}
-          sessionId={sessionId}
-        />
+        {view === "troubleshoot" ? (
+          <TroubleshootingPage onBack={() => setView("chat")} />
+        ) : (
+          <ChatWindow
+            messages={messages}
+            loading={loading || streaming}
+            onSend={sendMessage}
+            sessionId={sessionId}
+          />
+        )}
       </div>
     </div>
   );
