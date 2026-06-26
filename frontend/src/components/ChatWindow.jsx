@@ -165,7 +165,6 @@ export default function ChatWindow({ messages, loading, onSend, onDeleteMessage,
     setTimeout(() => textareaRef.current?.focus(), 0);
   }
 
-  type: unallocated_context
   function send() {
     if ((!input.trim() && !selectedTemplate) || loading) return;
 
