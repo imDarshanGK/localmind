@@ -1,6 +1,17 @@
 import { AppLogoIcon, BatchIcon, DocumentsIcon, LightningIcon, OfflineIcon, OnlineIcon, PlugIcon, SettingsIcon, TrashIcon } from "./Icons";
 
-export default function StatusBar({ ollamaOk, model, docCount, onUpload, onPlugins, onSettings, onClear, useStream, onToggleStream }) {
+export default function StatusBar({ 
+  ollamaOk, 
+  model, 
+  docCount, 
+  onUpload, 
+  onPlugins, 
+  onSettings, 
+  onClear, 
+  useStream, 
+  onToggleStream,
+  onTroubleshoot // Added the navigation callback prop here
+}) {
   return (
     <header className="flex items-center justify-between px-5 py-2.5 border-b border-gray-800 bg-gray-900 shrink-0">
       <div className="flex items-center gap-3">
@@ -18,6 +29,15 @@ export default function StatusBar({ ollamaOk, model, docCount, onUpload, onPlugi
         <Btn onClick={onPlugins}  icon={<PlugIcon className="w-3.5 h-3.5" />} label="Plugins"  />
         <Btn onClick={onClear}    icon={<TrashIcon className="w-3.5 h-3.5" />} label="Clear"    />
         <Btn onClick={onSettings} icon={<SettingsIcon className="w-3.5 h-3.5" />} label="Settings" />
+        
+        {/* --- Issue #321: Troubleshooting Button Action --- */}
+        <button
+          onClick={onTroubleshoot}
+          className="text-xs border border-gray-700 text-gray-400 hover:bg-gray-800 hover:text-gray-200 px-3 py-1.5 rounded-lg transition font-medium inline-flex items-center gap-1.5"
+          title="Open Troubleshooting System Guide"
+        >
+          ❓ Help
+        </button>
       </div>
     </header>
   );
