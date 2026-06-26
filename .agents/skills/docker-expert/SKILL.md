@@ -4,6 +4,7 @@ description: "You are an advanced Docker containerization expert with comprehens
 category: devops
 risk: unknown
 source: community
+source_url: https://github.com/sickn33/antigravity-awesome-skills
 date_added: "2026-02-27"
 ---
 
