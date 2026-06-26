@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { AppLogoIcon, ChatIcon, LockIcon, StarIcon, PinIcon } from "./Icons";
-import { PALETTE } from "../utils/colorHelper";
+import { getSessionColor } from "../utils/colorHelper";
 import { highlightText } from "../utils/search";
 import { getPinnedSessions, toggleSessionPin } from "../utils/pinHelper";
 import DeleteConfirmDialog from "./DeleteConfirmDialog";
@@ -30,6 +30,7 @@ export default function Sidebar({
   language,
   onLanguageChange,
   onUpdateSessionColor,
+  onRenameSession, // Keeps your rename functionality intact
 }) {
   const [search, setSearch] = useState("");
   const [isOpen, setIsOpen] = useState(false); // Mobile drawer toggle state
@@ -38,50 +39,30 @@ export default function Sidebar({
   const [pinnedIds, setPinnedIds] = useState(() => getPinnedSessions());
   const [deleteConfirm, setDeleteConfirm] = useState(null);
 
-  const [isResizing, setIsResizing] = useState(false);
-  const [width, setWidth] = useState(() => {
-    const saved = localStorage.getItem("sidebarWidth");
-    let w = saved !== null && !isNaN(parseInt(saved, 10)) ? parseInt(saved, 10) : 280;
-    if (w < 10) w = 10;
-    if (w > window.innerWidth - 10) w = window.innerWidth - 10;
-    return w;
-  });
+  // Issue #226 states for inline editing
+  const [editingId, setEditingId] = useState(null);
+  const [editTitle, setEditTitle] = useState("");
+  const inputRef = useRef(null);
 
+  // Auto-focus mechanic: triggers the exact millisecond the input mounts
   useEffect(() => {
-    if (!isResizing) return;
-
-    const handleMouseMove = (e) => {
-      let newWidth = e.clientX;
-      if (newWidth < 10) newWidth = 10;
-      if (newWidth > window.innerWidth - 10) newWidth = window.innerWidth - 10;
-      setWidth(newWidth);
-    };
-
-    const handleMouseUp = () => {
-      setIsResizing(false);
-    };
-
-    document.addEventListener("mousemove", handleMouseMove);
-    document.addEventListener("mouseup", handleMouseUp);
-    document.body.style.userSelect = "none";
-
-    return () => {
-      document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseup", handleMouseUp);
-      document.body.style.userSelect = "";
-    };
-  }, [isResizing]);
-
-  useEffect(() => {
-    if (!isResizing) {
-      localStorage.setItem("sidebarWidth", width);
+    if (editingId && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select(); // Highlight existing text for quick typing
     }
-  }, [isResizing, width]);
+  }, [editingId]);
 
   const modelList = models.length > 0 ? models.map((m) => m.name) : ["llama3", "mistral", "phi3", "gemma2"];
   const filtered = sessions.filter((s) => s.title?.toLowerCase().includes(search.toLowerCase()));
   const pinnedSessions = filtered.filter((s) => pinnedIds.includes(s.id));
   const unpinnedSessions = filtered.filter((s) => !pinnedIds.includes(s.id));
+
+  const handleSaveRename = (id) => {
+    if (editTitle.trim() && onRenameSession) {
+      onRenameSession(id, editTitle.trim());
+    }
+    setEditingId(null);
+  };
 
   const handleTogglePin = (e, sessionId) => {
     e.stopPropagation();
@@ -126,60 +107,76 @@ export default function Sidebar({
           className={`absolute left-1 top-1/2 -translate-y-1/2 w-1 h-1 rounded-full bg-purple-400 transition-opacity duration-300
             ${isActive ? "opacity-100 animate-pulse" : "opacity-0"}`}
         />
-        <button
-          onClick={() => onLoadSession(s.id)}
-          className="flex-1 min-w-0 text-left text-xs pl-5 pr-1 py-2 text-gray-400 group-hover:text-gray-200"
+        
+        {/* Issue #96 & #226: Interactive element boundary area wrapper */}
+        <div 
+          onDoubleClick={() => {
+            setEditingId(s.id);
+            setEditTitle(s.title || "New Chat");
+          }}
+          className="flex-1 min-w-0 text-left text-xs pl-5 pr-1 py-2 text-gray-400 group-hover:text-gray-200 cursor-pointer"
         >
-          <span className={`inline-flex items-center gap-1.5 w-full ${isActive ? "text-white" : ""}`}>
-            <ChatIcon className="w-3.5 h-3.5 text-gray-500 shrink-0" />
-            <span
-              className="w-1.5 h-1.5 rounded-full shrink-0"
-              style={{ backgroundColor: s.color }}
-              aria-label="Tag color"
+          {editingId === s.id ? (
+            <input
+              ref={inputRef}
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              onBlur={() => handleSaveRename(s.id)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleSaveRename(s.id);
+                if (e.key === "Escape") setEditingId(null);
+              }}
+              className="w-full bg-gray-800 border border-purple-500 text-white rounded px-1 outline-none text-xs"
+              onClick={(e) => e.stopPropagation()}
             />
-            <span className="truncate flex-1">{highlightText(s.title || "New Chat", search)}</span>
-            {s.message_count > 0 && (
-              <span className="ml-1 text-gray-500 text-[10px] bg-gray-800/60 px-1.5 py-0.5 rounded-full shrink-0">
-                {s.message_count}
+          ) : (
+            <span 
+              onClick={() => onLoadSession(s.id)} 
+              className={`inline-flex items-center gap-1.5 w-full ${isActive ? "text-white" : ""}`}
+            >
+              <ChatIcon className="w-3.5 h-3.5 text-gray-500 shrink-0" />
+              <span
+                className="w-1.5 h-1.5 rounded-full shrink-0"
+                style={{ backgroundColor: s.color || getSessionColor(s.id) }}
+                aria-label="Tag color"
+              />
+              <span className="truncate flex-1" title="Double click to rename">
+                {highlightText(s.title || "New Chat", search)}
               </span>
-            )}
-          </span>
-        </button>
+              {s.message_count > 0 && (
+                <span className="ml-1 text-gray-500 text-[10px] bg-gray-800/60 px-1.5 py-0.5 rounded-full shrink-0">
+                  {s.message_count}
+                </span>
+              )}
+            </span>
+          )}
+        </div>
 
-        <button
-          onClick={(e) => handleTogglePin(e, s.id)}
-          aria-label={isPinned ? "Unpin chat" : "Pin chat"}
-          className={`relative group/pin px-1 py-2 transition text-xs ${
-            isPinned ? "text-purple-400 opacity-100" : "text-gray-500 opacity-0 group-hover:opacity-100 hover:text-gray-300"
-          }`}
-        >
-          <PinIcon className="w-3.5 h-3.5 shrink-0" filled={isPinned} />
-          <span className="hidden md:block absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-gray-800 border border-gray-700 text-gray-300 text-[10px] rounded opacity-0 group-hover/pin:opacity-100 pointer-events-none whitespace-nowrap z-50 transition-opacity">
-            {isPinned ? "Unpin chat" : "Pin chat"}
-          </span>
-        </button>
+        <div className="flex items-center shrink-0">
+          <button
+            onClick={(e) => handleTogglePin(e, s.id)}
+            aria-label={isPinned ? "Unpin chat" : "Pin chat"}
+            className={`relative group/pin px-1 py-2 transition text-xs ${
+              isPinned ? "text-purple-400 opacity-100" : "text-gray-500 opacity-0 group-hover:opacity-100 hover:text-gray-300"
+            }`}
+          >
+            <PinIcon className="w-3.5 h-3.5 shrink-0" filled={isPinned} />
+            <span className="hidden md:block absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-gray-800 border border-gray-700 text-gray-300 text-[10px] rounded opacity-0 group-hover/pin:opacity-100 pointer-events-none whitespace-nowrap z-50 transition-opacity">
+              {isPinned ? "Unpin chat" : "Pin chat"}
+            </span>
+          </button>
 
-        <button
-          onClick={() => setDeleteConfirm({ sessionId: s.id, sessionName: s.title })}
-          aria-label="Delete chat"
-          className="relative group/del opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 px-1.5 py-2 transition text-sm font-medium shrink-0"
-        >
-          ×
-          <span className="hidden md:block absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-gray-800 border border-gray-700 text-gray-300 text-[10px] rounded opacity-0 group-hover/del:opacity-100 pointer-events-none whitespace-nowrap z-50 transition-opacity">
-            Delete
-          </span>
-        </button>
-
-        {deleteConfirm && (
-          <DeleteConfirmDialog
-            sessionName={deleteConfirm.sessionName}
-            onConfirm={() => {
-              onDeleteSession(deleteConfirm.sessionId);
-              setDeleteConfirm(null);
-            }}
-            onClose={() => setDeleteConfirm(null)}
-          />
-        )}
+          <button
+            onClick={() => setDeleteConfirm({ sessionId: s.id, sessionName: s.title })}
+            aria-label="Delete chat"
+            className="relative group/del opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 px-1.5 py-2 transition text-sm font-medium shrink-0"
+          >
+            ×
+            <span className="hidden md:block absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-gray-800 border border-gray-700 text-gray-300 text-[10px] rounded opacity-0 group-hover/del:opacity-100 pointer-events-none whitespace-nowrap z-50 transition-opacity">
+              Delete
+            </span>
+          </button>
+        </div>
       </div>
     );
   };
@@ -206,13 +203,13 @@ export default function Sidebar({
 
       {/* --- Responsive Sidebar Shell Container --- */}
       <div
-        style={{ width: window.innerWidth >= 768 ? width : undefined }}
         className={`
           fixed inset-y-0 left-0 z-40 transform transition-transform duration-300 ease-in-out
           md:relative md:transform-none md:translate-x-0 md:z-auto
           flex flex-col bg-gray-900 border-r border-gray-800 shrink-0
           ${isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
         `}
+        style={{ width: "260px" }}
       >
         {/* Logo Section */}
         <div className="px-4 pt-16 md:pt-5 pb-4 border-b border-gray-800">
@@ -291,8 +288,7 @@ export default function Sidebar({
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search chats..."
             className="w-full text-xs bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-gray-300 placeholder-gray-600 outline-none focus:border-purple-500"
-          >
-          </input>
+          />
         </div>
 
         {/* Chat Sessions Lists */}
@@ -336,13 +332,19 @@ export default function Sidebar({
             <span>Star on GitHub</span>
           </a>
         </div>
-
-        {/* Column Width Resize Drag Bar Handle */}
-        <div
-          onMouseDown={() => setIsResizing(true)}
-          className="hidden md:block absolute top-0 right-0 bottom-0 w-1 cursor-col-resize bg-transparent hover:bg-purple-500/40 transition-colors"
-        />
       </div>
+
+      {/* Delete Confirmation Portal Overlay */}
+      {deleteConfirm && (
+        <DeleteConfirmDialog
+          sessionName={deleteConfirm.sessionName}
+          onConfirm={() => {
+            onDeleteSession(deleteConfirm.sessionId);
+            setDeleteConfirm(null);
+          }}
+          onClose={() => setDeleteConfirm(null)}
+        />
+      )}
 
       {/* Context Menu Utilities portals */}
       {contextMenu && (
