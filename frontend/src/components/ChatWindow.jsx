@@ -7,7 +7,13 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
   const bottomRef = useRef(null);
   const textareaRef = useRef(null);
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
+  // --- Issue #267: Smarter Auto-Scroll Pause Routine ---
+  useEffect(() => {
+    const hasSelection = window.getSelection()?.toString();
+    if (!hasSelection) {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages]);
 
   function send() {
     if (!input.trim() || loading) return;
@@ -50,7 +56,7 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5">
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center gap-4">
-              <AppLogoIcon className="w-14 h-14 text-purple-400 opacity-70" />
+            <AppLogoIcon className="w-14 h-14 text-purple-400 opacity-70" />
             <div>
               <p className="text-xl font-semibold text-gray-200 mb-1">LocalMind is ready</p>
               <p className="text-sm text-gray-500">100% private · runs offline · no cloud</p>
