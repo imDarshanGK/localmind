@@ -314,6 +314,7 @@ export default function Sidebar({
             )}
             {unpinnedSessions.map((s) => renderSessionRow(s))}
           </div>
+
         </div>
 
         {/* Local Security and Source Attributions Footer */}
