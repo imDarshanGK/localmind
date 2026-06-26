@@ -29,10 +29,16 @@ async def export_session(session_id: str, fmt: ExportFormat):
         lines = [f"# {title}\n", f"*Exported: {ts} | Model: {session.get('model','?')}*\n\n---\n"]
         for m in messages:
             role_label = "**You**" if m["role"] == "user" else "**LocalMind**"
-            lines.append(f"{role_label}\n\n{m['content']}\n")
-            if m.get("sources"):
-                lines.append(f"*Sources: {', '.join(m['sources'])}*\n")
+            
+            # --- Issue #238: Keep assistant response content and sources tightly bound structurally ---
+            msg_block = f"{role_label}\n\n{m['content'].strip()}"
+            if m["role"] == "assistant" and m.get("sources"):
+                sources_str = ", ".join(m["sources"])
+                msg_block += f"\n\n*Sources: {sources_str}*"
+            
+            lines.append(msg_block + "\n")
             lines.append("\n---\n")
+            
         content   = "\n".join(lines)
         media     = "text/markdown"
         filename  = f"localmind_{session_id[:8]}.md"
@@ -41,7 +47,13 @@ async def export_session(session_id: str, fmt: ExportFormat):
         lines = [f"LocalMind Export — {title}", f"Exported: {ts}", "=" * 50, ""]
         for m in messages:
             role = "YOU" if m["role"] == "user" else "LOCALMIND"
-            lines += [f"[{role}]", m["content"], ""]
+            msg_block = f"[{role}]\n{m['content'].strip()}"
+            
+            # Keep sources together with the assistant in plain text format exports as well
+            if m["role"] == "assistant" and m.get("sources"):
+                msg_block += f"\nSources: {', '.join(m['sources'])}"
+                
+            lines += [msg_block, ""]
         content   = "\n".join(lines)
         media     = "text/plain"
         filename  = f"localmind_{session_id[:8]}.txt"

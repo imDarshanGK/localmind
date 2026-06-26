@@ -205,3 +205,38 @@ def test_export_txt():
     r2 = client.get(f"/api/export/{sid}/txt")
     assert r2.status_code == 200
     assert b"Plain text export" in r2.content
+
+# ─── Export Regression Tests (Issue #238) ────────────────
+def test_export_markdown_keeps_sources_together():
+    """Verify Markdown export groups assistant response text and sources structurally."""
+    r = client.post("/api/sessions/", json={"title": "RAG MD Export"})
+    sid = r.json()["id"]
+    
+    # Inject a mock assistant response containing linked document reference arrays
+    db.save_message(sid, "user", "What is the policy?")
+    db.save_message(sid, "assistant", "According to guidelines, it is 10 days.", ["policy_doc.pdf", "hr_guide.txt"])
+    
+    r2 = client.get(f"/api/export/{sid}/markdown")
+    assert r2.status_code == 200
+    
+    # Check that assistant response body and structural citation tags exist in content stream
+    content = r2.content.decode("utf-8")
+    assert "According to guidelines, it is 10 days." in content
+    assert "*Sources: policy_doc.pdf, hr_guide.txt*" in content
+
+
+def test_export_txt_keeps_sources_together():
+    """Verify Plain Text export groups assistant response text and sources structurally."""
+    r = client.post("/api/sessions/", json={"title": "RAG TXT Export"})
+    sid = r.json()["id"]
+    
+    db.save_message(sid, "user", "What is the policy?")
+    db.save_message(sid, "assistant", "According to guidelines, it is 10 days.", ["policy_doc.pdf"])
+    
+    r2 = client.get(f"/api/export/{sid}/txt")
+    assert r2.status_code == 200
+    
+    content = r2.content.decode("utf-8")
+    assert "[LOCALMIND]" in content
+    assert "According to guidelines, it is 10 days." in content
+    assert "Sources: policy_doc.pdf" in content
