@@ -29,6 +29,9 @@ export const saveSettings   = (b)    => req("/settings/", { method: "PUT", body:
 export const exportSession  = (id, fmt) => window.open(`${BASE}/export/${id}/${fmt}`, "_blank");
 export const deleteDocument = (docId) => req(`/upload/${docId}`, { method: "DELETE" });
 
+// --- Issue #265: Fetch Read-Only Plain Text Document Preview ---
+export const previewDocument = (filename, sessionId) => 
+  req(`/upload/preview?filename=${encodeURIComponent(filename)}&session_id=${encodeURIComponent(sessionId)}`);
 export async function uploadDocument(file, session_id) {
   const fd = new FormData();
   fd.append("file", file); fd.append("session_id", session_id);

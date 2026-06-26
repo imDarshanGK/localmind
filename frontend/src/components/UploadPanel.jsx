@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { uploadDocument, deleteDocument } from "../utils/api";
+import { uploadDocument, deleteDocument, previewDocument } from "../utils/api";
 import { CheckIcon, DocumentsIcon, ErrorIcon, SpinnerIcon, UploadIcon, FileIcon } from "./Icons";
 
 export default function UploadPanel({ sessionId, documents, onUploaded, onClose }) {
@@ -7,6 +7,12 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose 
   const [uploading, setUploading] = useState(false);
   const [result,    setResult]    = useState(null);
   const [error,     setError]     = useState("");
+  
+  // Preview UI local states
+  const [previewContent, setPreviewContent] = useState(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
+  const [previewFilename, setPreviewFilename] = useState("");
+
   const fileRef = useRef();
 
   async function handleFile(file) {
@@ -25,8 +31,22 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose 
     handleFile(e.dataTransfer.files[0]);
   }
 
+  async function handleTriggerPreview(filename) {
+    setLoadingPreview(true);
+    setPreviewFilename(filename);
+    try {
+      const data = await previewDocument(filename, sessionId);
+      setPreviewContent(data.content || "No textual content available to display.");
+    } catch (e) {
+      setError(e.message);
+      setPreviewContent(null);
+    } finally {
+      setLoadingPreview(false);
+    }
+  }
+
   return (
-    <div className="border-b border-gray-800 bg-gray-900 px-5 py-4 shrink-0">
+    <div className="border-b border-gray-800 bg-gray-900 px-5 py-4 shrink-0 relative">
       <div className="flex items-center justify-between mb-3">
         <p className="text-sm font-semibold text-white inline-flex items-center gap-1.5"><DocumentsIcon className="w-4 h-4" />Documents</p>
         <button onClick={onClose} className="text-gray-500 hover:text-gray-300 text-lg leading-none">×</button>
@@ -54,12 +74,55 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose 
       {documents.length > 0 && (
         <div>
           <p className="text-xs text-gray-500 mb-1">Indexed documents:</p>
-          {documents.map((d, i) => (
-            <div key={i} className="flex items-center justify-between text-xs bg-gray-800 rounded-lg px-3 py-1.5 mb-1">
-              <span className="text-gray-300 truncate inline-flex items-center gap-1"><FileIcon className="w-3.5 h-3.5" />{d.filename || d}</span>
-              {d.chunks_indexed && <span className="text-gray-500 ml-2 shrink-0">{d.chunks_indexed} chunks</span>}
+          {documents.map((d, i) => {
+            const currentFilename = d.filename || d;
+            return (
+              <div key={i} className="flex items-center justify-between text-xs bg-gray-800 rounded-lg px-3 py-1.5 mb-1 hover:bg-gray-750 transition">
+                <span className="text-gray-300 truncate inline-flex items-center gap-1 max-w-[65%]">
+                  <FileIcon className="w-3.5 h-3.5" />
+                  {currentFilename}
+                </span>
+                <div className="flex items-center gap-2 shrink-0">
+                  {d.chunks_indexed && <span className="text-gray-500">{d.chunks_indexed} chunks</span>}
+                  <button
+                    onClick={() => handleTriggerPreview(currentFilename)}
+                    className="p-1 text-gray-400 hover:text-purple-400 rounded transition"
+                    title="Preview Document Content"
+                    disabled={loadingPreview}
+                  >
+                    {loadingPreview && previewFilename === currentFilename ? (
+                      <SpinnerIcon className="w-3.5 h-3.5" />
+                    ) : (
+                      "👁️"
+                    )}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Read-Only Modal Viewport Overlay */}
+      {previewContent !== null && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-900 border border-gray-800 w-full max-w-2xl rounded-2xl max-h-[80vh] flex flex-col shadow-2xl">
+            <div className="p-4 border-b border-gray-800 flex items-center justify-between">
+              <div className="truncate pr-4">
+                <span className="text-[10px] text-purple-400 font-semibold uppercase tracking-wider block">Read-Only Preview</span>
+                <h3 className="text-sm font-medium text-white truncate">{previewFilename}</h3>
+              </div>
+              <button 
+                onClick={() => setPreviewContent(null)}
+                className="text-gray-400 hover:text-white px-2 py-1 text-sm bg-gray-800 border border-gray-700 rounded-lg transition"
+              >
+                Close
+              </button>
             </div>
-          ))}
+            <div className="p-5 overflow-y-auto flex-1 text-xs text-gray-300 font-mono whitespace-pre-wrap leading-relaxed bg-gray-950/40 selection:bg-purple-900">
+              {previewContent}
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -2,7 +2,7 @@
 
 import os
 from pathlib import Path
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Query
 from models.schemas import UploadResponse
 from services import db_service
 
@@ -60,3 +60,30 @@ async def upload(file: UploadFile = File(...), session_id: str = Form(...)):
 async def delete_document(doc_id: int):
     db_service.delete_document(doc_id)
     return {"status": "deleted", "doc_id": doc_id}
+
+
+# --- Issue #265: Fetch Read-Only Document Preview Endpoint ---
+@router.get("/preview")
+async def preview_document(filename: str = Query(...), session_id: str = Query(...)):
+    file_path = os.path.join(".", "data", "uploads", session_id, filename)
+    
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Document storage path not found.")
+        
+    ext = Path(filename).suffix.lower()
+    
+    try:
+        # If it's a standard clear-text format file layout, parse it cleanly
+        if ext in [".txt", ".md", ".csv", ".html"]:
+            with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+                content = f.read(50000) # Capped at 50k characters for UI fast loading optimization
+            return {"content": content}
+            
+        # For non-trivial binary sets (PDFs/DOCX), offer a safe notice for version 1
+        else:
+            return {
+                "content": f"[Binary Formatter Notice]\nPreviews for '{ext}' files are natively processed. Content indexed safely for Chat retrieval contexts."
+            }
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read file contents: {str(e)}")
