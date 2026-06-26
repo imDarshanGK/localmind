@@ -9,8 +9,24 @@ const LANGUAGES = [
 
 export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSession, onDeleteSession, model, models, onModelChange, language, onLanguageChange }) {
   const [search, setSearch] = useState("");
+  // --- Issue #95: Loading guard state to debounce multiple sequential clicks ---
+  const [creating, setCreating] = useState(false);
+
   const modelList = models.length > 0 ? models.map(m=>m.name) : ["llama3","mistral","phi3","gemma2"];
   const filtered  = sessions.filter(s => s.title?.toLowerCase().includes(search.toLowerCase()));
+
+  // Wraps the click execution with the async guard layout
+  async function handleCreateChat() {
+    if (creating) return;
+    setCreating(true);
+    try {
+      await onNewChat();
+    } catch (err) {
+      console.error("Failed to initialize session context:", err);
+    } finally {
+      setCreating(false);
+    }
+  }
 
   return (
     <div className="w-64 flex flex-col bg-gray-900 border-r border-gray-800 shrink-0">
@@ -23,9 +39,12 @@ export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSes
             <p className="text-xs text-gray-500">v2.0 · Offline AI</p>
           </div>
         </div>
-        <button onClick={onNewChat}
-          className="w-full text-sm bg-purple-700 hover:bg-purple-600 active:bg-purple-800 text-white py-2 rounded-xl font-medium transition">
-          + New Chat
+        <button 
+          onClick={handleCreateChat}
+          disabled={creating}
+          className="w-full text-sm bg-purple-700 hover:bg-purple-600 active:bg-purple-800 disabled:opacity-50 disabled:cursor-not-allowed text-white py-2 rounded-xl font-medium transition"
+        >
+          {creating ? "Creating..." : "+ New Chat"}
         </button>
       </div>
 
