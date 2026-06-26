@@ -8,7 +8,10 @@ const LANGUAGES = [
   { code: "ta", label: "தமிழ்" },
   { code: "te", label: "తెలుగు" },
   { code: "kn", label: "ಕನ್ನಡ" },
-  { code: "fr", label: "Français" }
+  { code: "fr", label: "Français" },
+  { code: "de", label: "Deutsch" },
+  { code: "es", label: "Español" },
+  { code: "ja", label: "日本語" },
 ];
 
 export default function SettingsPanel({ settings, onSave, onClose }) {
@@ -80,13 +83,13 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
 
       <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-xs">
         <Field label="Default Model" error={errors.default_model}>
-          <select value={form.default_model} onChange={e => set("default_model", e.target.value)} className={`sel ${errors.default_model ? "border-red-500" : ""}`}>
+          <select value={form.default_model} onChange={e => set("default_model", e.target.value)} aria-label="Default model" className={`sel focus:ring-2 focus:ring-purple-500/20 ${errors.default_model ? "border-red-500" : ""}`}>
             {MODELS.map(m => <option key={m} value={m}>{m}</option>)}
           </select>
         </Field>
 
         <Field label="Default Language" error={errors.default_language}>
-          <select value={form.default_language} onChange={e => set("default_language", e.target.value)} className={`sel ${errors.default_language ? "border-red-500" : ""}`}>
+          <select value={form.default_language} onChange={e => set("default_language", e.target.value)} aria-label="Default language" className={`sel focus:ring-2 focus:ring-purple-500/20 ${errors.default_language ? "border-red-500" : ""}`}>
             {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
           </select>
         </Field>

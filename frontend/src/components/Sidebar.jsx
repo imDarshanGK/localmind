@@ -15,6 +15,7 @@ const LANGUAGES = [
   { code: "de", label: "Deutsch" },
   { code: "es", label: "Español" },
   { code: "ar", label: "العربية" },
+  { code: "ja", label: "日本語" },
 ];
 
 export default function Sidebar({
@@ -259,7 +260,8 @@ export default function Sidebar({
           <select
             value={model}
             onChange={(e) => onModelChange(e.target.value)}
-            className="w-full text-xs bg-gray-800 text-gray-200 border border-gray-700 rounded-lg px-2 py-1.5 outline-none focus:border-purple-500"
+            aria-label="Select AI model"
+            className="w-full text-xs bg-gray-800 text-gray-200 border border-gray-700 rounded-lg px-2 py-1.5 outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20"
           >
             {modelList.map((m) => (
               <option key={m} value={m}>
@@ -271,7 +273,8 @@ export default function Sidebar({
           <select
             value={language}
             onChange={(e) => onLanguageChange(e.target.value)}
-            className="w-full text-xs bg-gray-800 text-gray-200 border border-gray-700 rounded-lg px-2 py-1.5 outline-none focus:border-purple-500"
+            aria-label="Select language"
+            className="w-full text-xs bg-gray-800 text-gray-200 border border-gray-700 rounded-lg px-2 py-1.5 outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20"
           >
             {LANGUAGES.map((l) => (
               <option key={l.code} value={l.code}>
@@ -281,13 +284,14 @@ export default function Sidebar({
           </select>
         </div>
 
-        {/* Search Bar */}
+        {/* Search */}
         <div className="px-3 py-2 border-b border-gray-800">
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search chats..."
-            className="w-full text-xs bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-gray-300 placeholder-gray-600 outline-none focus:border-purple-500"
+            aria-label="Search chat sessions"
+            className="w-full text-xs bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-gray-300 placeholder-gray-600 outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20"
           />
         </div>
 
