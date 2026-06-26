@@ -7,6 +7,7 @@ import PluginsPanel from "./components/PluginsPanel";
 import SettingsPanel from "./components/SettingsPanel";
 import PromptRegistryPage from "./components/PromptRegistryPage";
 import StatusBar from "./components/StatusBar";
+import TroubleshootingPage from "./components/TroubleshootingPage"; 
 import * as api from "./utils/api";
 import SharedView from "./components/SharedView";
 import { getSessionColor, setSessionColor } from "./utils/colorHelper";
@@ -15,13 +16,16 @@ export default function App() {
   const [sessionId,  setSessionId]  = useState(() => uuidv4());
   const [messages,    setMessages]   = useState([]);
   const [sessions,    setSessions]   = useState([]);
-  const [model,      setModel]      = useState("llama3");
-  const [models,     setModels]     = useState([]);
+  const [model,       setModel]      = useState("llama3");
+  const [models,      setModels]     = useState([]);
   const [documents,  setDocuments]  = useState([]);
   const [loading,    setLoading]    = useState(false);
   const [streaming,  setStreaming]  = useState(false);
   const [panel,      setPanel]      = useState(null); // "upload"|"plugins"|"settings"|null
-  const [view,       setView]       = useState("chat"); // "chat"|"prompts"
+  
+  // --- Issue #95: Combined distinct view routers cleanly into one declaration block ---
+  const [view,       setView]       = useState("chat"); // "chat"|"troubleshoot"|"prompts"
+  
   const [language,   setLanguage]   = useState("en");
   const [ollamaOk,   setOllamaOk]   = useState(null);
   const [settings,   setSettings]   = useState({});
@@ -66,7 +70,7 @@ export default function App() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  }, [language, model]); // Added state synchronization bindings safely
 
   // Apply the selected theme preset globally (contrast / readability).
   useEffect(() => {
@@ -204,22 +208,26 @@ export default function App() {
     }
   }
 
+  // --- Issue #95: Pass current framework language context explicitly into creation requests ---
   async function newChat() {
-    const sid = uuidv4();
     try {
-      await api.createSession({ title: "New Chat", model, language });
-    } catch { }
-
-    setSessionId(sid);
-    setMessages([]);
-    setDocuments([]);
-    setPanel(null);
-    refreshSessions();
+      const data = await api.createSession({ title: "New Chat", model, language });
+      const activeId = data.id || data.session_id;
+      setSessionId(activeId);
+      setMessages([]);
+      setDocuments([]);
+      setPanel(null);
+      setView("chat"); 
+      refreshSessions();
+    } catch (err) {
+      console.error("Failed to establish new clean session architecture:", err);
+    }
   }
 
   async function loadSession(sid) {
     setSessionId(sid);
     setPanel(null);
+    setView("chat"); 
     try {
       const [msgRes, docRes, freshSessions] = await Promise.all([
         api.getMessages(sid),
@@ -274,7 +282,13 @@ export default function App() {
       if (filteredSessions.length > 0) {
         loadSession(filteredSessions[0].id);
       } else {
-        setSessionId(uuidv4());
+        try {
+          const data = await api.createSession({ title: "New Chat", model, language });
+          const activeId = data.id || data.session_id;
+          setSessionId(activeId);
+        } catch {
+          setSessionId(uuidv4());
+        }
         setMessages([]);
         setDocuments([]);
       }
@@ -317,7 +331,6 @@ export default function App() {
     setDeletedSessionCache(null);
   };
 
-  // Issue #226 sync hook handler
   async function handleRenameSession(sid, newTitle) {
     try {
       await api.updateSession(sid, { title: newTitle });
@@ -395,6 +408,7 @@ export default function App() {
           onClear={handleClearChat}
           useStream={useStream}
           onToggleStream={() => setUseStream(p => !p)}
+          onTroubleshoot={() => { setView("troubleshoot"); setPanel(null); }} 
         />
 
         <UploadPanel
@@ -418,6 +432,8 @@ export default function App() {
 
         {view === "prompts" ? (
           <PromptRegistryPage onBack={() => setView("chat")} />
+        ) : view === "troubleshoot" ? (
+          <TroubleshootingPage onBack={() => setView("chat")} />
         ) : (
           <>
             <ChatWindow

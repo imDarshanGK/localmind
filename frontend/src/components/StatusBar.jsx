@@ -1,7 +1,19 @@
 import { useState, useEffect } from "react";
 import { AppLogoIcon, BatchIcon, DocumentsIcon, LightningIcon, OfflineIcon, OnlineIcon, PlugIcon, SettingsIcon, TemplateIcon, TrashIcon } from "./Icons";
 
-export default function StatusBar({ ollamaOk, model, docCount, onUpload, onPrompts, onPlugins, onSettings, onClear, useStream, onToggleStream }) {
+export default function StatusBar({ 
+  ollamaOk, 
+  model, 
+  docCount, 
+  onUpload, 
+  onPrompts, 
+  onPlugins, 
+  onSettings, 
+  onClear, 
+  useStream, 
+  onToggleStream,
+  onTroubleshoot // Keeps your troubleshooting navigation hook intact
+}) {
   const [rateLimit, setRateLimit] = useState(null);
 
   useEffect(() => {
@@ -35,6 +47,15 @@ export default function StatusBar({ ollamaOk, model, docCount, onUpload, onPromp
         <Btn onClick={onPlugins}  testId="btn-plugins"  icon={<PlugIcon className="w-3.5 h-3.5" />} label="Plugins"  />
         <Btn onClick={onClear}    testId="btn-clear"    icon={<TrashIcon className="w-3.5 h-3.5" />} label="Clear"    />
         <Btn onClick={onSettings} testId="btn-settings" icon={<SettingsIcon className="w-3.5 h-3.5" />} label="Settings" />
+        
+        {/* Safely appends your Troubleshooting system button to the trigger array matrix */}
+        <button
+          onClick={onTroubleshoot}
+          className="text-xs px-3 py-1.5 rounded-lg border border-gray-700 text-gray-400 hover:bg-gray-800 hover:text-gray-200 transition font-medium inline-flex items-center"
+          title="Open Troubleshooting System Guide"
+        >
+          ? Help
+        </button>
       </div>
     </header>
   );
