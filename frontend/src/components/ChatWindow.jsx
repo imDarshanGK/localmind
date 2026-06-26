@@ -15,6 +15,14 @@ export default function ChatWindow({ messages, loading, onSend, onDeleteMessage,
   const textareaRef = useRef(null);
   const plusMenuRef = useRef(null);
 
+  // --- Issue #267: Smarter Auto-Scroll Pause Routine ---
+  useEffect(() => {
+    const hasSelection = window.getSelection()?.toString();
+    if (!hasSelection) {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages]);
+
   const [localReactions, setLocalReactions] = useState({});
   const [selectedMessages, setSelectedMessages] = useState([]);
   const [exportFormat, setExportFormat] = useState("markdown");
@@ -111,10 +119,6 @@ export default function ChatWindow({ messages, loading, onSend, onDeleteMessage,
         <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
       </button>
     );
-
-  useEffect(() => { 
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" }); 
-  }, [messages]);
 
   useEffect(() => {
     const textarea = textareaRef.current;
