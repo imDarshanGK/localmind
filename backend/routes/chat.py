@@ -70,6 +70,9 @@ async def chat_stream(req: ChatRequest):
     full_reply = []
 
     async def event_stream():
+        # --- Issue #263: Local incremental tracking index layer ---
+        token_counter = 0
+        
         async for token in ollama_service.chat_stream(
             message=req.message,
             model=req.model,
@@ -79,10 +82,15 @@ async def chat_stream(req: ChatRequest):
             temperature=req.temperature,
         ):
             full_reply.append(token)
-            yield f"data: {json.dumps({'token': token})}\n\n"
+            token_counter += 1
+            
+            # Yield token back along with its active structural token index value
+            yield f"data: {json.dumps({'token': token, 'token_count': token_counter})}\n\n"
 
         complete = "".join(full_reply)
         db_service.save_message(req.session_id, "assistant", complete, sources)
-        yield f"data: {json.dumps({'done': True, 'sources': sources})}\n\n"
+        
+        # Append the final summary calculation inside the concluding done message
+        yield f"data: {json.dumps({'done': True, 'sources': sources, 'total_tokens': token_counter})}\n\n"
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")

@@ -48,7 +48,19 @@ export function streamMessage(body, onToken, onDone) {
         if (done) return;
         decoder.decode(value).split("\n").forEach(line => {
           if (line.startsWith("data: ")) {
-            try { const d = JSON.parse(line.slice(6)); if (d.token) onToken(d.token); if (d.done) onDone(d.sources||[]); } catch {}
+            try { 
+              const d = JSON.parse(line.slice(6)); 
+              
+              // # --- Issue #263: Pass live token index to token callback ---
+              if (d.token) {
+                onToken(d.token, d.token_count || 0);
+              } 
+              
+              // # --- Issue #263: Pass total summary tokens to done callback ---
+              if (d.done) {
+                onDone(d.sources || [], d.total_tokens || 0);
+              }
+            } catch {}
           }
         });
         return pump();

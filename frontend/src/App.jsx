@@ -56,14 +56,17 @@ export default function App() {
 
     if (useStream) {
       setStreaming(true);
-      const aiMsg = { role: "assistant", content: "", sources: [], id: Date.now() + 1, streaming: true };
+      // --- Issue #263: Initialize token_count tracking metric locally ---
+      const aiMsg = { role: "assistant", content: "", sources: [], token_count: 0, id: Date.now() + 1, streaming: true };
       setMessages(prev => [...prev, aiMsg]);
       try {
         await api.streamMessage(
           { message: text, session_id: sessionId, model, use_documents: documents.length > 0, language },
-          (token) => setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, content: m.content + token } : m)),
-          (sources) => {
-            setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, sources, streaming: false } : m));
+          // --- Issue #263: Map continuous chunks and incremental counts to target layout state ---
+          (token, currentCount) => setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, content: m.content + token, token_count: currentCount } : m)),
+          // --- Issue #263: Handle completion payloads with explicit total counters ---
+          (sources, totalTokens) => {
+            setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, sources, token_count: totalTokens, streaming: false } : m));
             refreshSessions();
           }
         );
