@@ -242,6 +242,7 @@ export default function App() {
       const sess = (freshSessions || []).find(s => s.id === sid);
       if (sess) {
         setLanguage(sess.language || settings.default_language || "en");
+        setModel(sess.model || settings.default_model || "llama3"); // Issue #256: restore the session's own model
         setSessions((freshSessions || []).map(s => ({ ...s, color: getSessionColor(s.id) })));
       }
     } catch { }
@@ -374,6 +375,19 @@ export default function App() {
     }
   }, [sessionId]);
 
+  // Issue #256: persist the chosen model per session so each chat keeps its own model
+  const handleModelChange = useCallback(async (newModel) => {
+    setModel(newModel);
+    if (sessionId) {
+      try {
+        await api.updateSession(sessionId, { model: newModel });
+        setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, model: newModel } : s));
+      } catch (e) {
+        console.error("Failed to update session model:", e);
+      }
+    }
+  }, [sessionId]);
+
   const handleUpdateSessionColor = useCallback((sid, color) => {
     setSessionColor(sid, color);
     setSessions(prev => prev.map(s => s.id === sid ? { ...s, color } : s));
@@ -392,7 +406,7 @@ export default function App() {
           onClearAllSessions={handleClearAllSessions}
           model={model}
           models={models}
-          onModelChange={setModel}
+          onModelChange={handleModelChange}
           language={language}
           onLanguageChange={handleLanguageChange}
           onUpdateSessionColor={handleUpdateSessionColor}
