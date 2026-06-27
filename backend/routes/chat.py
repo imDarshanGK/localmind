@@ -102,7 +102,7 @@ async def background_generator(buffer: StreamBuffer, req, context, history, sour
             
             # Push token and continuous count index to all active listeners
             for listener in list(buffer.listeners):
-                await listener.put({"token": token, "token_count": buffer.token_count})
+                await listener.put({"token": token})
 
         if buffer.cancelled:
             buffer.buffer += "\n\n[Generation Stopped]"
@@ -155,7 +155,7 @@ async def stream_from_buffer(buffer: StreamBuffer, resume_offset: int):
     # 1. Send already accumulated tokens from resume_offset
     accumulated = buffer.buffer
     if resume_offset < len(accumulated):
-        yield f"data: {json.dumps({'token': accumulated[resume_offset:], 'token_count': buffer.token_count})}\n\n"
+        yield f"data: {json.dumps({'token': accumulated[resume_offset:]})}\n\n"
 
     # 2. If already finished, stop
     if buffer.completed:
@@ -175,14 +175,13 @@ async def stream_from_buffer(buffer: StreamBuffer, resume_offset: int):
                 yield f"data: {json.dumps({'error': event['error']})}\n\n"
                 break
             if "token" in event:
-                yield f"data: {json.dumps({'token': event['token'], 'token_count': event.get('token_count', buffer.token_count)})}\n\n"
-                break
+                # FIXED: Emits the token cleanly and loops back around to wait for the next chunk
+                yield f"data: {json.dumps({'token': event['token']})}\n\n"
             if "done" in event:
                 yield f"data: {json.dumps({'done': True, 'sources': event['sources'], 'benchmarks': event.get('benchmarks'), 'total_tokens': event.get('total_tokens', buffer.token_count)})}\n\n"
                 break
     finally:
         buffer.listeners.discard(listener)
-
 
 # ─── New Reaction Schemas & Routes ──────────────────────────────────────────
 
