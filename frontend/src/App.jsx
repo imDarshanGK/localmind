@@ -31,6 +31,7 @@ export default function App() {
   const [settings,   setSettings]   = useState({});
   const minimalMode = settings?.minimal_mode === true;
   const [useStream,  setUseStream]  = useState(true);
+  const [focusMode,  setFocusMode]  = useState(false); // hides sidebar + side panels for distraction-free chat
 
   // --- Issue #261: Undo Delete Cache Management ---
   const [deletedSessionCache, setDeletedSessionCache] = useState(null); // stores { id, title, position }
@@ -380,21 +381,23 @@ export default function App() {
 
   return (
     <div className={`flex h-screen overflow-hidden ${settings.theme === "light" ? "bg-gray-100" : "bg-gray-950"} text-gray-100 relative`}>
-      <Sidebar
-        sessions={sessions}
-        currentSession={sessionId}
-        onNewChat={newChat}
-        onLoadSession={loadSession}
-        onDeleteSession={handleDeleteSession}
-        onRenameSession={handleRenameSession}
-        onClearAllSessions={handleClearAllSessions}
-        model={model}
-        models={models}
-        onModelChange={setModel}
-        language={language}
-        onLanguageChange={handleLanguageChange}
-        onUpdateSessionColor={handleUpdateSessionColor}
-      />
+      {!focusMode && (
+        <Sidebar
+          sessions={sessions}
+          currentSession={sessionId}
+          onNewChat={newChat}
+          onLoadSession={loadSession}
+          onDeleteSession={handleDeleteSession}
+          onRenameSession={handleRenameSession}
+          onClearAllSessions={handleClearAllSessions}
+          model={model}
+          models={models}
+          onModelChange={setModel}
+          language={language}
+          onLanguageChange={handleLanguageChange}
+          onUpdateSessionColor={handleUpdateSessionColor}
+        />
+      )}
 
       <div className="flex flex-col flex-1 overflow-hidden relative">
         <StatusBar
@@ -408,21 +411,23 @@ export default function App() {
           onClear={handleClearChat}
           useStream={useStream}
           onToggleStream={() => setUseStream(p => !p)}
-          onTroubleshoot={() => { setView("troubleshoot"); setPanel(null); }} 
+          onTroubleshoot={() => { setView("troubleshoot"); setPanel(null); }}
+          focusMode={focusMode}
+          onToggleFocus={() => setFocusMode(f => { if (!f) setPanel(null); return !f; })}
         />
 
         <UploadPanel
-          show={panel === "upload"}
+          show={!focusMode && panel === "upload"}
           sessionId={sessionId}
           documents={documents}
           onUploaded={() => refreshDocuments(sessionId)}
           onClose={() => setPanel(null)}
           minimalMode={minimalMode}
         />
-        {panel === "plugins" && (
+        {!focusMode && panel === "plugins" && (
           <PluginsPanel sessionId={sessionId} onClose={() => setPanel(null)} />
         )}
-        {panel === "settings" && (
+        {!focusMode && panel === "settings" && (
           <SettingsPanel
             settings={settings}
             onSave={async (s) => { await api.saveSettings(s); setSettings(s); setPanel(null); }}
