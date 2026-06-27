@@ -161,19 +161,26 @@ export default function App() {
 
     if (useStream) {
       setStreaming(true);
-      const aiMsg = { role: "assistant", content: "", sources: [], id: tempUserId + 1, streaming: true };
+      
+      // --- Issue #263: Initialize token_count tracking metric locally ---
+      const aiMsg = { role: "assistant", content: "", sources: [], token_count: 0, id: tempUserId + 1, streaming: true };
       setMessages(prev => [...prev, aiMsg]);
+      
       try {
         await api.streamMessage(
           { message: text, session_id: activeSid, model, use_documents: documents.length > 0, language },
-          (token) => setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, content: m.content + token } : m)),
-          async (resData) => {
+          
+          // --- Issue #263: Map continuous chunks and incremental counts to target layout state ---
+          (token, currentCount) => setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, content: m.content + token, token_count: currentCount } : m)),
+          
+          // --- Issue #263: Handle completion payloads with explicit total counters and main's fresh re-fetch logic ---
+          async (sources, totalTokens) => {
             try {
               const freshRes = await api.getMessages(activeSid);
               const freshMessages = freshRes.messages || freshRes || [];
-              setMessages(freshMessages.map(m => ({ ...m, id: m.id })));
+              setMessages(freshMessages.map(m => m.id === aiMsg.id ? { ...m, token_count: totalTokens, streaming: false } : { ...m, id: m.id }));
             } catch {
-              setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, streaming: false } : m));
+              setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, sources, token_count: totalTokens, streaming: false } : m));
             }
             refreshSessions();
           },

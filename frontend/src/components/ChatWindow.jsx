@@ -24,8 +24,6 @@ export default function ChatWindow({ messages, loading, onSend, onDeleteMessage,
   }, [messages]);
 
   const [localReactions, setLocalReactions] = useState({});
-  const [selectedMessages, setSelectedMessages] = useState([]);
-  const [exportFormat, setExportFormat] = useState("markdown");
   const [copiedMsgId, setCopiedMsgId] = useState(null);
   const [hoveredStatsId, setHoveredStatsId] = useState(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
@@ -245,14 +243,24 @@ export default function ChatWindow({ messages, loading, onSend, onDeleteMessage,
             </div>
           )}
 
-          {/* Messages list */}
+          {/* Messages list with Search & Token Tracking support */}
           {filteredMessages.map((msg, i) => (
             <div key={msg.id || i} className={`flex group ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
               <div className="max-w-2xl">
                 {msg.role === "assistant" && (
-                  <div className="flex items-center gap-1.5 mb-1.5 ml-1">
-                    <AppLogoIcon className="w-4 h-4 text-purple-400" />
-                    <span className="text-xs font-semibold text-purple-400">LocalMind</span>
+                  <div className="flex items-center gap-2 mb-1.5 ml-1">
+                    <div className="flex items-center gap-1.5">
+                      <AppLogoIcon className="w-4 h-4 text-purple-400" />
+                      <span className="text-xs font-semibold text-purple-400">LocalMind</span>
+                    </div>
+                    
+                    {/* --- Issue #263: Real-time token display with non-stream fallback --- */}
+                    {(msg.token_count > 0 || (!msg.streaming && msg.content)) && (
+                      <span className="text-[10px] bg-purple-950/60 text-purple-300 border border-purple-800/40 font-mono px-1.5 py-0.5 rounded-md shadow-sm">
+                        {(msg.token_count > 0 ? msg.token_count : (msg.content ? Math.round(msg.content.trim().split(/\s+/).length * 1.3) : 0))} tokens
+                      </span>
+                    )}
+
                     {msg.streaming && <span className="text-xs text-gray-400 animate-pulse">typing...</span>}
                   </div>
                 )}
@@ -346,6 +354,7 @@ export default function ChatWindow({ messages, loading, onSend, onDeleteMessage,
 
                 {msg.role === "assistant" && !msg.streaming && (
                   <div className="flex justify-end mt-1.5 mr-1 items-center gap-1">
+                    {renderReactionsBar(msg)}
                     <button
                       onClick={() => copyToClipboard(msg.id, msg.content)}
                       className="p-1 rounded hover:bg-gray-800 text-gray-500 hover:text-gray-300 transition"
@@ -397,9 +406,7 @@ export default function ChatWindow({ messages, loading, onSend, onDeleteMessage,
           ))}
 
           {filteredMessages.length === 0 && messages.length > 0 && (
-            <p className="text-center text-gray-500 text-sm">
-              No messages found
-            </p>
+            <p className="text-center text-gray-500 text-sm mt-4">No messages found</p>
           )}
 
           {loading && !messages.find(m => m.streaming) && (
