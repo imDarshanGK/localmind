@@ -257,7 +257,7 @@ export default function ChatWindow({ messages, loading, onSend, onDeleteMessage,
                     {/* --- Issue #263: Real-time token display with non-stream fallback --- */}
                     {(msg.token_count > 0 || (!msg.streaming && msg.content)) && (
                       <span className="text-[10px] bg-purple-950/60 text-purple-300 border border-purple-800/40 font-mono px-1.5 py-0.5 rounded-md shadow-sm">
-                        {msg.token_count || Math.round(msg.content.trim().split(/\s+/).length * 1.3)} tokens
+                        {(msg.token_count > 0 ? msg.token_count : (msg.content ? Math.round(msg.content.trim().split(/\s+/).length * 1.3) : 0))} tokens
                       </span>
                     )}
 
