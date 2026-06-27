@@ -32,7 +32,10 @@ async def export_session(session_id: str, fmt: ExportFormat):
             lines.append(f"{role_label}\n\n{m['content']}\n")
             if m.get("sources"):
                 lines.append(f"*Sources: {', '.join(m['sources'])}*\n")
-            lines.append("\n---\n")
+            
+            # FIXED: Added explicit padding newlines around the separator block
+            lines.append("\n\n---\n\n")
+            
         content   = "\n".join(lines)
         media     = "text/markdown"
         filename  = f"localmind_{session_id[:8]}.md"
