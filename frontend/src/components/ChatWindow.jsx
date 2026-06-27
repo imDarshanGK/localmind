@@ -70,9 +70,19 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
           <div key={msg.id || i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
             <div className={`max-w-2xl ${msg.role === "user" ? "max-w-xl" : "max-w-2xl"}`}>
               {msg.role === "assistant" && (
-                <div className="flex items-center gap-1.5 mb-1.5 ml-1">
-                  <AppLogoIcon className="w-4 h-4 text-purple-400" />
-                  <span className="text-xs font-semibold text-purple-400">LocalMind</span>
+                <div className="flex items-center gap-2 mb-1.5 ml-1">
+                  <div className="flex items-center gap-1.5">
+                    <AppLogoIcon className="w-4 h-4 text-purple-400" />
+                    <span className="text-xs font-semibold text-purple-400">LocalMind</span>
+                  </div>
+                  
+                  {/* --- Issue #263: Real-time token display with non-stream fallback --- */}
+{(msg.token_count > 0 || (!msg.streaming && msg.content)) && (
+  <span className="text-[10px] bg-purple-950/60 text-purple-300 border border-purple-800/40 font-mono px-1.5 py-0.5 rounded-md shadow-sm">
+    {msg.token_count || Math.round(msg.content.trim().split(/\s+/).length * 1.3)} tokens
+  </span>
+)}
+                  
                   {msg.streaming && <span className="text-xs text-gray-500 animate-pulse">typing...</span>}
                 </div>
               )}
