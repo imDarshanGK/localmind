@@ -37,7 +37,13 @@ export default function App() {
         if (settRes.value.default_model) setModel(settRes.value.default_model);
         if (settRes.value.default_language) setLanguage(settRes.value.default_language);
       }
-      if (stRes.status === "fulfilled") setOllamaOk(stRes.value.ollama_running);
+      
+      // # FIXED (#87): Explicitly handle network rejection or down-status to surface warning banner
+      if (stRes.status === "fulfilled") {
+        setOllamaOk(stRes.value.ollama_running);
+      } else {
+        setOllamaOk(false);
+      }
     } catch {}
   }
 
