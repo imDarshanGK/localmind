@@ -10,8 +10,9 @@ import chromadb
 from chromadb.config import Settings
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import (
-    PyPDFLoader, TextLoader, CSVLoader, Docx2txtLoader, UnstructuredHTMLLoader,
+        PyPDFLoader, TextLoader, UnstructuredHTMLLoader,
 )
+from services.csv_loader import CleanCSVLoader
 from sentence_transformers import SentenceTransformer
 
 logger = logging.getLogger(__name__)
@@ -31,7 +32,7 @@ LOADERS = {
     ".pdf":  PyPDFLoader,
     ".txt":  TextLoader,
     ".md":   TextLoader,
-    ".csv":  CSVLoader,
+    ".csv":  CleanCSVLoader,
     ".docx": Docx2txtLoader,
     ".html": UnstructuredHTMLLoader,
 }
