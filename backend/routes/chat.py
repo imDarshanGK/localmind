@@ -178,6 +178,11 @@ class ReactionToggleRequest(BaseModel):
     message_id: int
     emoji: str
 
+class SummaryRequest(BaseModel): #This keeps the summary API independent from the chat API.
+    messages: list
+    model: str
+    language: str = "en"
+
 @router.post("/messages/toggle-reaction")
 async def api_toggle_reaction(payload: ReactionToggleRequest):
     """Toggles an emoji reaction for a given message and returns updated arrays."""
@@ -252,6 +257,49 @@ async def chat(req: ChatRequest):
 
     return ChatResponse(reply=reply, session_id=req.session_id, model=req.model, sources=sources)
 
+#The Current Session Summary Endpoint
+@router.post("/summary")
+async def generate_summary(req: SummaryRequest):
+    """
+    Generate a concise summary of the current session.
+    """
+    if not await ollama_service.is_ollama_running():
+        raise HTTPException(503, "Ollama not running.")
+    conversation = "\n".join(
+        f"{msg['role']}: {msg['content']}"
+        for msg in req.messages
+    )
+
+    prompt = f"""
+            You are an AI assistant.
+
+            Generate a concise summary of the following conversation.
+
+            Include:
+            - Main topic
+            - Important questions
+            - Important answers(Highlight if required)
+            - Steps used to solve(if any)
+            - Action items (if any)
+            - Summarization points(If required)
+            - Points to Note(if any)
+
+            Keep the summary under 300 words.
+
+            Conversation:
+    {conversation}
+    """
+    summary = await ollama_service.chat(
+        message=prompt,
+        model=req.model,
+        context="",
+        history=[],
+        language=req.language,
+        temperature=0.3,
+    )
+    return {
+        "summary": summary
+    }
 
 @router.post("/stream")
 async def chat_stream(req: ChatRequest):

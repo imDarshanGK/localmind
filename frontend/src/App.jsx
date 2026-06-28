@@ -9,6 +9,7 @@ import PromptRegistryPage from "./components/PromptRegistryPage";
 import StatusBar from "./components/StatusBar";
 import * as api from "./utils/api";
 import { getSessionColor, setSessionColor } from "./utils/colorHelper";
+import { jsPDF } from "jspdf";
 
 export default function App() {
   const [sessionId,  setSessionId]  = useState(() => uuidv4());
@@ -16,6 +17,7 @@ export default function App() {
   const [sessions,   setSessions]   = useState([]);
   const [model,      setModel]      = useState("llama3");
   const [models,     setModels]     = useState([]);
+  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   const [documents,  setDocuments]  = useState([]);
   const [loading,    setLoading]    = useState(false);
   const [streaming,  setStreaming]  = useState(false);
@@ -245,6 +247,38 @@ export default function App() {
     setMessages([]);
   }
 
+  //fetching for download Summary
+  const handleDownloadSummary = async () => {
+    try {
+      setIsGeneratingSummary(true);
+    if (!messages.length) {
+      alert("No messages available in the current session.");
+      return;
+    }
+    const response = await api.generateSessionSummary({
+      messages,
+      model,
+      language,
+    });
+    const doc = new jsPDF();
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.text("LocalMind Session Summary", 20, 20);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(11);
+    const wrappedText = doc.splitTextToSize(response.summary, 170);
+    doc.text(wrappedText, 20, 35);
+    doc.save("LocalMind_Session_Summary.pdf");
+
+    } catch (err) {
+      console.error(err);
+      alert("Failed to generate summary.");
+    } finally {
+    setIsGeneratingSummary(false);
+    }
+  };
+
+
   const handleLanguageChange = useCallback(async (newLang) => {
     setLanguage(newLang);
     if (sessionId) {
@@ -277,6 +311,8 @@ export default function App() {
         language={language}
         onLanguageChange={handleLanguageChange}
         onUpdateSessionColor={handleUpdateSessionColor}
+        onDownloadSummary={handleDownloadSummary}
+        isGeneratingSummary={isGeneratingSummary}
       />
 
       <div className="flex flex-col flex-1 overflow-hidden relative">

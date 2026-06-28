@@ -17,6 +17,7 @@ async function req(path, opts = {}) {
 
 // NEW: sendMessage can now accept an optional trailing signal parameter
 export const sendMessage = (b, signal) => req("/chat/", { method: "POST", body: JSON.stringify(b), signal });
+export const generateSessionSummary = (body) => req("/chat/summary", {method: "POST", body: JSON.stringify(body) });
 export const cancelStream = (id) => req(`/chat/cancel/${id}`, { method: "POST" });
 export const getSessions = () => req("/sessions/");
 export const createSession = (b) => req("/sessions/", { method: "POST", body: JSON.stringify(b) });

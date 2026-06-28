@@ -11,7 +11,7 @@ const LANGUAGES = [
 
 ];
 
-export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSession, onDeleteSession, onClearAllSessions, model, models, onModelChange, language, onLanguageChange, onUpdateSessionColor }) {
+export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSession, onDeleteSession, onClearAllSessions, model, models, onModelChange, language, onLanguageChange, onUpdateSessionColor, onDownloadSummary, isGeneratingSummary, }) {
   const [search, setSearch] = useState("");
   const [contextMenu, setContextMenu] = useState(null); // { sessionId, x, y }
   const [pinnedIds, setPinnedIds] = useState(() => getPinnedSessions());
@@ -200,13 +200,39 @@ export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSes
 
       {/* Sessions */}
       {/* Session Summary Card */}
-      <div className="px-3 py-2 border-b border-gray-800">
-        <label className="text-xs text-gray-500 block mb-1">Session Sumary</label>
-          <div className="text-xs text-white-500 block mb-1">
-            Messages count:
-            <br></br>
-            Summary :
-          </div>
+      <div className="px-3 py-3 border-b border-gray-800">
+      <div className="flex items-center justify-between mb-3">
+        <label className="text-xs font-medium text-gray-400">
+            Session Summary
+        </label>
+        <button 
+            id="btn-session-summary-info"
+            onClick={async () => {
+              try {
+                alert("Here you can download current session summary directly!\nClick on the Generate and download button\nIt will take few seconds or minutes to download.")
+              } catch (e) {
+                alert(`Failed to fetch model info: ${e.message}`);
+              }
+            }}
+            className="text-[10px] text-purple-400 hover:text-purple-300"
+            title="View Model Metadata (Cached)"
+          >
+            ⓘ
+          </button>
+      </div>
+        <button
+          onClick={onDownloadSummary}
+          disabled={isGeneratingSummary}
+          className={`w-full rounded-md py-2 text-xs font-medium text-white transition-colors ${
+          isGeneratingSummary
+            ? "bg-gray-600 cursor-not-allowed"
+            : "bg-purple-600 hover:bg-purple-700"
+          }`}
+        >
+          {isGeneratingSummary
+              ? "Generating..."
+              : "Generate & Download"}
+        </button>
       </div>
 
       {/* Chat History */}
@@ -279,7 +305,7 @@ export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSes
           <LockIcon className="w-3.5 h-3.5" />
           <span>100% local · no cloud · MIT</span>
         </p>
-        <a href="https://github.com/yourusername/localmind" target="_blank" rel="noreferrer"
+        <a href="https://github.com/imDarshanGK/localmind" target="_blank" rel="noreferrer"
           className="text-xs text-purple-500 hover:text-purple-400 transition inline-flex items-center gap-1">
           <StarIcon className="w-3.5 h-3.5" />
           <span>Star on GitHub</span>
