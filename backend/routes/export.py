@@ -60,7 +60,9 @@ def export_session_markdown(session: dict, messages: list, ts: str) -> str:
                 msg_block += f"\n\n*Sources: {', '.join(source_names)}*"
                 
         lines.append(msg_block + "\n")
-        lines.append("\n---\n")
+        
+        # FIXED (#93): Enforce distinct double line breaks padding around separator
+        lines.append("\n\n---\n\n")
     return "\n".join(lines)
 
 
@@ -191,7 +193,7 @@ async def export_messages(req: ExportMessagesRequest):
         for m in messages:
             role_label = "**You**" if m["role"] == "user" else "**LocalMind**"
             msg_block = f"{role_label}\n\n{m['content'].strip()}"
-            
+
             if m["role"] == "assistant" and m.get("sources"):
                 source_names = []
                 for src in m["sources"]:
@@ -202,12 +204,15 @@ async def export_messages(req: ExportMessagesRequest):
                 source_names = [s for s in source_names if s]
                 if source_names:
                     msg_block += f"\n\n*Sources: {', '.join(source_names)}*"
-            
+
             lines.append(msg_block + "\n")
-            lines.append("\n---\n")
-        content = "\n".join(lines)
-        media = "text/markdown"
-        filename = f"localmind_messages_{ts.replace(' ', '_').replace(':', '-')}.md"
+            
+            # FIXED (#93): Enforce distinct double line breaks padding around separator
+            lines.append("\n\n---\n\n")
+
+        content   = "\n".join(lines)
+        media     = "text/markdown"
+        filename  = f"localmind_messages_{ts.replace(' ', '_').replace(':', '-')}.md"
 
     else:
         lines = ["LocalMind Export — Selected Messages", f"Exported: {ts}", "=" * 50, ""]
@@ -229,8 +234,6 @@ async def export_messages(req: ExportMessagesRequest):
             lines += [msg_block, ""]
         content   = "\n".join(lines)
         media     = "text/plain"
-        
-        # --- Fixed undefined variable session_id mismatch bug here ---
         filename  = f"localmind_messages_{ts.replace(' ', '_').replace(':', '-')}.txt"
 
     return Response(
