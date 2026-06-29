@@ -1,6 +1,7 @@
 """Export routes — /api/export — export chats as MD, JSON, TXT"""
 
 import json
+import re
 from datetime import datetime
 from typing import List
 
@@ -127,22 +128,29 @@ async def export_session(session_id: str, fmt: ExportFormat):
         raise HTTPException(404, "Session not found")
 
     messages = db_service.get_messages_full(session_id)
+    title = session.get("title", "LocalMind Chat")
     ts = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    # FIXED (#83): Clean the title to make it safe for a filename
+    safe_title = re.sub(r"[^\w\s-]", "", title).strip().lower()
+    safe_title = re.sub(r"[\s-]+", "_", safe_title)
+    if not safe_title:
+        safe_title = "localmind_chat"
 
     if fmt == ExportFormat.json:
         content = export_session_json(session, messages, ts)
         media = "application/json"
-        filename = f"localmind_messages_{ts.replace(' ', '_').replace(':', '-')}.json"
+        filename = f"{safe_title}.json"
 
     elif fmt == ExportFormat.markdown:
         content = export_session_markdown(session, messages, ts)
         media = "text/markdown"
-        filename = f"localmind_messages_{ts.replace(' ', '_').replace(':', '-')}.md"
+        filename = f"{safe_title}.md"
 
     else:  # txt
         content = export_session_txt(session, messages, ts)
         media = "text/plain"
-        filename = f"localmind_messages_{ts.replace(' ', '_').replace(':', '-')}.txt"
+        filename = f"{safe_title}.txt"
 
     return Response(
         content=content.encode("utf-8"),
@@ -224,17 +232,20 @@ async def export_messages(req: ExportMessagesRequest):
     messages.sort(key=lambda m: m.get("timestamp", ""))
     ts = datetime.now().strftime("%Y-%m-%d %H:%M")
 
+    # FIXED (#83): Use a shared default title format for custom standalone message groups
+    safe_title = f"localmind_messages_{ts.replace(' ', '_').replace(':', '-')}"
+
     if req.format == ExportFormat.json:
         content = json.dumps(
             {"messages": messages, "exported_at": ts}, indent=2, ensure_ascii=False
         )
         media = "application/json"
-        filename = f"localmind_messages_{ts.replace(' ', '_').replace(':', '-')}.json"
+        filename = f"{safe_title}.json"
 
     elif req.format == ExportFormat.markdown:
         content = _format_markdown_export("LocalMind – Exported Messages", ts, messages)
         media = "text/markdown"
-        filename = f"localmind_messages_{ts.replace(' ', '_').replace(':', '-')}.md"
+        filename = f"{safe_title}.md"
 
     else:
         lines = [
@@ -256,7 +267,7 @@ async def export_messages(req: ExportMessagesRequest):
             lines += [msg_block, ""]
         content = "\n".join(lines)
         media = "text/plain"
-        filename = f"localmind_messages_{ts.replace(' ', '_').replace(':', '-')}.txt"
+        filename = f"{safe_title}.txt"
 
     return Response(
         content=content.encode("utf-8"),
