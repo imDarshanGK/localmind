@@ -62,7 +62,7 @@ def export_session_markdown(session: dict, messages: list, ts: str) -> str:
                 
         lines.append(msg_block + "\n")
         
-        # Keep our pristine spacing fix from #93 intact!
+        # FIXED (#93): Enforce distinct double line breaks padding around separator
         lines.append("\n\n---\n\n")
     return "\n".join(lines)
 
