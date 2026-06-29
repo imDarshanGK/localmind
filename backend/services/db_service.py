@@ -437,6 +437,34 @@ def get_messages_full(session_id: str) -> list[dict]:
         ]
 
 
+def get_messages_by_ids(message_ids: list[str]) -> list[dict]:
+    """Fetch messages by ID for selected-message exports."""
+    if not message_ids:
+        return []
+
+    placeholders = ",".join("?" for _ in message_ids)
+    with get_db() as conn:
+        rows = conn.execute(
+            f"""
+            SELECT id, role, content, sources, created_at AS timestamp
+            FROM messages
+            WHERE id IN ({placeholders})
+            ORDER BY created_at ASC
+            """,
+            message_ids,
+        ).fetchall()
+        return [
+            {
+                "id": r["id"],
+                "role": r["role"],
+                "content": r["content"],
+                "sources": json.loads(r["sources"] or "[]"),
+                "timestamp": r["timestamp"],
+            }
+            for r in rows
+        ]
+
+
 def clear_messages(session_id: str):
     with get_db() as conn:
         cur = conn.execute("DELETE FROM messages WHERE session_id=?", (session_id,))

@@ -427,6 +427,40 @@ def test_export_markdown():
     assert r2.status_code == 200
     assert b"Test question" in r2.content
 
+
+def test_export_markdown_uses_spaced_message_separators():
+    r = client.post("/api/sessions/", json={"title": "Readable Markdown"})
+    sid = r.json()["id"]
+    db.save_message(sid, "user", "First message")
+    db.save_message(sid, "assistant", "Second message")
+
+    export = client.get(f"/api/export/{sid}/markdown")
+
+    assert export.status_code == 200
+    content = export.content.decode("utf-8")
+    assert "\n\n---\n\n**You**" in content
+    assert "First message\n\n---\n\n**LocalMind**" in content
+
+
+def test_export_selected_messages_markdown_uses_spaced_separators():
+    r = client.post("/api/sessions/", json={"title": "Selected Markdown"})
+    sid = r.json()["id"]
+    db.save_message(sid, "user", "Selected first")
+    db.save_message(sid, "assistant", "Selected second")
+    message_ids = [str(message["id"]) for message in db.get_messages_full(sid)]
+
+    export = client.post(
+        "/api/export/messages",
+        json={"message_ids": message_ids, "format": "markdown"},
+    )
+
+    assert export.status_code == 200
+    content = export.content.decode("utf-8")
+    assert "\n\n---\n\n**You**" in content
+    assert "Selected first\n\n---\n\n**LocalMind**" in content
+    assert "*Sources:" not in content
+
+
 def test_export_txt():
     r = client.post("/api/sessions/", json={"title": "TXT Export"})
     sid = r.json()["id"]
