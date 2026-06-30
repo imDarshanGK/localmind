@@ -55,6 +55,9 @@ export const saveSettings = (b) => req("/settings/", { method: "PUT", body: JSON
 export const exportSession = (id, fmt) => window.open(`${BASE}/export/${id}/${fmt}`, "_blank");
 export const deleteDocument = (docId) => req(`/upload/${docId}`, { method: "DELETE" });
 
+// --- Issue #265: Fetch Read-Only Plain Text Document Preview ---
+export const previewDocument = (filename, sessionId) => 
+  req(`/upload/preview?filename=${encodeURIComponent(filename)}&session_id=${encodeURIComponent(sessionId)}`);
 // Prompt Templates
 export const getPromptTemplates      = ()     => req("/prompt-templates/");
 export const createPromptTemplate    = (b)    => req("/prompt-templates/", { method: "POST", body: JSON.stringify(b) });
@@ -111,17 +114,21 @@ export function streamMessage(body, onToken, onDone, signal) {
           if (line.startsWith("data: ")) {
             try { 
               const d = JSON.parse(line.slice(6)); 
+              // --- Issue #263: Forward stream token counts with main payload schemas ---
               if (d.token) {
-                onToken(d.token);
+                onToken(d.token, d.token_count || 0);
               }
               if (d.done) {
-                onDone({
-                  message_id: d.message_id,
-                  sources: d.sources || [],
-                  benchmarks: d.benchmarks || null
-                });
+                onDone(
+                  d.sources || [], 
+                  d.total_tokens || 0, 
+                  {
+                    message_id: d.message_id,
+                    benchmarks: d.benchmarks || null
+                  }
+                );
               }
-            } catch (e) { 
+            } catch (e) {
               // Ignore partial chunk parse errors
             }
           }
@@ -133,8 +140,9 @@ export function streamMessage(body, onToken, onDone, signal) {
   });
 }
 
-export const createShareLink = (sessionId) => 
+// ─── Shareable LINK API Operations ──────────────────────────────────────────
+export const createShareLink = (sessionId) =>
   req(`/chat/share/${sessionId}`, { method: "POST" });
 
-export const getSharedSnapshot = (shareId) => 
+export const getSharedSnapshot = (shareId) =>
   req(`/chat/share/${shareId}`);

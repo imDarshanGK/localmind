@@ -7,6 +7,7 @@ import PluginsPanel from "./components/PluginsPanel";
 import SettingsPanel from "./components/SettingsPanel";
 import PromptRegistryPage from "./components/PromptRegistryPage";
 import StatusBar from "./components/StatusBar";
+import TroubleshootingPage from "./components/TroubleshootingPage"; 
 import * as api from "./utils/api";
 import SharedView from "./components/SharedView";
 import { getSessionColor, setSessionColor } from "./utils/colorHelper";
@@ -15,18 +16,22 @@ export default function App() {
   const [sessionId,  setSessionId]  = useState(() => uuidv4());
   const [messages,    setMessages]   = useState([]);
   const [sessions,    setSessions]   = useState([]);
-  const [model,      setModel]      = useState("llama3");
-  const [models,     setModels]     = useState([]);
+  const [model,       setModel]      = useState("llama3");
+  const [models,      setModels]     = useState([]);
   const [documents,  setDocuments]  = useState([]);
   const [loading,    setLoading]    = useState(false);
   const [streaming,  setStreaming]  = useState(false);
   const [panel,      setPanel]      = useState(null); // "upload"|"plugins"|"settings"|null
-  const [view,       setView]       = useState("chat"); // "chat"|"prompts"
+  
+  // --- Issue #95: Combined distinct view routers cleanly into one declaration block ---
+  const [view,       setView]       = useState("chat"); // "chat"|"troubleshoot"|"prompts"
+  
   const [language,   setLanguage]   = useState("en");
   const [ollamaOk,   setOllamaOk]   = useState(null);
   const [settings,   setSettings]   = useState({});
   const minimalMode = settings?.minimal_mode === true;
   const [useStream,  setUseStream]  = useState(true);
+  const [focusMode,  setFocusMode]  = useState(false); // hides sidebar + side panels for distraction-free chat
 
   // --- Issue #261: Undo Delete Cache Management ---
   const [deletedSessionCache, setDeletedSessionCache] = useState(null); // stores { id, title, position }
@@ -66,7 +71,7 @@ export default function App() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  }, [language, model]); // Added state synchronization bindings safely
 
   // Apply the selected theme preset globally (contrast / readability).
   useEffect(() => {
@@ -105,8 +110,14 @@ export default function App() {
         if (settRes.value.default_model) setModel(settRes.value.default_model);
         if (settRes.value.default_language) setLanguage(settRes.value.default_language);
       }
-      if (stRes.status === "fulfilled") setOllamaOk(stRes.value.ollama_running);
-    } catch { }
+      
+      // # FIXED (#87): Explicitly handle network rejection or down-status to surface warning banner
+      if (stRes.status === "fulfilled") {
+        setOllamaOk(stRes.value.ollama_running);
+      } else {
+        setOllamaOk(false);
+      }
+    } catch {}
   }
 
   const refreshSessions = useCallback(async () => {
@@ -156,19 +167,26 @@ export default function App() {
 
     if (useStream) {
       setStreaming(true);
-      const aiMsg = { role: "assistant", content: "", sources: [], id: tempUserId + 1, streaming: true };
+      
+      // --- Issue #263: Initialize token_count tracking metric locally ---
+      const aiMsg = { role: "assistant", content: "", sources: [], token_count: 0, id: tempUserId + 1, streaming: true };
       setMessages(prev => [...prev, aiMsg]);
+      
       try {
         await api.streamMessage(
           { message: text, session_id: activeSid, model, use_documents: documents.length > 0, language },
-          (token) => setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, content: m.content + token } : m)),
-          async (resData) => {
+          
+          // --- Issue #263: Map continuous chunks and incremental counts to target layout state ---
+          (token, currentCount) => setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, content: m.content + token, token_count: currentCount } : m)),
+          
+          // --- Issue #263: Handle completion payloads with explicit total counters and main's fresh re-fetch logic ---
+          async (sources, totalTokens) => {
             try {
               const freshRes = await api.getMessages(activeSid);
               const freshMessages = freshRes.messages || freshRes || [];
-              setMessages(freshMessages.map(m => ({ ...m, id: m.id })));
+              setMessages(freshMessages.map(m => m.id === aiMsg.id ? { ...m, token_count: totalTokens, streaming: false } : { ...m, id: m.id }));
             } catch {
-              setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, streaming: false } : m));
+              setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, sources, token_count: totalTokens, streaming: false } : m));
             }
             refreshSessions();
           },
@@ -204,22 +222,26 @@ export default function App() {
     }
   }
 
+  // --- Issue #95: Pass current framework language context explicitly into creation requests ---
   async function newChat() {
-    const sid = uuidv4();
     try {
-      await api.createSession({ title: "New Chat", model, language });
-    } catch { }
-
-    setSessionId(sid);
-    setMessages([]);
-    setDocuments([]);
-    setPanel(null);
-    refreshSessions();
+      const data = await api.createSession({ title: "New Chat", model, language });
+      const activeId = data.id || data.session_id;
+      setSessionId(activeId);
+      setMessages([]);
+      setDocuments([]);
+      setPanel(null);
+      setView("chat"); 
+      refreshSessions();
+    } catch (err) {
+      console.error("Failed to establish new clean session architecture:", err);
+    }
   }
 
   async function loadSession(sid) {
     setSessionId(sid);
     setPanel(null);
+    setView("chat"); 
     try {
       const [msgRes, docRes, freshSessions] = await Promise.all([
         api.getMessages(sid),
@@ -233,6 +255,7 @@ export default function App() {
       const sess = (freshSessions || []).find(s => s.id === sid);
       if (sess) {
         setLanguage(sess.language || settings.default_language || "en");
+        setModel(sess.model || settings.default_model || "llama3"); // Issue #256: restore the session's own model
         setSessions((freshSessions || []).map(s => ({ ...s, color: getSessionColor(s.id) })));
       }
     } catch { }
@@ -274,7 +297,13 @@ export default function App() {
       if (filteredSessions.length > 0) {
         loadSession(filteredSessions[0].id);
       } else {
-        setSessionId(uuidv4());
+        try {
+          const data = await api.createSession({ title: "New Chat", model, language });
+          const activeId = data.id || data.session_id;
+          setSessionId(activeId);
+        } catch {
+          setSessionId(uuidv4());
+        }
         setMessages([]);
         setDocuments([]);
       }
@@ -317,7 +346,6 @@ export default function App() {
     setDeletedSessionCache(null);
   };
 
-  // Issue #226 sync hook handler
   async function handleRenameSession(sid, newTitle) {
     try {
       await api.updateSession(sid, { title: newTitle });
@@ -360,6 +388,19 @@ export default function App() {
     }
   }, [sessionId]);
 
+  // Issue #256: persist the chosen model per session so each chat keeps its own model
+  const handleModelChange = useCallback(async (newModel) => {
+    setModel(newModel);
+    if (sessionId) {
+      try {
+        await api.updateSession(sessionId, { model: newModel });
+        setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, model: newModel } : s));
+      } catch (e) {
+        console.error("Failed to update session model:", e);
+      }
+    }
+  }, [sessionId]);
+
   const handleUpdateSessionColor = useCallback((sid, color) => {
     setSessionColor(sid, color);
     setSessions(prev => prev.map(s => s.id === sid ? { ...s, color } : s));
@@ -367,21 +408,23 @@ export default function App() {
 
   return (
     <div className={`flex h-screen overflow-hidden ${settings.theme === "light" ? "bg-gray-100" : "bg-gray-950"} text-gray-100 relative`}>
-      <Sidebar
-        sessions={sessions}
-        currentSession={sessionId}
-        onNewChat={newChat}
-        onLoadSession={loadSession}
-        onDeleteSession={handleDeleteSession}
-        onRenameSession={handleRenameSession}
-        onClearAllSessions={handleClearAllSessions}
-        model={model}
-        models={models}
-        onModelChange={setModel}
-        language={language}
-        onLanguageChange={handleLanguageChange}
-        onUpdateSessionColor={handleUpdateSessionColor}
-      />
+      {!focusMode && (
+        <Sidebar
+          sessions={sessions}
+          currentSession={sessionId}
+          onNewChat={newChat}
+          onLoadSession={loadSession}
+          onDeleteSession={handleDeleteSession}
+          onRenameSession={handleRenameSession}
+          onClearAllSessions={handleClearAllSessions}
+          model={model}
+          models={models}
+          onModelChange={handleModelChange}
+          language={language}
+          onLanguageChange={handleLanguageChange}
+          onUpdateSessionColor={handleUpdateSessionColor}
+        />
+      )}
 
       <div className="flex flex-col flex-1 overflow-hidden relative">
         <StatusBar
@@ -395,20 +438,23 @@ export default function App() {
           onClear={handleClearChat}
           useStream={useStream}
           onToggleStream={() => setUseStream(p => !p)}
+          onTroubleshoot={() => { setView("troubleshoot"); setPanel(null); }}
+          focusMode={focusMode}
+          onToggleFocus={() => setFocusMode(f => { if (!f) setPanel(null); return !f; })}
         />
 
         <UploadPanel
-          show={panel === "upload"}
+          show={!focusMode && panel === "upload"}
           sessionId={sessionId}
           documents={documents}
           onUploaded={() => refreshDocuments(sessionId)}
           onClose={() => setPanel(null)}
           minimalMode={minimalMode}
         />
-        {panel === "plugins" && (
+        {!focusMode && panel === "plugins" && (
           <PluginsPanel sessionId={sessionId} onClose={() => setPanel(null)} />
         )}
-        {panel === "settings" && (
+        {!focusMode && panel === "settings" && (
           <SettingsPanel
             settings={settings}
             onSave={async (s) => { await api.saveSettings(s); setSettings(s); setPanel(null); }}
@@ -418,6 +464,8 @@ export default function App() {
 
         {view === "prompts" ? (
           <PromptRegistryPage onBack={() => setView("chat")} />
+        ) : view === "troubleshoot" ? (
+          <TroubleshootingPage onBack={() => setView("chat")} />
         ) : (
           <>
             <ChatWindow

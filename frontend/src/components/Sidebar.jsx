@@ -31,13 +31,18 @@ export default function Sidebar({
   language,
   onLanguageChange,
   onUpdateSessionColor,
-  onRenameSession, // Keeps your rename functionality intact
+  onRenameSession, 
 }) {
   const [search, setSearch] = useState("");
-  const [isOpen, setIsOpen] = useState(false); // Mobile drawer toggle state
-
-  const [contextMenu, setContextMenu] = useState(null); // { sessionId, x, y }
-  const [pinnedIds, setPinnedIds] = useState(() => getPinnedSessions());
+  // --- Issue #95: Loading guard state to debounce multiple sequential clicks ---
+  const [creating, setCreating] = useState(false);
+  
+  // Responsive sidebar toggle states
+  const [isOpen, setIsOpen] = useState(false);
+  
+  // Pins, context menus, and deletion states
+  const [pinnedIds, setPinnedIds] = useState(() => getPinnedSessions() || []);
+  const [contextMenu, setContextMenu] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
 
   // Issue #226 states for inline editing
@@ -53,24 +58,6 @@ export default function Sidebar({
     }
   }, [editingId]);
 
-  const modelList = models.length > 0 ? models.map((m) => m.name) : ["llama3", "mistral", "phi3", "gemma2"];
-  const filtered = sessions.filter((s) => s.title?.toLowerCase().includes(search.toLowerCase()));
-  const pinnedSessions = filtered.filter((s) => pinnedIds.includes(s.id));
-  const unpinnedSessions = filtered.filter((s) => !pinnedIds.includes(s.id));
-
-  const handleSaveRename = (id) => {
-    if (editTitle.trim() && onRenameSession) {
-      onRenameSession(id, editTitle.trim());
-    }
-    setEditingId(null);
-  };
-
-  const handleTogglePin = (e, sessionId) => {
-    e.stopPropagation();
-    const newPinned = toggleSessionPin(sessionId);
-    setPinnedIds(newPinned);
-  };
-
   useEffect(() => {
     const closeMenu = () => setContextMenu(null);
     window.addEventListener("click", closeMenu);
@@ -80,6 +67,37 @@ export default function Sidebar({
       window.removeEventListener("contextmenu", closeMenu);
     };
   }, []);
+
+  const modelList = models.length > 0 ? models.map((m) => m.name) : ["llama3", "mistral", "phi3", "gemma2"];
+  const filtered = sessions.filter((s) => s.title?.toLowerCase().includes(search.toLowerCase()));
+  const pinnedSessions = filtered.filter((s) => pinnedIds.includes(s.id));
+  const unpinnedSessions = filtered.filter((s) => !pinnedIds.includes(s.id));
+
+  // Wraps the click execution with the async guard layout
+  async function handleCreateChat() {
+    if (creating) return;
+    setCreating(true);
+    try {
+      await onNewChat();
+    } catch (err) {
+      console.error("Failed to initialize session context:", err);
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  const handleSaveRename = (id) => {
+    if (editTitle.trim() && onRenameSession) {
+      onRenameSession(id, editTitle.trim());
+    }
+    setEditingId(null);
+  };
+
+  const handleTogglePin = (e, sessionId) => {
+    if (e) e.stopPropagation();
+    const newPinned = toggleSessionPin(sessionId);
+    setPinnedIds(newPinned);
+  };
 
   const handleContextMenu = (e, sessionId) => {
     e.preventDefault();
@@ -132,7 +150,10 @@ export default function Sidebar({
             />
           ) : (
             <span 
-              onClick={() => onLoadSession(s.id)} 
+              onClick={() => {
+                onLoadSession(s.id);
+                setIsOpen(false);
+              }} 
               className={`inline-flex items-center gap-1.5 w-full ${isActive ? "text-white" : ""}`}
             >
               <ChatIcon className="w-3.5 h-3.5 text-gray-500 shrink-0" />
@@ -222,14 +243,12 @@ export default function Sidebar({
             </div>
           </div>
           <button
-            onClick={() => {
-              onNewChat();
-              setIsOpen(false);
-            }}
+            onClick={handleCreateChat}
+            disabled={creating}
             title="New Chat"
-            className="w-full text-sm bg-purple-700 hover:bg-purple-600 active:bg-purple-800 text-white py-2 rounded-xl font-medium transition"
+            className="w-full text-sm bg-purple-700 hover:bg-purple-600 active:bg-purple-800 disabled:opacity-50 disabled:cursor-not-allowed text-white py-2 rounded-xl font-medium transition"
           >
-            + New Chat
+            {creating ? "Creating..." : "+ New Chat"}
             <span className="block text-xs text-purple-300 font-normal opacity-75">Ctrl+Shift+N</span>
           </button>
         </div>
