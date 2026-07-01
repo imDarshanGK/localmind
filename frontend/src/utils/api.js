@@ -1,11 +1,20 @@
 const BASE = (import.meta.env.VITE_API_BASE_URL || "/api").replace(/\/$/, "");
 
+// Helper utility to generate or append consistent headers with tracking IDs
+function getTrackingHeaders(customHeaders = {}) {
+  return {
+    "X-Correlation-ID": crypto.randomUUID(), // Generates a unique track string millisecond request fires
+    ...customHeaders,
+  };
+}
+
 async function req(path, opts = {}) {
   const { signal, ...restOpts } = opts; // Separate signal from rest of parameters
   const res = await fetch(`${BASE}${path}`, {
-    headers: { "Content-Type": "application/json", ...opts.headers },
-    signal, // <--- Attaches the AbortController listener to normal HTTP requests
     ...restOpts,
+    // FIXED: Now properly calls getTrackingHeaders to inject the tracking UUID token!
+    headers: getTrackingHeaders({ "Content-Type": "application/json", ...opts.headers }),
+    signal, // <--- Attaches the AbortController listener to normal HTTP requests
   });
 
   const limit = res.headers.get("X-RateLimit-Limit");
@@ -50,6 +59,9 @@ export const saveSettings = (b) => req("/settings/", { method: "PUT", body: JSON
 export const exportSession = (id, fmt) => window.open(`${BASE}/export/${id}/${fmt}`, "_blank");
 export const deleteDocument = (docId) => req(`/upload/${docId}`, { method: "DELETE" });
 
+// --- Issue #265: Fetch Read-Only Plain Text Document Preview ---
+export const previewDocument = (filename, sessionId) => 
+  req(`/upload/preview?filename=${encodeURIComponent(filename)}&session_id=${encodeURIComponent(sessionId)}`);
 // Prompt Templates
 export const getPromptTemplates      = ()     => req("/prompt-templates/");
 export const createPromptTemplate    = (b)    => req("/prompt-templates/", { method: "POST", body: JSON.stringify(b) });
@@ -59,10 +71,15 @@ export const deletePromptTemplate    = (id)   => req(`/prompt-templates/${id}`, 
 export async function uploadDocument(file, session_id) {
   const fd = new FormData();
   fd.append("file", file); fd.append("session_id", session_id);
-  const res = await fetch(`${BASE}/upload/`, { method: "POST", body: fd });
-  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || "Upload failed"); }
+  const res = await fetch(`${BASE}/upload/`, { 
+    method: "POST", 
+    body: fd,
+    headers: getTrackingHeaders() // Appends tracking token alongside the raw file payload form data
+  });
+  if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e.detail||"Upload failed"); }
   return res.json();
 }
+
 // Message Reactions API Toggle
 export const toggleMessageReaction = (messageId, emoji) => 
   req("/chat/messages/toggle-reaction", { 
@@ -70,10 +87,14 @@ export const toggleMessageReaction = (messageId, emoji) =>
     body: JSON.stringify({ message_id: messageId, emoji }) 
   });
 
+<<<<<<< HEAD
+=======
+// NEW: Appended 'signal' parameter right to the tail of your token reader stream
+>>>>>>> upstream/main
 export function streamMessage(body, onToken, onDone, signal) {
   return fetch(`${BASE}/chat/stream`, {
     method: "POST", 
-    headers: { "Content-Type": "application/json" },
+    headers: getTrackingHeaders({ "Content-Type": "application/json" }), // Attaches token to chat stream
     body: JSON.stringify(body),
     signal // <--- Attaches the cancel token listener directly to your chunk stream reader
   }).then(res => {
@@ -109,17 +130,21 @@ export function streamMessage(body, onToken, onDone, signal) {
           if (line.startsWith("data: ")) {
            try { 
               const d = JSON.parse(line.slice(6)); 
+              // --- Issue #263: Forward stream token counts with main payload schemas ---
               if (d.token) {
-                onToken(d.token);
+                onToken(d.token, d.token_count || 0);
               }
               if (d.done) {
-                onDone({
-                  message_id: d.message_id,
-                  sources: d.sources || [],
-                  benchmarks: d.benchmarks || null
-                });
+                onDone(
+                  d.sources || [], 
+                  d.total_tokens || 0, 
+                  {
+                    message_id: d.message_id,
+                    benchmarks: d.benchmarks || null
+                  }
+                );
               }
-            } catch (e) { 
+            } catch (e) {
               // Ignore partial chunk parse errors
             }
           }
@@ -131,8 +156,9 @@ export function streamMessage(body, onToken, onDone, signal) {
   });
 }
 
-export const createShareLink = (sessionId) => 
+// ─── Shareable LINK API Operations ──────────────────────────────────────────
+export const createShareLink = (sessionId) =>
   req(`/chat/share/${sessionId}`, { method: "POST" });
 
-export const getSharedSnapshot = (shareId) => 
+export const getSharedSnapshot = (shareId) =>
   req(`/chat/share/${shareId}`);

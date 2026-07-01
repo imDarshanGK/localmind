@@ -11,8 +11,9 @@ import chromadb
 from chromadb.config import Settings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import (
-    PyPDFLoader, TextLoader, CSVLoader, UnstructuredHTMLLoader,
+        PyPDFLoader, TextLoader, UnstructuredHTMLLoader,
 )
+from services.csv_loader import CleanCSVLoader
 from services.docx_loader import DocxWithTablesLoader
 from sentence_transformers import SentenceTransformer
 
@@ -35,7 +36,7 @@ LOADERS = {
     ".pdf":  PyPDFLoader,
     ".txt":  TextLoader,
     ".md":   TextLoader,
-    ".csv":  CSVLoader,
+    ".csv":  CleanCSVLoader,
     ".docx": DocxWithTablesLoader,
     ".html": UnstructuredHTMLLoader,
     ".srt":  TextLoader,  # Handle SubRip video/audio transcripts natively
