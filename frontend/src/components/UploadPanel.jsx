@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { uploadDocument, deleteDocument, previewDocument } from "../utils/api";
-import { CheckIcon, DocumentsIcon, ErrorIcon, SpinnerIcon, UploadIcon, FileIcon } from "./Icons";
+import { CheckIcon, DocumentsIcon, ErrorIcon, SpinnerIcon, UploadIcon, FileIcon, TrashIcon, CloseIcon } from "./Icons";
 
 export default function UploadPanel({ sessionId, documents, onUploaded, onClose, show, minimalMode }) {
   const [dragging, setDragging] = useState(false);
@@ -10,6 +10,9 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
   const [previewContent, setPreviewContent] = useState(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [previewFilename, setPreviewFilename] = useState("");
+
+  const [documentToDelete, setDocumentToDelete] = useState(null);
+  const [showToast, setShowToast] = useState(false);
 
   const [uploadResults, setUploadResults] = useState([]);
   const fileRef = useRef();
@@ -58,6 +61,23 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
       setPreviewContent(`Error loading preview: ${e.message}`);
     } finally {
       setLoadingPreview(false);
+    }
+  }
+
+  async function handleDeleteConfirm() {
+    if (!documentToDelete) return;
+    const docId = documentToDelete.id;
+    try {
+      await deleteDocument(docId);
+      setShowToast(true);
+      setTimeout(() => {
+        setShowToast(false);
+      }, 3000);
+      onUploaded();
+    } catch (e) {
+      console.error("Error deleting document:", e);
+    } finally {
+      setDocumentToDelete(null);
     }
   }
 
@@ -129,6 +149,13 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
                       "👁️"
                     )}
                   </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setDocumentToDelete(d); }}
+                    className="p-1 text-gray-400 hover:text-red-400 rounded transition"
+                    title="Delete Document"
+                  >
+                    <TrashIcon className="w-3.5 h-3.5" />
+                  </button>
                 </div>
               </div>
             );
@@ -156,6 +183,63 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
               {previewContent}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Document Delete Confirmation Modal */}
+      {documentToDelete !== null && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-sm mx-4 shadow-2xl">
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-800">
+              <button
+                onClick={() => setDocumentToDelete(null)}
+                className="text-gray-500 hover:text-gray-300 transition"
+                title="Close"
+              >
+                <CloseIcon className="w-4 h-4" />
+              </button>
+              <h2 className="text-sm font-semibold text-white">Delete Document</h2>
+              <div className="w-4" />
+            </div>
+
+            {/* Body */}
+            <div className="px-5 py-5">
+              <p className="text-sm text-gray-300">
+                Are you sure you want to delete '{documentToDelete.filename || documentToDelete}'? This action cannot be undone.
+              </p>
+            </div>
+
+            {/* Footer */}
+            <div className="flex gap-2 px-5 pb-5">
+              <button
+                autoFocus
+                onClick={() => setDocumentToDelete(null)}
+                className="flex-1 text-sm bg-gray-800 hover:bg-gray-700 text-gray-300 py-2 rounded-xl font-medium transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteConfirm}
+                className="flex-1 text-sm bg-red-600 hover:bg-red-500 active:bg-red-700 text-white py-2 rounded-xl font-medium transition"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast Notification */}
+      {showToast && (
+        <div className="fixed bottom-5 right-5 z-50 flex items-center justify-between gap-4 bg-gray-900 border border-green-500/40 text-gray-200 text-xs rounded-xl shadow-2xl px-4 py-3 animate-fade-in min-w-[240px]">
+          <p className="truncate">Document deleted successfully.</p>
+          <button
+            onClick={() => setShowToast(false)}
+            className="text-gray-500 hover:text-gray-300 text-xs font-semibold leading-none ml-2"
+          >
+            ×
+          </button>
         </div>
       )}
     </div>
