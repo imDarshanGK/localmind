@@ -4,6 +4,7 @@ import { AppLogoIcon, FileIcon, LockIcon } from "./Icons";
 
 export default function ChatWindow({ messages, loading, onSend, sessionId }) {
   const [input, setInput] = useState("");
+  const [copiedId, setCopiedId] = useState(null); // Tracking temporary copy confirmation state
   const bottomRef = useRef(null);
   const textareaRef = useRef(null);
 
@@ -24,6 +25,35 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
     e.target.style.height = "auto";
     e.target.style.height = Math.min(e.target.scrollHeight, 160) + "px";
   }
+
+  // --- Quick Action Handlers ---
+  const handleCopy = async (id, text) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 1500); // Reset text banner after 1.5s
+    } catch {}
+  };
+
+  const handleRegenerate = (currentIndex) => {
+    // Find the closest preceding user message relative to this assistant response
+    for (let idx = currentIndex - 1; idx >= 0; idx--) {
+      if (messages[idx].role === "user") {
+        onSend(messages[idx].content);
+        break;
+      }
+    }
+  };
+
+  const handleExportSingleMessage = (text, index) => {
+    const element = document.createElement("a");
+    const file = new Blob([text], { type: "text/plain;charset=utf-8" });
+    element.href = URL.createObjectURL(file);
+    element.download = `localmind_message_${index + 1}.txt`;
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+  };
 
   const SUGGESTIONS = [
     "Summarize the uploaded document",
@@ -68,7 +98,7 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
 
         {messages.map((msg, i) => (
           <div key={msg.id || i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-            <div className={`max-w-2xl ${msg.role === "user" ? "max-w-xl" : "max-w-2xl"}`}>
+            <div className={`group relative max-w-2xl ${msg.role === "user" ? "max-w-xl" : "max-w-2xl"}`}>
               {msg.role === "assistant" && (
                 <div className="flex items-center gap-1.5 mb-1.5 ml-1">
                   <AppLogoIcon className="w-4 h-4 text-purple-400" />
@@ -76,6 +106,7 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
                   {msg.streaming && <span className="text-xs text-gray-500 animate-pulse">typing...</span>}
                 </div>
               )}
+              
               <div className={`px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words
                 ${msg.role === "user"
                   ? "bg-purple-700 text-white rounded-br-sm"
@@ -83,6 +114,7 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
                 {msg.content}
                 {msg.streaming && <span className="inline-block w-1.5 h-4 bg-purple-400 ml-1 animate-pulse rounded" />}
               </div>
+              
               {msg.sources?.length > 0 && (
                 <div className="mt-1.5 ml-1 flex flex-wrap gap-1">
                   {msg.sources.map((s,i) => (
@@ -95,6 +127,37 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
                   ))}
                 </div>
               )}
+
+              {/* FIXED (#252): Embedded Small Action Toolbar */}
+              {!msg.streaming && (
+                <div className={`flex items-center gap-3 mt-1.5 px-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200
+                  ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                  <button 
+                    onClick={() => handleCopy(msg.id || i, msg.content)}
+                    className="text-[11px] text-gray-500 hover:text-purple-400 transition-colors"
+                  >
+                    {copiedId === (msg.id || i) ? "✓ Copied" : "Copy"}
+                  </button>
+                  
+                  {msg.role === "assistant" && (
+                    <button 
+                      onClick={() => handleRegenerate(i)}
+                      disabled={loading}
+                      className="text-[11px] text-gray-500 hover:text-purple-400 transition-colors disabled:opacity-30"
+                    >
+                      Regenerate
+                    </button>
+                  )}
+                  
+                  <button 
+                    onClick={() => handleExportSingleMessage(msg.content, i)}
+                    className="text-[11px] text-gray-500 hover:text-purple-400 transition-colors"
+                  >
+                    Export
+                  </button>
+                </div>
+              )}
+
               {msg.role === "user" && (
                 <div className="text-right mt-1 mr-1">
                   <span className="text-xs text-gray-600">You</span>
