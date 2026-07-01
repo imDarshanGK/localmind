@@ -71,4 +71,58 @@ describe("UploadPanel multi-select upload", () => {
     expect(screen.getByText(/bad\.exe.*Unsupported file type/)).toBeDefined();
     expect(onUploaded).toHaveBeenCalledTimes(1);
   });
+
+  it("renders a delete button for each document and opens the confirmation modal on click", async () => {
+    const documents = [
+      { id: 123, filename: "test-doc.pdf", chunks_indexed: 5, status: "completed" }
+    ];
+    const onUploaded = vi.fn();
+    render(
+      <UploadPanel sessionId="s1" documents={documents} onUploaded={onUploaded} onClose={vi.fn()} show={true} />
+    );
+
+    const deleteBtn = screen.getByTitle("Delete Document");
+    expect(deleteBtn).toBeInTheDocument();
+
+    // Click delete button
+    fireEvent.click(deleteBtn);
+
+    // Confirmation modal should appear
+    expect(screen.getByText(/Are you sure you want to delete 'test-doc.pdf'\?/)).toBeInTheDocument();
+    
+    // Modal buttons should be present
+    const cancelBtn = screen.getByRole("button", { name: "Cancel" });
+    const confirmDeleteBtn = screen.getByRole("button", { name: "Delete" });
+    expect(cancelBtn).toBeInTheDocument();
+    expect(confirmDeleteBtn).toBeInTheDocument();
+
+    // Click Cancel
+    fireEvent.click(cancelBtn);
+    expect(screen.queryByText(/Are you sure you want to delete 'test-doc.pdf'\?/)).not.toBeInTheDocument();
+    expect(api.deleteDocument).not.toHaveBeenCalled();
+  });
+
+  it("deletes the document upon confirmation and shows a toast", async () => {
+    api.deleteDocument.mockResolvedValue({ status: "deleted", doc_id: 123 });
+    const documents = [
+      { id: 123, filename: "test-doc.pdf", chunks_indexed: 5, status: "completed" }
+    ];
+    const onUploaded = vi.fn();
+    render(
+      <UploadPanel sessionId="s1" documents={documents} onUploaded={onUploaded} onClose={vi.fn()} show={true} />
+    );
+
+    const deleteBtn = screen.getByTitle("Delete Document");
+    fireEvent.click(deleteBtn);
+
+    const confirmDeleteBtn = screen.getByRole("button", { name: "Delete" });
+    fireEvent.click(confirmDeleteBtn);
+
+    await waitFor(() => {
+      expect(api.deleteDocument).toHaveBeenCalledWith(123);
+    });
+
+    expect(onUploaded).toHaveBeenCalled();
+    expect(screen.getByText("Document deleted successfully.")).toBeInTheDocument();
+  });
 });
