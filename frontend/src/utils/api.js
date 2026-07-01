@@ -87,10 +87,6 @@ export const toggleMessageReaction = (messageId, emoji) =>
     body: JSON.stringify({ message_id: messageId, emoji }) 
   });
 
-<<<<<<< HEAD
-=======
-// NEW: Appended 'signal' parameter right to the tail of your token reader stream
->>>>>>> upstream/main
 export function streamMessage(body, onToken, onDone, signal) {
   return fetch(`${BASE}/chat/stream`, {
     method: "POST", 
