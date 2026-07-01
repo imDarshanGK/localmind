@@ -22,7 +22,7 @@ client = TestClient(app)
 def test_root():
     r = client.get("/")
     assert r.status_code == 200
-    assert r.json()["version"] == "2.0.0"
+    assert r.json()["version"] == app.version
 
 
 def test_health():
@@ -44,6 +44,12 @@ def test_rate_limit_headers():
     
     assert int(r.headers["X-RateLimit-Limit"]) == 100
     assert int(r.headers["X-RateLimit-Remaining"]) < 100
+
+def test_api_version_header():
+    r = client.get("/health")
+    assert r.status_code == 200
+    assert "X-API-Version" in r.headers
+    assert r.headers["X-API-Version"] == app.version
 
 # ─── Sessions ────────────────────────────────────────────
 def test_create_session():
@@ -464,6 +470,14 @@ def test_export_txt_keeps_sources_together():
     
     r2 = client.get(f"/api/export/{sid}/txt")
     assert r2.status_code == 200
+
+    r_delete = client.delete("/api/sessions/")
+    assert r_delete.status_code == 200
+    assert r_delete.json() == {"message": "All sessions cleared"}
+
+    r_list = client.get("/api/sessions/")
+    assert r_list.status_code == 200
+    assert len(r_list.json()) == 0
     
     content = r2.content.decode("utf-8")
     assert "[LOCALMIND]" in content

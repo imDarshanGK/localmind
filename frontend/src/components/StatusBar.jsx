@@ -17,11 +17,19 @@ export default function StatusBar({
   onToggleFocus
 }) {
   const [rateLimit, setRateLimit] = useState(null);
+  const [apiVersion, setApiVersion] = useState(null);
 
   useEffect(() => {
     const handleRateLimit = (e) => setRateLimit(e.detail);
+    const handleApiVersion = (e) => setApiVersion(e.detail); 
+
     window.addEventListener("ratelimit-update", handleRateLimit);
-    return () => window.removeEventListener("ratelimit-update", handleRateLimit);
+    window.addEventListener("apiversion-update", handleApiVersion);
+
+    return () => {
+      window.removeEventListener("ratelimit-update", handleRateLimit);
+      window.removeEventListener("apiversion-update", handleApiVersion);
+    };
   }, []);
 
   return (
@@ -29,6 +37,13 @@ export default function StatusBar({
       <div className="flex items-center gap-3">
         <AppLogoIcon className="w-5 h-5 text-purple-400" />
         <span className="font-semibold text-white text-sm">LocalMind</span>
+        
+        {apiVersion && (
+          <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-800 text-gray-400">
+            v{apiVersion}
+          </span>
+        )}
+
         <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-purple-900 text-purple-300">{model}</span>
         {ollamaOk === true  && <StatusBadge icon={<OnlineIcon className="w-3.5 h-3.5 text-green-300" />} className="bg-green-900 text-green-300" label="online" />}
         {ollamaOk === false && <StatusBadge icon={<OfflineIcon className="w-3.5 h-3.5 text-red-300" />} className="bg-red-900 text-red-300" label="ollama offline" />}
