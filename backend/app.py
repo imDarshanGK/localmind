@@ -173,15 +173,12 @@ async def rate_limit_middleware(request: Request, call_next):
     
     return response
 
-<<<<<<< HEAD
 @app.middleware("http")
 async def api_version_middleware(request: Request, call_next):
     response = await call_next(request)
     response.headers["X-API-Version"] = app.version
     return response
 
-=======
->>>>>>> upstream/main
 app.include_router(chat_router,     prefix="/api/chat",     tags=["Chat"])
 app.include_router(upload_router,   prefix="/api/upload",   tags=["Upload"])
 app.include_router(models_router,   prefix="/api/models",   tags=["Models"])

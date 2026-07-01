@@ -470,7 +470,6 @@ def test_export_txt_keeps_sources_together():
     
     r2 = client.get(f"/api/export/{sid}/txt")
     assert r2.status_code == 200
-<<<<<<< HEAD
 
     r_delete = client.delete("/api/sessions/")
     assert r_delete.status_code == 200
@@ -479,10 +478,8 @@ def test_export_txt_keeps_sources_together():
     r_list = client.get("/api/sessions/")
     assert r_list.status_code == 200
     assert len(r_list.json()) == 0
-=======
     
     content = r2.content.decode("utf-8")
     assert "[LOCALMIND]" in content
     assert "According to guidelines, it is 10 days." in content
     assert "Sources: policy_doc.pdf" in content
->>>>>>> upstream/main
