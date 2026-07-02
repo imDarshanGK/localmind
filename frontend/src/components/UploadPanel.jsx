@@ -5,7 +5,7 @@ import { CheckIcon, DocumentsIcon, ErrorIcon, SpinnerIcon, UploadIcon, FileIcon 
 export default function UploadPanel({ sessionId, documents, onUploaded, onClose, show, minimalMode }) {
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
-  
+
   // Preview UI local states
   const [previewContent, setPreviewContent] = useState(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
@@ -28,22 +28,22 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
   async function handleFiles(filelist) {
     const files = Array.from(filelist || []);
     if (files.length === 0) return;
-    setUploading(true); 
+    setUploading(true);
     setUploadResults([]);
     for (const file of files) {
       try {
         const data = await uploadDocument(file, sessionId);
         setUploadResults(prev => [...prev, { filename: data.filename || file.name, status: "success", message: data.message }]);
         onUploaded(data.filename);
-      } catch(e) { 
+      } catch (e) {
         setUploadResults(prev => [...prev, { filename: file.name, status: "error", message: e.message }]);
       }
     }
-    setUploading(false); 
+    setUploading(false);
   }
 
   function onDrop(e) {
-    e.preventDefault(); 
+    e.preventDefault();
     setDragging(false);
     handleFiles(e.dataTransfer.files);
   }
@@ -72,14 +72,9 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
 
       {/* Drop zone */}
       <div
-<<<<<<< HEAD
-        onDragEnter={e=>e.preventDefault()}
-        onDragOver={e=>{e.preventDefault();setDragging(true)}}
-        onDragLeave={()=>setDragging(false)}
-=======
-        onDragOver={e => { e.preventDefault(); setDragging(true); }}
+        onDragEnter={e => e.preventDefault()}
+        onDragOver={e => { e.preventDefault(); setDragging(true) }}
         onDragLeave={() => setDragging(false)}
->>>>>>> upstream/main
         onDrop={onDrop}
         onClick={() => fileRef.current.click()}
         className={`border-2 border-dashed rounded-xl px-4 py-5 text-center cursor-pointer transition mb-3
@@ -88,12 +83,12 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
         {/* Updated accept attribute to include .srt and .vtt transcript options */}
         <input ref={fileRef} type="file" accept=".pdf,.txt,.csv,.docx,.md,.html,.srt,.vtt" className="hidden" multiple
           onChange={e => handleFiles(e.target.files)} />
-        
+
         <p className="text-2xl mb-1 flex justify-center">
           {uploading ? <SpinnerIcon className="w-7 h-7 text-purple-400" /> : <UploadIcon className="w-7 h-7 text-gray-300" />}
         </p>
         <p className="text-sm text-gray-400">{uploading ? "Indexing documents..." : "Drop files here or click to browse"}</p>
-        
+
         {/* Updated visual footer labels to explicitly display audio transcript support */}
         <p className="text-xs text-gray-600 mt-1">PDF · TXT · CSV · DOCX · MD · HTML · SRT · VTT · max 50MB</p>
       </div>
@@ -108,7 +103,7 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
           ))}
         </div>
       )}
-      
+
       {/* Uploaded docs list */}
       {documents.length > 0 && (
         <div>
@@ -151,7 +146,7 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
                 <span className="text-[10px] text-purple-400 font-semibold uppercase tracking-wider block">Read-Only Preview</span>
                 <h3 className="text-sm font-medium text-white truncate">{previewFilename}</h3>
               </div>
-              <button 
+              <button
                 onClick={() => setPreviewContent(null)}
                 className="text-gray-400 hover:text-white px-2 py-1 text-sm bg-gray-800 border border-gray-700 rounded-lg transition"
               >
