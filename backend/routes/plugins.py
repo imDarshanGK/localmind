@@ -30,6 +30,14 @@ AVAILABLE_PLUGINS = [
 async def list_plugins():
     return {"plugins": AVAILABLE_PLUGINS}
 
+@router.get("/logs")
+async def get_plugin_logs(limit: int = 50):
+    """Fetch recent plugin execution logs for the audit UI."""
+    try:
+        logs = db_service.get_plugin_logs(limit)
+        return {"logs": logs}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch logs: {str(e)}")
 
 @router.post("/run", response_model=PluginResult)
 async def run_plugin(body: PluginRun):
