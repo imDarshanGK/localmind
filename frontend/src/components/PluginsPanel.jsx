@@ -19,6 +19,10 @@ export default function PluginsPanel({ sessionId, onClose }) {
   const [running,  setRunning]  = useState(false);
   const [error,    setError]    = useState("");
   const [logs,     setLogs]     = useState([]);
+  const [pluginFilter, setPluginFilter] = useState("");
+const [startDate, setStartDate] = useState("");
+const [endDate, setEndDate] = useState("");
+const [expandedLog, setExpandedLog] = useState(null);
 
 
   const fetchLogs = async () => {
@@ -48,6 +52,22 @@ export default function PluginsPanel({ sessionId, onClose }) {
     } catch(e) { setError(e.message); }
     finally { setRunning(false); }
   }
+  const filteredLogs = logs.filter((log) => {
+  const matchesPlugin =
+    pluginFilter === "" ||
+    log.plugin.toLowerCase().includes(pluginFilter.toLowerCase());
+
+  const logDate = new Date(log.created_at);
+
+  const matchesStart =
+    !startDate || logDate >= new Date(startDate);
+
+  const matchesEnd =
+    !endDate ||
+    logDate <= new Date(endDate + "T23:59:59");
+
+  return matchesPlugin && matchesStart && matchesEnd;
+});
 
   return (
     <div data-testid="plugins-panel" className="border-b border-gray-800 bg-gray-900 px-5 py-4 shrink-0 flex flex-col max-h-[50vh]">
@@ -96,30 +116,102 @@ export default function PluginsPanel({ sessionId, onClose }) {
       )}
 
       <div className="mt-2 border-t border-gray-800 pt-4 flex-1 overflow-hidden flex flex-col">
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 shrink-0">
-              Recent Executions
-          </h3>
+          <div className="flex items-center justify-between mb-3">
+    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+        Plugin History
+    </h3>
+            <div className="flex gap-2 mb-3 flex-wrap">
+    <input
+        type="text"
+        placeholder="Filter by plugin"
+        value={pluginFilter}
+        onChange={(e) => setPluginFilter(e.target.value)}
+        className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-white"
+    />
+
+    <input
+        type="date"
+        value={startDate}
+        onChange={(e) => setStartDate(e.target.value)}
+        className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-white"
+    />
+
+    <input
+        type="date"
+        value={endDate}
+        onChange={(e) => setEndDate(e.target.value)}
+        className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-white"
+    />
+</div>
+</div>
           {logs.length === 0 ? (
               <p className="text-xs text-gray-500">No plugins have been run yet.</p>
           ) : (
               <ul className="space-y-2 overflow-y-auto pr-2 text-sm flex-1 custom-scrollbar">
-                  {logs.map((log) => (
-                      <li key={log.id} className="p-3 bg-gray-800/50 rounded-md border border-gray-700/50">
-                          <div className="flex justify-between items-center mb-1">
-                              <span className="font-bold text-purple-400 capitalize text-xs">
-                                  {log.plugin}
-                              </span>
-                              <span className={`text-[10px] px-2 py-0.5 rounded-full ${log.success ? 'bg-green-900/50 text-green-400' : 'bg-red-900/50 text-red-400'}`}>
-                                  {log.success ? 'Success' : 'Error'}
-                              </span>
-                          </div>
-                          <div className="text-gray-300 truncate text-xs">
-                              <span className="text-gray-500">Input:</span> {log.input}
-                          </div>
-                          <div className="text-gray-600 text-[10px] mt-1 text-right">
-                              {new Date(log.created_at + 'Z').toLocaleString()}
-                          </div>
-                      </li>
+                  {filteredLogs.map((log) => (
+                     <li
+    key={log.id}
+    className="p-3 bg-gray-800/50 rounded-md border border-gray-700/50"
+>
+    <div className="flex justify-between items-center mb-2">
+
+        <span className="font-bold text-purple-400 capitalize text-xs">
+            {log.plugin}
+        </span>
+
+        <span
+            className={`text-[10px] px-2 py-0.5 rounded-full ${
+                log.success
+                    ? "bg-green-900/50 text-green-400"
+                    : "bg-red-900/50 text-red-400"
+            }`}
+        >
+            {log.success ? "Success" : "Failure"}
+        </span>
+
+    </div>
+
+    <div className="text-xs text-gray-300">
+        <span className="text-gray-500">Input:</span>{" "}
+        {expandedLog === log.id
+            ? log.input
+            : (log.input || "").slice(0, 80)}
+        {expandedLog !== log.id &&
+            log.input &&
+            log.input.length > 80 &&
+            "..."}
+    </div>
+
+    <div className="text-xs text-gray-300 mt-2">
+        <span className="text-gray-500">Output:</span>{" "}
+        {expandedLog === log.id
+            ? log.output
+            : (log.output || "").slice(0, 80)}
+        {expandedLog !== log.id &&
+            log.output &&
+            log.output.length > 80 &&
+            "..."}
+    </div>
+
+    <div className="flex justify-between items-center mt-3">
+
+        <span className="text-[10px] text-gray-500">
+            {new Date(log.created_at + "Z").toLocaleString()}
+        </span>
+
+        <button
+            className="text-purple-400 text-xs hover:underline"
+            onClick={() =>
+                setExpandedLog(
+                    expandedLog === log.id ? null : log.id
+                )
+            }
+        >
+            {expandedLog === log.id ? "Show Less" : "Show More"}
+        </button>
+
+    </div>
+</li>
                   ))}
               </ul>
           )}
