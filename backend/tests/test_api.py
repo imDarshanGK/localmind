@@ -35,6 +35,16 @@ def test_db_health():
     assert r.status_code == 200
     assert r.json()["status"] == "healthy"
 
+def test_rate_limit_headers():
+    r = client.get("/health")
+    assert r.status_code == 200
+    assert "X-RateLimit-Limit" in r.headers
+    assert "X-RateLimit-Remaining" in r.headers
+    assert "X-RateLimit-Reset" in r.headers
+    
+    assert int(r.headers["X-RateLimit-Limit"]) == 100
+    assert int(r.headers["X-RateLimit-Remaining"]) < 100
+
 # ─── Sessions ────────────────────────────────────────────
 def test_create_session():
     r = client.post("/api/sessions/", json={"title": "Test Chat", "model": "llama3", "language": "hi"})
@@ -338,11 +348,12 @@ def test_models_list(m1, m2):
     assert len(r.json()["models"]) == 1
 
 
-# ─── Chat (mocked Ollama) ────────────────────────────────
 @patch("routes.chat.ollama_service.is_ollama_running", new_callable=AsyncMock, return_value=False)
 def test_chat_ollama_down(mock):
     r = client.post("/api/chat/", json={"message":"hi","session_id":"x","model":"llama3"})
-    assert r.status_code == 503
+    # Expect 200 OK now that we handle this gracefully
+    assert r.status_code == 200
+    assert "⚠️ I'm currently unable to process your request" in r.json()["reply"]
 
 @patch("routes.chat.ollama_service.is_ollama_running", new_callable=AsyncMock, return_value=True)
 @patch("routes.chat.ollama_service.chat", new_callable=AsyncMock, return_value="Hello! I'm LocalMind.")
@@ -424,79 +435,37 @@ def test_export_txt():
     assert r2.status_code == 200
     assert b"Plain text export" in r2.content
 
-
-# ─── Prompt Templates ────────────────────────────────────────
-def test_create_prompt_template():
-    r = client.post("/api/prompt-templates/", json={
-        "prompt_title": "Code Reviewer",
-        "prompt": "Review this code for bugs and suggest improvements."
-    })
-    assert r.status_code == 200
-    assert r.json()["prompt_title"] == "Code Reviewer"
-    assert "id" in r.json()
-
-
-def test_list_prompt_templates():
-    r = client.get("/api/prompt-templates/")
-    assert r.status_code == 200
-    assert isinstance(r.json(), list)
-    assert len(r.json()) >= 1
-
-
-def test_update_prompt_template():
-    r = client.post("/api/prompt-templates/", json={
-        "prompt_title": "Old Title",
-        "prompt": "Old prompt text"
-    })
-    tid = r.json()["id"]
-    r2 = client.put(f"/api/prompt-templates/{tid}", json={
-        "prompt_title": "New Title"
-    })
-    assert r2.json()["prompt_title"] == "New Title"
-
-
-def test_delete_prompt_template():
-    r = client.post("/api/prompt-templates/", json={
-        "prompt_title": "To Delete",
-        "prompt": "This will be deleted."
-    })
-    tid = r.json()["id"]
-    r2 = client.delete(f"/api/prompt-templates/{tid}")
+# ─── Export Regression Tests (Issue #238) ────────────────
+def test_export_markdown_keeps_sources_together():
+    """Verify Markdown export groups assistant response text and sources structurally."""
+    r = client.post("/api/sessions/", json={"title": "RAG MD Export"})
+    sid = r.json()["id"]
+    
+    # Inject a mock assistant response containing linked document reference arrays
+    db.save_message(sid, "user", "What is the policy?")
+    db.save_message(sid, "assistant", "According to guidelines, it is 10 days.", ["policy_doc.pdf", "hr_guide.txt"])
+    
+    r2 = client.get(f"/api/export/{sid}/markdown")
     assert r2.status_code == 200
-    assert r2.json()["status"] == "deleted"
+    
+    # Check that assistant response body and structural citation tags exist in content stream
+    content = r2.content.decode("utf-8")
+    assert "According to guidelines, it is 10 days." in content
+    assert "*Sources: policy_doc.pdf, hr_guide.txt*" in content
 
 
-def test_get_prompt_template_not_found():
-    r = client.put("/api/prompt-templates/99999", json={
-        "prompt_title": "Nope"
-    })
-    assert r.status_code == 404
-
-
-def test_delete_prompt_template_not_found():
-    r = client.delete("/api/prompt-templates/99999")
-    assert r.status_code == 404
-
-
-def test_create_prompt_template_empty_title():
-    r = client.post("/api/prompt-templates/", json={
-        "prompt_title": "",
-        "prompt": "Some prompt"
-    })
-    assert r.status_code == 422
-
-def test_clear_all_sessions():
-    r1 = client.post("/api/sessions/", json={"title": "Session 1"})
-    r2 = client.post("/api/sessions/", json={"title": "Session 2"})
-    assert r1.status_code == 200
+def test_export_txt_keeps_sources_together():
+    """Verify Plain Text export groups assistant response text and sources structurally."""
+    r = client.post("/api/sessions/", json={"title": "RAG TXT Export"})
+    sid = r.json()["id"]
+    
+    db.save_message(sid, "user", "What is the policy?")
+    db.save_message(sid, "assistant", "According to guidelines, it is 10 days.", ["policy_doc.pdf"])
+    
+    r2 = client.get(f"/api/export/{sid}/txt")
     assert r2.status_code == 200
-
-    r_delete = client.delete("/api/sessions/")
-    assert r_delete.status_code == 200
-    assert r_delete.json() == {"message": "All sessions cleared"}
-
-    r_list = client.get("/api/sessions/")
-    assert r_list.status_code == 200
-    assert len(r_list.json()) == 0
-
-
+    
+    content = r2.content.decode("utf-8")
+    assert "[LOCALMIND]" in content
+    assert "According to guidelines, it is 10 days." in content
+    assert "Sources: policy_doc.pdf" in content

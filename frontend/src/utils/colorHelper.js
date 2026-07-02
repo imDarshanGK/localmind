@@ -1,3 +1,16 @@
+// Local cache memory dictionary map for session color groupings
+const colorCache = {};
+
+const TAILWIND_COLORS = [
+  "text-red-400",
+  "text-blue-400",
+  "text-green-400",
+  "text-yellow-400",
+  "text-purple-400",
+  "text-pink-400",
+  "text-indigo-400"
+];
+
 export const PALETTE = [
   { name: "Blue", hex: "#3b82f6" },
   { name: "Green", hex: "#22c55e" },
@@ -9,34 +22,33 @@ export const PALETTE = [
   { name: "Gray", hex: "#6b7280" }
 ];
 
-export function hashSessionIdToColor(sessionId) {
-  if (!sessionId) return PALETTE[0].hex;
-  let hash = 0;
-  for (let i = 0; i < sessionId.length; i++) {
-    hash = sessionId.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  const index = Math.abs(hash) % PALETTE.length;
-  return PALETTE[index].hex;
-}
-
-export function getSessionColor(sessionId) {
+export function getSessionColor(sid) {
+  if (!sid) return "text-gray-500";
+  
+  // Checks if Darshan's explicit local storage overrides exist first
   try {
-    const overrides = JSON.parse(localStorage.getItem("localmind_session_colors") || "{}");
-    if (overrides[sessionId]) {
-      return overrides[sessionId];
-    }
+    const overrides = JSON.parse(localStorage.getItem("localmind_session_colors")) || {};
+    if (overrides[sid]) return overrides[sid];
   } catch (e) {
-    // Fallback if localStorage fails or is disabled
+    console.error("Failed to parse session colors", e);
   }
-  return hashSessionIdToColor(sessionId);
+
+  // Fallback to our dynamic fallback hashing system if no override is set
+  if (!colorCache[sid]) {
+    const hash = Array.from(sid).reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    colorCache[sid] = TAILWIND_COLORS[hash % TAILWIND_COLORS.length];
+  }
+  return colorCache[sid];
 }
 
-export function setSessionColor(sessionId, color) {
+export function setSessionColor(sid, color) {
+  if (!sid) return;
+  colorCache[sid] = color;
   try {
-    const overrides = JSON.parse(localStorage.getItem("localmind_session_colors") || "{}");
-    overrides[sessionId] = color;
+    const overrides = JSON.parse(localStorage.getItem("localmind_session_colors")) || {};
+    overrides[sid] = color;
     localStorage.setItem("localmind_session_colors", JSON.stringify(overrides));
   } catch (e) {
-    // Fail silently if localStorage is disabled
+    console.error("Failed to save session color", e);
   }
 }

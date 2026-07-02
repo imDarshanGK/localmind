@@ -11,3 +11,18 @@ body { font-family: 'JetBrains Mono', 'Fira Code', monospace; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #374151; border-radius: 2px; }
 ::-webkit-scrollbar-thumb:hover { background: #4B5563; }
+
+/* ── Theme presets for contrast & readability (issue #273) ────────────────
+   Driven by the data-theme attribute set on <html> from settings.theme.
+   "dark" / "light" keep the base UI; the presets below layer contrast and
+   readability adjustments on top without changing component markup. */
+#root { transition: filter 0.2s ease; }
+
+/* Higher contrast for low-vision readability. */
+html[data-theme="high-contrast"] #root { filter: contrast(1.18); }
+
+/* Warm, lower-glare tone that's easier on the eyes for long reading. */
+html[data-theme="sepia"] #root { filter: sepia(0.4) brightness(0.96); }
+
+/* Larger text/spacing for comfortable reading (scales the rem-based UI). */
+html[data-theme="comfort"] { font-size: 18px; }

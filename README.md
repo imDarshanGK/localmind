@@ -295,6 +295,53 @@ localmind/
 | Code Runner | Run Python snippets in a sandbox |
 | Translator | Language detection + translation via LocalMind |
 
+## 📤 Bulk Session Export API
+
+Export multiple chat sessions in a single payload.
+
+**Endpoint:** `POST /api/export/sessions`
+
+**Request Headers:** `Content-Type: application/json`
+
+**Request Body:**
+```json
+{
+  "session_ids": ["sess_1", "sess_2"],
+  "format": "json"
+}
+```
+
+**Response (JSON format):**
+```json
+{
+  "exported_at": "2026-06-24 19:30",
+  "sessions": [
+    {
+      "session": {
+        "id": "sess_1",
+        "title": "LocalMind Chat",
+        "model": "llama3",
+        "language": "en",
+        "message_count": 2,
+        "created_at": "2026-06-24 19:00:00",
+        "updated_at": "2026-06-24 19:05:00"
+      },
+      "messages": [
+        {
+          "id": 1,
+          "role": "user",
+          "content": "Hello",
+          "sources": [],
+          "created_at": "2026-06-24 19:00:05",
+          "benchmarks": {}
+        }
+      ]
+    }
+  ]
+}
+```
+Supported formats: `json`, `markdown`, `txt`.
+
 ---
 
 ## Running Tests
@@ -304,6 +351,13 @@ cd backend
 pip install pytest pytest-asyncio
 pytest tests/ -v
 # 30+ tests covering: sessions, chat, plugins, upload, export, settings
+```
+
+### Local Backup Verification
+
+```bash
+# Verify backup and restore round-trip works correctly
+pytest backend/tests/test_backup.py -v
 ```
 ---
 
@@ -349,12 +403,18 @@ LocalMind automatically reclaims disk space after large deletions — clearing a
 
 ---
 
+---
+
 ## 🚀 Optimization & Performance Utilities
 
 ### Embeddings Cache Warmup
 To prevent cold-start latency when users upload documents for the first time, you can pre-download and warm up the SentenceTransformer inference weights (`all-MiniLM-L6-v2`) before starting the web server.
 
-Run the following command within your active virtual environment i
+Run the following command within your active virtual environment inside the backend directory:
+
+```bash
+cd backend
+python warmup.py
 
 ## 🤝 Contributing
 
