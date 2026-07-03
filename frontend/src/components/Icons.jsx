@@ -300,3 +300,32 @@ export function TemplateIcon(props) {
     </Icon>
   );
 }
+
+export function CopyIcon(props) {
+  return (
+    <Icon {...props}>
+      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </Icon>
+  );
+}
+
+export function ChartIcon(props) {
+  return (
+    <Icon {...props}>
+      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+    </Icon>
+  );
+}
+
+export function PinIcon({ filled, ...props }) {
+  return (
+    <Icon {...props}>
+      <path 
+        d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.36a.5.5 0 0 0 .62.62l4.36-1.32a2 2 0 0 0 .83-.5z" 
+        fill={filled ? "currentColor" : "none"} 
+      />
+      <path d="m15 9 3-3" />
+    </Icon>
+  );
+}
