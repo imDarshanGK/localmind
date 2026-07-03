@@ -35,17 +35,21 @@ export default function PluginsPanel({ sessionId, onClose }) {
   }
 
   return (
-    <div className="border-b border-gray-800 bg-gray-900 px-5 py-4 shrink-0">
-      <div className="flex items-center justify-between mb-3">
-        <p className="text-sm font-semibold text-white inline-flex items-center gap-1.5"><PlugIcon className="w-4 h-4" />Plugins</p>
-        <button onClick={onClose} className="text-gray-500 hover:text-gray-300 text-lg leading-none">×</button>
+    /* FIXED (#590): Added mobile full-screen modal overlay styling with md breakpoint fallbacks */
+    <div className="fixed inset-0 z-50 flex flex-col bg-gray-900 px-5 py-4 overflow-y-auto md:relative md:inset-auto md:z-auto md:border-b md:border-gray-800 md:shrink-0 md:bg-gray-900">
+      <div className="flex items-center justify-between mb-4 md:mb-3">
+        <p className="text-sm font-semibold text-white inline-flex items-center gap-1.5">
+          <PlugIcon className="w-4 h-4" />
+          Plugins
+        </p>
+        <button onClick={onClose} className="text-gray-500 hover:text-gray-300 text-2xl md:text-lg leading-none p-1">×</button>
       </div>
 
-      {/* Plugin selector */}
-      <div className="flex flex-wrap gap-2 mb-3">
+      {/* Plugin selector - improved padding for easier touch targets on mobile */}
+      <div className="flex flex-wrap gap-2 mb-4 md:mb-3">
         {plugins.map(p => (
           <button key={p.id} onClick={() => { setSelected(p); setOutput(""); setError(""); }}
-            className={`text-xs px-3 py-1.5 rounded-lg border transition font-medium
+            className={`text-xs px-3.5 py-2 md:py-1.5 rounded-lg border transition font-medium touch-manipulation
               ${selected?.id === p.id ? "border-purple-500 bg-purple-900/30 text-purple-300" : "border-gray-700 text-gray-400 hover:bg-gray-800"}`}>
             {(() => {
               const Icon = PLUGIN_ICONS[p.icon] || PlugIcon;
@@ -61,21 +65,23 @@ export default function PluginsPanel({ sessionId, onClose }) {
       </div>
 
       {selected && (
-        <div className="space-y-2">
+        <div className="space-y-3 md:space-y-2 flex-1 md:flex-initial flex flex-col justify-start">
           <p className="text-xs text-gray-500">{selected.description}</p>
           <textarea value={input} onChange={e=>setInput(e.target.value)}
-            placeholder={`Enter input for ${selected.name}...`} rows={3}
-            className="w-full text-xs bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-gray-200 placeholder-gray-600 outline-none focus:border-purple-500 resize-none" />
-          <button onClick={run} disabled={!input.trim() || running}
-            className="text-xs bg-purple-700 hover:bg-purple-600 disabled:opacity-40 text-white px-4 py-1.5 rounded-lg transition font-medium">
-            {running ? "Running..." : `Run ${selected.name}`}
-          </button>
+            placeholder={`Enter input for ${selected.name}...`} rows={4}
+            className="w-full text-sm md:text-xs bg-gray-800 border border-gray-700 rounded-xl px-3 py-2.5 md:py-2 text-gray-200 placeholder-gray-600 outline-none focus:border-purple-500 resize-none" />
+          <div>
+            <button onClick={run} disabled={!input.trim() || running}
+              className="w-full md:w-auto text-sm md:text-xs bg-purple-700 hover:bg-purple-600 disabled:opacity-40 text-white px-5 py-2.5 md:py-1.5 rounded-lg transition font-medium shadow-md">
+              {running ? "Running..." : `Run ${selected.name}`}
+            </button>
+          </div>
           {output && (
-            <pre className="text-xs bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-green-300 whitespace-pre-wrap max-h-40 overflow-y-auto">
+            <pre className="text-xs bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-green-300 whitespace-pre-wrap max-h-60 md:max-h-40 overflow-y-auto font-mono mt-2">
               {output}
             </pre>
           )}
-          {error && <p className="text-xs text-red-400 inline-flex items-center gap-1"><ErrorIcon className="w-3.5 h-3.5" />{error}</p>}
+          {error && <p className="text-xs text-red-400 inline-flex items-center gap-1 mt-1"><ErrorIcon className="w-3.5 h-3.5" />{error}</p>}
         </div>
       )}
     </div>
