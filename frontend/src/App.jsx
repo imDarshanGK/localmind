@@ -17,6 +17,7 @@ export default function App() {
   const [models,     setModels]     = useState([]);
   const [documents,  setDocuments]  = useState([]);
   const [loading,    setLoading]    = useState(false);
+  const [settingsLoading, setSettingsLoading] = useState(true);
   const [streaming,  setStreaming]  = useState(false);
   const [panel,      setPanel]      = useState(null); // "upload"|"plugins"|"settings"|null
   const [view,        setView]       = useState("chat"); // "chat"|"prompts"
@@ -52,8 +53,12 @@ export default function App() {
         if (settRes.value.default_model) setModel(settRes.value.default_model);
         if (settRes.value.default_language) setLanguage(settRes.value.default_language);
       }
-      if (stRes.status === "fulfilled") setOllamaOk(stRes.value.ollama_running);
-    } catch {}
+       if (stRes.status === "fulfilled") setOllamaOk(stRes.value.ollama_running);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setSettingsLoading(false);
+    }
   }
 
   const refreshSessions = useCallback(async () => {
@@ -129,6 +134,13 @@ export default function App() {
     await api.clearMessages(sessionId);
     setMessages([]);
   }
+  if (settingsLoading) {
+  return (
+    <div className="flex items-center justify-center h-screen bg-gray-950">
+      <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-600 border-t-white"></div>
+    </div>
+  );
+}
 
   return (
     <div className={`flex h-screen overflow-hidden ${settings.theme === "light" ? "bg-gray-100" : "bg-gray-950"} text-gray-100`}>
