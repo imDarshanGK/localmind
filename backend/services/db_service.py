@@ -611,11 +611,6 @@ def log_plugin(
                 int(success),
             ),
         )
-    with get_db() as conn:
-        conn.execute(
-            "INSERT INTO plugin_logs (session_id, plugin, input, output, success) VALUES (?,?,?,?,?)",
-            (session_id, plugin, inp, out, int(success)),
-        )
 
 
 # ─── Shareable Sessions (Issue #270) ─────────────────────────
