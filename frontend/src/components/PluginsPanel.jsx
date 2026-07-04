@@ -42,14 +42,25 @@ const [expandedLog, setExpandedLog] = useState(null);
   async function run() {
     if (!selected || !input.trim()) return;
     setRunning(true); setOutput(""); setError("");
-    try {
-      const r = await runPlugin({ plugin: selected.id, input, session_id: sessionId });
-      if (r.success) {
-        setOutput(r.output);
-        await fetchLogs();
-      }
-      else setError(r.error || "Plugin failed");
-    } catch(e) { setError(e.message); }
+   try {
+  const r = await runPlugin({
+      plugin: selected.id,
+      input,
+      session_id: sessionId
+  });
+
+  if (r.success) {
+      setOutput(r.output);
+  } else {
+      setError(r.error || "Plugin failed");
+  }
+
+  await fetchLogs();
+
+} catch (e) {
+    setError(e.message);
+}
+    catch(e) { setError(e.message); }
     finally { setRunning(false); }
   }
   const filteredLogs = logs.filter((log) => {
