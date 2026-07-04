@@ -57,10 +57,10 @@ const [expandedLog, setExpandedLog] = useState(null);
 
   await fetchLogs();
 
-} catch (e) {
+} 
+   catch (e) {
     setError(e.message);
 }
-    catch(e) { setError(e.message); }
     finally { setRunning(false); }
   }
   const filteredLogs = logs.filter((log) => {
@@ -204,7 +204,7 @@ const [expandedLog, setExpandedLog] = useState(null);
             "..."}
     </div>
 
-    <div className="flex justify-between items-center mt-3">
+    <div className="flex flex-col gap-3 mb-3">
 
         <span className="text-[10px] text-gray-500">
             {new Date(log.created_at + "Z").toLocaleString()}
