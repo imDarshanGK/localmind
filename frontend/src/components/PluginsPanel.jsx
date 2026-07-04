@@ -144,7 +144,7 @@ const [expandedLog, setExpandedLog] = useState(null);
     />
 </div>
 </div>
-          {logs.length === 0 ? (
+          {filteredLogs.length === 0 ? (
               <p className="text-xs text-gray-500">No plugins have been run yet.</p>
           ) : (
               <ul className="space-y-2 overflow-y-auto pr-2 text-sm flex-1 custom-scrollbar">
