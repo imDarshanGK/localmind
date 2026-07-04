@@ -101,7 +101,7 @@ export default function App() {
   async function bootstrap() {
     try {
       const [mRes, sRes, settRes, stRes] = await Promise.allSettled([
-        api.getModels(), api.getSessions(), api.getSettings(), api.getOllamaStatus(),
+        api.getModels(), api.getSessions(), api.getOllamaStatus(), api.getSettings()
       ]);
       if (mRes.status === "fulfilled") setModels(mRes.value.models || []);
       if (sRes.status === "fulfilled") setSessions((sRes.value || []).map(s => ({ ...s, color: getSessionColor(s.id) })));
@@ -116,6 +116,11 @@ export default function App() {
         setOllamaOk(stRes.value.ollama_running);
       } else {
         setOllamaOk(false);
+      }
+       if (settRes.status === "fulfilled") {
+        setSettings(settRes.value);
+        if (settRes.value.default_model) setModel(settRes.value.default_model);
+        if (settRes.value.default_language) setLanguage(settRes.value.default_language);
       }
     } catch {}
   }
