@@ -67,8 +67,22 @@ async def run_plugin(body: PluginRun):
 
     except HTTPException:
         raise
-    except Exception as e:
-        return PluginResult(plugin=plugin, output="", success=False, error=str(e))
+   except Exception as e:
+    if body.session_id:
+        db_service.log_plugin(
+            body.session_id,
+            plugin,
+            inp,
+            str(e),
+            False
+        )
+
+    return PluginResult(
+        plugin=plugin,
+        output="",
+        success=False,
+        error=str(e)
+    )
 
 
 # ─── Plugin implementations ──────────────────────────────────
