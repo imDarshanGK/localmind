@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { SettingsIcon } from "./Icons";
 
 const MODELS    = ["llama3", "mistral", "phi3", "gemma2", "deepseek-r1"];
@@ -20,8 +20,23 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
     rag_top_k:        settings?.rag_top_k        || 4,
     rag_chunk_overlap: settings?.rag_chunk_overlap ?? 50,
     theme:            settings?.theme            || "dark",
-    minimal_mode:     settings?.minimal_mode ?? false,
+    minimal_mode:      settings?.minimal_mode ?? false,
   });
+
+  // --- FIXED (#585): LocalStorage Drafts Management State Hooks ---
+  const [drafts, setDrafts] = useState(() => {
+    try {
+      const saved = localStorage.getItem("localmind_settings_drafts");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [newDraft, setNewDraft] = useState("");
+
+  useEffect(() => {
+    localStorage.setItem("localmind_settings_drafts", JSON.stringify(drafts));
+  }, [drafts]);
 
   const [errors, setErrors] = useState({});
   const [isSaving, setIsSaving] = useState(false);
@@ -62,6 +77,16 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
       setIsSaving(false);
     }
   }
+
+  const handleAddDraft = () => {
+    if (!newDraft.trim()) return;
+    setDrafts(p => [...p, { id: crypto.randomUUID(), text: newDraft.trim() }]);
+    setNewDraft("");
+  };
+
+  const handleDeleteDraft = (id) => {
+    setDrafts(p => p.filter(d => d.id !== id));
+  };
 
   return (
     <div data-testid="settings-panel" className="border-b border-gray-800 bg-gray-900 px-5 py-4 shrink-0">
@@ -126,22 +151,64 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
         </Field>
 
         <Field label="Minimal Mode">
-          <label className="flex items-center gap-2 text-gray-300">
+          <label className="flex items-center gap-2 text-gray-300 mt-1 cursor-pointer select-none">
             <input
               type="checkbox"
               checked={form.minimal_mode}
               onChange={e => set("minimal_mode", e.target.checked)}
+              className="accent-purple-500"
             />
             Low-bandwidth mode
           </label>
         </Field>
       </div>
 
-      <div className="flex gap-2 mt-4">
+      {/* --- Saved Drafts Scratchpad Dashboard Area --- */}
+      <div className="mt-5 pt-4 border-t border-gray-800 text-xs">
+        <label className="text-gray-400 font-medium block mb-2">Saved Prompt Drafts / Notes</label>
+        
+        <div className="flex gap-2 mb-3">
+          <input 
+            type="text" 
+            value={newDraft} 
+            onChange={e => setNewDraft(e.target.value)}
+            placeholder="Type a canned prompt snippet or scratchpad note..."
+            className="flex-1 bg-gray-800 text-gray-200 border border-gray-700 rounded-lg px-3 py-1 text-xs outline-none focus:border-purple-500 placeholder-gray-600"
+            onKeyDown={e => e.key === "Enter" && handleAddDraft()}
+          />
+          <button 
+            onClick={handleAddDraft}
+            className="bg-purple-700/40 hover:bg-purple-700 border border-purple-500/30 hover:border-purple-500 text-purple-300 hover:text-white px-3 py-1 rounded-lg font-medium transition text-xs shrink-0"
+          >
+            Add
+          </button>
+        </div>
+
+        {drafts.length === 0 ? (
+          <p className="text-[11px] text-gray-600 italic">No message drafts stored yet.</p>
+        ) : (
+          <div className="space-y-1.5 max-h-[120px] overflow-y-auto pr-1 custom-scrollbar">
+            {drafts.map(d => (
+              <div key={d.id} className="flex justify-between items-start gap-3 bg-gray-800/40 border border-gray-800/80 p-2 rounded-lg group hover:border-gray-700/60 transition">
+                <p className="text-[11px] text-gray-300 break-words flex-1 font-mono">{d.text}</p>
+                <button 
+                  onClick={() => handleDeleteDraft(d.id)}
+                  className="text-gray-500 hover:text-red-400 transition font-bold px-1 text-sm leading-none"
+                  title="Delete draft"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="flex gap-2 mt-5 pt-3 border-t border-gray-800">
         <button 
           onClick={handleSave}
           disabled={isSaving}
-          className="text-xs bg-purple-700 hover:bg-purple-600 disabled:bg-gray-800 text-white px-4 py-1.5 rounded-lg transition font-medium">
+          className="text-xs bg-purple-700 hover:bg-purple-600 disabled:bg-gray-800 text-white px-4 py-1.5 rounded-lg transition font-medium shadow-md">
           {isSaving ? "Saving..." : "Save Settings"}
         </button>
         <button onClick={onClose}
