@@ -532,15 +532,85 @@ def save_setting(key: str, value):
 
 # ─── Plugin logs ─────────────────────────────────────────────
 
-def get_plugin_logs(limit: int = 50) -> list[dict]:
+def get_plugin_logs(
+    limit: int = 50,
+    plugin: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
+) -> list[dict]:
+    """
+    Fetch plugin execution history with optional filtering.
+    """
+
+    query = """
+        SELECT id,
+               session_id,
+               plugin,
+               input,
+               output,
+               success,
+               created_at
+        FROM plugin_logs
+        WHERE 1=1
+    """
+
+    params = []
+
+    if plugin:
+        query += " AND plugin = ?"
+        params.append(plugin)
+
+    if start_date:
+        query += " AND date(created_at) >= date(?)"
+        params.append(start_date)
+
+    if end_date:
+        query += " AND date(created_at) <= date(?)"
+        params.append(end_date)
+
+    query += """
+        ORDER BY created_at DESC
+        LIMIT ?
+    """
+
+    params.append(limit)
+
     with get_db() as conn:
-        rows = conn.execute(
-            "SELECT * FROM plugin_logs ORDER BY created_at DESC LIMIT ?",
-            (limit,)
-        ).fetchall()
+        rows = conn.execute(query, params).fetchall()
         return [dict(r) for r in rows]
 
-def log_plugin(session_id: str, plugin: str, inp: str, out: str, success: bool = True):
+def log_plugin(
+    session_id: str,
+    plugin: str,
+    inp: str,
+    out: str,
+    success: bool = True,
+):
+    """
+    Store plugin execution in audit history.
+    """
+
+    with get_db() as conn:
+        conn.execute(
+            """
+            INSERT INTO plugin_logs
+            (
+                session_id,
+                plugin,
+                input,
+                output,
+                success
+            )
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                session_id,
+                plugin,
+                inp,
+                out,
+                int(success),
+            ),
+        )
     with get_db() as conn:
         conn.execute(
             "INSERT INTO plugin_logs (session_id, plugin, input, output, success) VALUES (?,?,?,?,?)",
