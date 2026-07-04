@@ -25,6 +25,19 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
     e.target.style.height = Math.min(e.target.scrollHeight, 160) + "px";
   }
 
+  // --- FIXED (#742): Interactive Empty-State Suggestion Handler ---
+  function handleSuggestionClick(text) {
+    setInput(text);
+    if (textareaRef.current) {
+      textareaRef.current.focus();
+      // Give React a tick to update the DOM value before recalculating height
+      setTimeout(() => {
+        textareaRef.current.style.height = "auto";
+        textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 160) + "px";
+      }, 0);
+    }
+  }
+
   const SUGGESTIONS = [
     "Summarize the uploaded document",
     "What are the key points?",
@@ -50,14 +63,15 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5">
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center gap-4">
-              <AppLogoIcon className="w-14 h-14 text-purple-400 opacity-70" />
+            <AppLogoIcon className="w-14 h-14 text-purple-400 opacity-70" />
             <div>
               <p className="text-xl font-semibold text-gray-200 mb-1">LocalMind is ready</p>
               <p className="text-sm text-gray-500">100% private · runs offline · no cloud</p>
             </div>
             <div className="grid grid-cols-2 gap-2 mt-4 max-w-lg w-full">
               {SUGGESTIONS.map(s => (
-                <button key={s} onClick={() => onSend(s)}
+                // --- FIXED (#742): Swapped instant send execution for guided form injection ---
+                <button key={s} onClick={() => handleSuggestionClick(s)}
                   className="text-xs text-left border border-gray-800 rounded-xl px-3 py-2.5 text-gray-400 hover:border-purple-600 hover:text-purple-300 hover:bg-purple-900/20 transition">
                   {s}
                 </button>
@@ -141,12 +155,12 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
             Send →
           </button>
         </div>
-        <p className="text-center text-xs text-gray-700 mt-2">
+        <div className="text-center text-xs text-gray-700 mt-2">
           <span className="inline-flex items-center gap-1">
             <LockIcon className="w-3.5 h-3.5" />
             <span>Everything is processed locally. No data leaves your machine.</span>
           </span>
-        </p>
+        </div>
       </div>
     </div>
   );
