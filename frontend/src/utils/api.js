@@ -32,7 +32,7 @@ async function req(path, opts = {}) {
   return res.json();
 }
 
-// Network Request Operations Block
+// NEW: sendMessage can now accept an optional trailing signal parameter
 export const sendMessage = (b, signal) => req("/chat/", { method: "POST", body: JSON.stringify(b), signal });
 export const cancelStream = (id) => req(`/chat/cancel/${id}`, { method: "POST" });
 export const getSessions = () => req("/sessions/");
@@ -84,14 +84,15 @@ export const toggleMessageReaction = (messageId, emoji) =>
     body: JSON.stringify({ message_id: messageId, emoji }) 
   });
 
-// Token Reader Stream Handler
+// NEW: Appended 'signal' parameter right to the tail of your token reader stream
 export function streamMessage(body, onToken, onDone, signal) {
   return fetch(`${BASE}/chat/stream`, {
     method: "POST", 
-    headers: getTrackingHeaders({ "Content-Type": "application/json" }),
+    headers: getTrackingHeaders({ "Content-Type": "application/json" }), // Attaches token to chat stream
     body: JSON.stringify(body),
-    signal
+    signal // <--- Attaches the cancel token listener directly to your chunk stream reader
   }).then(res => {
+
     const limit = res.headers.get("X-RateLimit-Limit");
     const remaining = res.headers.get("X-RateLimit-Remaining");
     if (limit && remaining) {
@@ -114,6 +115,7 @@ export function streamMessage(body, onToken, onDone, signal) {
           if (line.startsWith("data: ")) {
             try { 
               const d = JSON.parse(line.slice(6)); 
+              // --- Issue #263: Forward stream token counts with main payload schemas ---
               if (d.token) {
                 onToken(d.token, d.token_count || 0);
               }
