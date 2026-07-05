@@ -7,6 +7,7 @@ import os
 import httpx
 import json
 from typing import AsyncGenerator
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -38,8 +39,6 @@ def _build_messages(message: str, context: str, history: list, language: str) ->
         )
     msgs.append({"role": "user", "content": user_content})
     return msgs
-
-
 async def chat(
     message: str,
     model: str = "llama3",
@@ -55,13 +54,39 @@ async def chat(
         "model": model,
         "messages": messages,
         "stream": False,
-        "options": {"temperature": temperature, "top_p": 0.9, "num_predict": 2048},
+        "options": {
+            "temperature": temperature,
+            "top_p": 0.9,
+            "num_predict": 2048,
+        },
     }
-    async with httpx.AsyncClient(timeout=TIMEOUT) as client:
-        response = await client.post(f"{OLLAMA_BASE_URL}/api/chat", json=payload)
-        response.raise_for_status()
-        return response.json()["message"]["content"]
 
+    async with httpx.AsyncClient(timeout=TIMEOUT) as client:
+        for attempt in range(3):
+            try:
+                response = await client.post(
+                    f"{OLLAMA_BASE_URL}/api/chat",
+                    json=payload,
+                )
+                response.raise_for_status()
+                return response.json()["message"]["content"]
+
+            except (
+                httpx.ConnectError,
+                httpx.ReadTimeout,
+                httpx.ConnectTimeout,
+            ) as e:
+                logger.warning(
+                    "Transient Ollama request failed (attempt %d/3): %s",
+                    attempt + 1,
+                    e,
+                )
+
+                if attempt == 2:
+                    logger.error("Ollama request failed after retries.")
+                    raise
+
+                await asyncio.sleep(1)
 
 async def chat_stream(
     message: str,
