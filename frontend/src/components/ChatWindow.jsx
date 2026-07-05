@@ -7,6 +7,7 @@ import PromptTemplateDialog from "./PromptTemplateDialog";
 
 export default function ChatWindow({ messages, loading, onSend, onDeleteMessage, onStop, sessionId, minimalMode }) {
   const [input, setInput] = useState("");
+  const [copiedId, setCopiedId] = useState(null); // Tracking temporary copy confirmation state
   const [searchTerm, setSearchTerm] = useState(""); // Issue #275: Message search filter
   const [showPlusMenu, setShowPlusMenu] = useState(false);
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
@@ -174,6 +175,34 @@ export default function ChatWindow({ messages, loading, onSend, onDeleteMessage,
       send(); 
     }
   }
+
+  // --- Quick Action Handlers ---
+  const handleCopy = async (id, text) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 1500); // Reset text banner after 1.5s
+    } catch {}
+  };
+
+  const handleRegenerate = (currentIndex) => {
+    for (let idx = currentIndex - 1; idx >= 0; idx--) {
+      if (messages[idx].role === "user") {
+        onSend(messages[idx].content);
+        break;
+      }
+    }
+  };
+
+  const handleExportSingleMessage = (text, index) => {
+    const element = document.createElement("a");
+    const file = new Blob([text], { type: "text/plain;charset=utf-8" });
+    element.href = URL.createObjectURL(file);
+    element.download = `localmind_message_${index + 1}.txt`;
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+  };
 
   const SUGGESTIONS = [
     "Summarize the uploaded document",
@@ -346,6 +375,36 @@ export default function ChatWindow({ messages, loading, onSend, onDeleteMessage,
                   );
                 })()}
 
+                {/* FIXED (#252): Embedded Small Action Toolbar */}
+                {!msg.streaming && (
+                  <div className={`flex items-center gap-3 mt-1.5 px-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200
+                    ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                    <button 
+                      onClick={() => handleCopy(msg.id || i, msg.content)}
+                      className="text-[11px] text-gray-500 hover:text-purple-400 transition-colors"
+                    >
+                      {copiedId === (msg.id || i) ? "✓ Copied" : "Copy"}
+                    </button>
+                    
+                    {msg.role === "assistant" && (
+                      <button 
+                        onClick={() => handleRegenerate(i)}
+                        disabled={loading}
+                        className="text-[11px] text-gray-500 hover:text-purple-400 transition-colors disabled:opacity-30"
+                      >
+                        Regenerate
+                      </button>
+                    )}
+                    
+                    <button 
+                      onClick={() => handleExportSingleMessage(msg.content, i)}
+                      className="text-[11px] text-gray-500 hover:text-purple-400 transition-colors"
+                    >
+                      Export
+                    </button>
+                  </div>
+                )}
+
                 {msg.role === "user" && (
                   <div className="flex justify-end items-center gap-1 mt-1 mr-1">
                     {renderDeleteControl(msg.id)}
@@ -419,7 +478,8 @@ export default function ChatWindow({ messages, loading, onSend, onDeleteMessage,
                 </div>
                 <div className="flex gap-1">
                   {[0,1,2].map(i => (
-                    <div key={i} className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: `${i*0.15}s` }} />
+                    <div key={i} className="w-2 h-2 bg-purple-400 rounded-full animate-bounce"
+                      style={{ animationDelay: `${i*0.15}s` }} />
                   ))}
                 </div>
               </div>
@@ -428,26 +488,9 @@ export default function ChatWindow({ messages, loading, onSend, onDeleteMessage,
           <div ref={bottomRef} />
         </div>
 
-        {/* Input Form Footer */}
+        {/* Input panel framework */}
         <div className="px-4 pb-4 pt-2 shrink-0">
           <div className="flex items-end gap-2 bg-gray-900 border border-gray-700 rounded-2xl px-4 py-3 focus-within:border-purple-500 transition-colors">
-            
-            {/* Plus menu template anchor */}
-            <div className="relative shrink-0 mb-0.5" ref={plusMenuRef}>
-              <button onClick={() => setShowPlusMenu(p => !p)} className="p-1 text-gray-500 hover:text-purple-400 transition" title="Insert prompt template">
-                <PlusCircleIcon className="w-5 h-5" />
-              </button>
-              {showPlusMenu && (
-                <div className="absolute bottom-full mb-2 left-0 bg-gray-800 border border-gray-700 rounded-lg shadow-xl py-1 min-w-[180px] z-50">
-                  <button onClick={() => setShowTemplateDialog(true)} className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-purple-300 transition flex items-center gap-2">
-                    <TemplateIcon className="w-4 h-4" />
-                    Use Prompt Template
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Core Text Input Framework with integrated layout chips */}
             <div className="flex-1 flex flex-col gap-1.5">
               {selectedTemplate && (
                 <div className="flex items-center gap-1.5 bg-gray-800 rounded-lg px-2.5 py-1 w-fit">
@@ -471,7 +514,7 @@ export default function ChatWindow({ messages, loading, onSend, onDeleteMessage,
               />
             </div>
 
-            {/* Dynamic action handler button trigger matrix */}
+            {/* Input Action Controls */}
             {loading ? (
               <button type="button" onClick={onStop} className="shrink-0 text-sm bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-xl transition font-medium flex items-center gap-1.5">
                 <span className="w-2 h-2 bg-white rounded-sm" />
