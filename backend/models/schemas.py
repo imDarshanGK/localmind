@@ -89,17 +89,20 @@ class ModelInfo(BaseModel):
 class SessionCreate(BaseModel):
     title: str = "New Chat"
     model: str = "llama3"
+    language: str = "en"
 
 
 class SessionUpdate(BaseModel):
     title: Optional[str] = None
     model: Optional[str] = None
+    language: Optional[str] = None
 
 
 class SessionOut(BaseModel):
     id: str
     title: str
     model: str
+    language: str="en"
     message_count: int = 0
     created_at: str
     updated_at: str
@@ -124,7 +127,9 @@ class AppSettings(BaseModel):
     temperature: float = 0.7
     max_history_turns: int = 10
     rag_top_k: int = 4
+    rag_chunk_overlap: int = 50
     theme: str = "dark"
+    minimal_mode: bool = False
 
 
 class ExportFormat(str, Enum):
