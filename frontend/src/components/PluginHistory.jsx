@@ -29,7 +29,17 @@ export default function PluginHistory() {
       !pluginFilter ||
       log.plugin.toLowerCase().includes(pluginFilter.toLowerCase());
 
-    const logDate = new Date(log.created_at);
+    const logDate = new Date(
+    log.created_at.replace(" ", "T") + "Z"
+);
+
+const startMatch =
+    !startDate ||
+    logDate >= new Date(`${startDate}T00:00:00Z`);
+
+const endMatch =
+    !endDate ||
+    logDate <= new Date(`${endDate}T23:59:59Z`);
 
     const startMatch =
       !startDate || logDate >= new Date(startDate);
