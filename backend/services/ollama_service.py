@@ -70,31 +70,9 @@ async def chat(
     }
 
     async with httpx.AsyncClient(timeout=TIMEOUT) as client:
-        for attempt in range(3):
-            try:
-                response = await client.post(
-                    f"{OLLAMA_BASE_URL}/api/chat",
-                    json=payload,
-                )
-                response.raise_for_status()
-                return response.json()["message"]["content"]
-
-            except (
-                httpx.ConnectError,
-                httpx.ReadTimeout,
-                httpx.ConnectTimeout,
-            ) as e:
-                logger.warning(
-                    "Transient Ollama request failed (attempt %d/3): %s",
-                    attempt + 1,
-                    e,
-                )
-
-                if attempt == 2:
-                    logger.error("Ollama request failed after retries.")
-                    raise
-
-                await asyncio.sleep(1)
+        response = await client.post(f"{OLLAMA_BASE_URL}/api/chat", json=payload)
+        response.raise_for_status()
+        return response.json()["message"]["content"]
 
 async def chat_stream(
     message: str,
