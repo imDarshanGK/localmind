@@ -68,14 +68,17 @@ const [expandedLog, setExpandedLog] = useState(null);
     pluginFilter === "" ||
     log.plugin.toLowerCase().includes(pluginFilter.toLowerCase());
 
-  const logDate = new Date(log.created_at);
+  const logDate = new Date(
+  log.created_at.replace(" ", "T") + "Z"
+);
 
-  const matchesStart =
-    !startDate || logDate >= new Date(startDate);
+const matchesStart =
+  !startDate ||
+  logDate >= new Date(`${startDate}T00:00:00Z`);
 
-  const matchesEnd =
-    !endDate ||
-    logDate <= new Date(endDate + "T23:59:59");
+const matchesEnd =
+  !endDate ||
+  logDate <= new Date(`${endDate}T23:59:59Z`);
 
   return matchesPlugin && matchesStart && matchesEnd;
 });
@@ -132,27 +135,30 @@ const [expandedLog, setExpandedLog] = useState(null);
         Plugin History
     </h3>
             <div className="flex gap-2 mb-3 flex-wrap">
-    <input
-        type="text"
-        placeholder="Filter by plugin"
-        value={pluginFilter}
-        onChange={(e) => setPluginFilter(e.target.value)}
-        className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-white"
-    />
+   <input
+    type="text"
+    aria-label="Filter by plugin"
+    placeholder="Filter by plugin"
+    value={pluginFilter}
+    onChange={(e) => setPluginFilter(e.target.value)}
+    className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-white"
+/>
 
-    <input
-        type="date"
-        value={startDate}
-        onChange={(e) => setStartDate(e.target.value)}
-        className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-white"
-    />
+<input
+    type="date"
+    aria-label="Start date"
+    value={startDate}
+    onChange={(e) => setStartDate(e.target.value)}
+    className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-white"
+/>
 
-    <input
-        type="date"
-        value={endDate}
-        onChange={(e) => setEndDate(e.target.value)}
-        className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-white"
-    />
+<input
+    type="date"
+    aria-label="End date"
+    value={endDate}
+    onChange={(e) => setEndDate(e.target.value)}
+    className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-white"
+/>
 </div>
 </div>
           {filteredLogs.length === 0 ? (
