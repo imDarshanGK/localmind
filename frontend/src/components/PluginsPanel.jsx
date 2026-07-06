@@ -19,6 +19,9 @@ export default function PluginsPanel({ sessionId, onClose }) {
   const [running,  setRunning]  = useState(false);
   const [error,    setError]    = useState("");
   const [logs,     setLogs]     = useState([]);
+  
+  // --- FIXED (#586): Initialize Loading state variable ---
+  const [loading, setLoading]   = useState(true);
 
   const fetchLogs = async () => {
     try {
@@ -30,7 +33,12 @@ export default function PluginsPanel({ sessionId, onClose }) {
   };
 
   useEffect(() => {
-    getPlugins().then(d => setPlugins(d.plugins || [])).catch(()=>{});
+    setLoading(true);
+    getPlugins()
+      .then(d => setPlugins(d.plugins || []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+      
     fetchLogs();
   }, []);
 
@@ -96,23 +104,33 @@ export default function PluginsPanel({ sessionId, onClose }) {
         <button onClick={onClose} className="text-gray-500 hover:text-gray-300 text-2xl md:text-lg leading-none p-1" aria-label="Close panel">×</button>
       </div>
 
-      {/* Plugin selector */}
+      {/* Plugin selector row */}
       <div className="flex flex-wrap gap-2 mb-4 md:mb-3 shrink-0">
-        {plugins.map(p => (
-          <button key={p.id} onClick={() => { setSelected(p); setOutput(""); setError(""); }}
-            className={`text-xs px-3.5 py-2 md:py-1.5 rounded-lg border transition font-medium touch-manipulation
-              ${selected?.id === p.id ? "border-purple-500 bg-purple-900/30 text-purple-300 shadow-sm shadow-purple-500/10" : "border-gray-700 text-gray-400 hover:bg-gray-800"}`}>
-            {(() => {
-              const Icon = PLUGIN_ICONS[p.icon] || PlugIcon;
-              return (
-                <span className="inline-flex items-center gap-1">
-                  <Icon className="w-3.5 h-3.5" />
-                  <span>{p.name}</span>
-                </span>
-              );
-            })()}
-          </button>
-        ))}
+        {loading ? (
+          // --- FIXED (#586): Render beautiful pulsing skeleton pill shapes while loading ---
+          Array.from({ length: 4 }).map((_, idx) => (
+            <div 
+              key={idx} 
+              className="h-7 w-20 bg-gray-800 border border-gray-800 rounded-lg animate-pulse" 
+            />
+          ))
+        ) : (
+          plugins.map(p => (
+            <button key={p.id} onClick={() => { setSelected(p); setOutput(""); setError(""); }}
+              className={`text-xs px-3.5 py-2 md:py-1.5 rounded-lg border transition font-medium touch-manipulation
+                ${selected?.id === p.id ? "border-purple-500 bg-purple-900/30 text-purple-300 shadow-sm shadow-purple-500/10" : "border-gray-700 text-gray-400 hover:bg-gray-800"}`}>
+              {(() => {
+                const Icon = PLUGIN_ICONS[p.icon] || PlugIcon;
+                return (
+                  <span className="inline-flex items-center gap-1">
+                    <Icon className="w-3.5 h-3.5" />
+                    <span>{p.name}</span>
+                  </span>
+                );
+              })()}
+            </button>
+          ))
+        )}
       </div>
 
       {/* FIXED (#587): Plugin Input/Output Area OR Empty-State Guidance Layout */}
