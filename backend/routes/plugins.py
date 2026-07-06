@@ -60,41 +60,33 @@ async def run_plugin(body: PluginRun):
         else:
             raise HTTPException(400, f"Unknown plugin: {plugin}")
 
-       if body.session_id:
-        db_service.log_plugin(
+      if body.session_id:
+       db_service.log_plugin(
         body.session_id,
         plugin,
         inp,
         result,
-        True
+        True,
     )
 
         return PluginResult(plugin=plugin, output=result, success=True)
 
-    except HTTPException:
-        raise
+   except HTTPException:
+    raise
 
-
-
-    
-    except Exception as e:
-      if body.session_id:
+except Exception as e:
+    if body.session_id:
         db_service.log_plugin(
             body.session_id,
             plugin,
             inp,
             str(e),
-            False
+            False,
         )
 
-
-    
-
     return PluginResult(
-        plugin=plugin,
-        output="",
         success=False,
-        error=str(e)
+        error=str(e),
     )
 
 
