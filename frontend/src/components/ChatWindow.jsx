@@ -203,6 +203,18 @@ export default function ChatWindow({ messages, loading, onSend, onDeleteMessage,
     document.body.removeChild(element);
   };
 
+  // --- FIXED (#742): Interactive Empty-State Suggestion Handler ---
+  function handleSuggestionClick(text) {
+    setInput(text);
+    if (textareaRef.current) {
+      textareaRef.current.focus();
+      setTimeout(() => {
+        textareaRef.current.style.height = "auto";
+        textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 160) + "px";
+      }, 0);
+    }
+  }
+
   const SUGGESTIONS = [
     "Summarize the uploaded document",
     "What are the key points?",
@@ -250,7 +262,7 @@ export default function ChatWindow({ messages, loading, onSend, onDeleteMessage,
           )}
         </div>
 
-        {/* Messages viewport */}
+        {/* Messages Viewport */}
         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5">
           {messages.length === 0 && (
             <div className="flex flex-col items-center justify-center h-full text-center gap-4">
@@ -262,7 +274,8 @@ export default function ChatWindow({ messages, loading, onSend, onDeleteMessage,
               {!minimalMode && (
                 <div className="grid grid-cols-2 gap-2 mt-4 max-w-lg w-full">
                   {SUGGESTIONS.map(s => (
-                    <button key={s} onClick={() => onSend(s)}
+                    // --- FIXED (#742): Swapped instant send execution for guided form injection ---
+                    <button key={s} onClick={() => handleSuggestionClick(s)}
                       className="text-xs text-left border border-gray-800 rounded-xl px-3 py-2.5 text-gray-400 hover:border-purple-600 hover:text-purple-300 hover:bg-purple-900/20 transition">
                       {s}
                     </button>
