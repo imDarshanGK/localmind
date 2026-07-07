@@ -103,7 +103,8 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-xs">
+      {/* FIXED (#788): Updated grid definition to stack gracefully on mobile screen layout configurations */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-xs">
         <Field label="Default Model" error={errors.default_model}>
           <select value={form.default_model} onChange={e => set("default_model", e.target.value)} className={`sel ${errors.default_model ? "border-red-500" : ""}`}>
             {MODELS.map(m => <option key={m} value={m}>{m}</option>)}
@@ -222,6 +223,7 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
   );
 }
 
+// Keep field definitions intact and matching identical styling rules
 function Field({ label, error, children }) {
   return (
     <div className="flex flex-col justify-between">
