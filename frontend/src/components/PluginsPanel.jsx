@@ -1,4 +1,3 @@
-import PluginHistory from "./PluginHistory";
 import { useState, useEffect } from "react";
 import { getPlugins, runPlugin, getPluginLogs } from "../utils/api";
 import { BracesIcon, CalculatorIcon, CodeIcon, ErrorIcon, GlobeIcon, PlugIcon, SummaryIcon, HashIcon } from "./Icons";
