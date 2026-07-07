@@ -42,7 +42,7 @@ async def get_plugin_logs(limit: int = 50):
 @router.post("/run", response_model=PluginResult)
 async def run_plugin(body: PluginRun):
     plugin = body.plugin.lower()
-    inp    = body.input.strip()
+    inp = body.input.strip()
 
     try:
         if plugin == "calculator":
@@ -58,37 +58,43 @@ async def run_plugin(body: PluginRun):
         elif plugin == "translator":
             result = _translator(inp)
         else:
-            raise HTTPException(400, f"Unknown plugin: {plugin}")
+            raise HTTPException(status_code=400, detail=f"Unknown plugin: {plugin}")
 
-      if body.session_id:
-       db_service.log_plugin(
-        body.session_id,
-        plugin,
-        inp,
-        result,
-        True,
-    )
+        # Log successful execution
+        if body.session_id:
+            db_service.log_plugin(
+                body.session_id,
+                plugin,
+                inp,
+                result,
+                True,
+            )
 
-        return PluginResult(plugin=plugin, output=result, success=True)
-
-   except HTTPException:
-    raise
-
-except Exception as e:
-    if body.session_id:
-        db_service.log_plugin(
-            body.session_id,
-            plugin,
-            inp,
-            str(e),
-            False,
+        return PluginResult(
+            plugin=plugin,
+            output=result,
+            success=True,
         )
 
-    return PluginResult(
-        success=False,
-        error=str(e),
-    )
+    except HTTPException:
+        raise
 
+    except Exception as e:
+        # Log failed execution
+        if body.session_id:
+            db_service.log_plugin(
+                body.session_id,
+                plugin,
+                inp,
+                str(e),
+                False,
+            )
+
+        return PluginResult(
+            plugin=plugin,
+            success=False,
+            error=str(e),
+        )
 
 # ─── Plugin implementations ──────────────────────────────────
 
