@@ -214,7 +214,7 @@ const matchesEnd =
     <div className="flex flex-col gap-3 mb-3">
 
         <span className="text-[10px] text-gray-500">
-            {new Date(log.created_at + "Z").toLocaleString()}
+            {{new Date(log.created_at.replace(" ", "T") + "Z").toLocaleString()}}
         </span>
 
         <button
