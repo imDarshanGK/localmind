@@ -17,40 +17,54 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
   function set(key, val) { setForm(p => ({...p, [key]: val})); }
 
   return (
-    <div className="border-b border-gray-800 bg-gray-900 px-5 py-4 shrink-0">
+    /* FIXED (#580): Changed top wrapper from a generic <div> to a semantic section landmark region */
+    <section 
+      aria-labelledby="settings-heading" 
+      className="border-b border-gray-800 bg-gray-900 px-5 py-4 shrink-0"
+    >
       <div className="flex items-center justify-between mb-4">
-        <p className="text-sm font-semibold text-white inline-flex items-center gap-1.5"><SettingsIcon className="w-4 h-4" />Settings</p>
-        <button onClick={onClose} className="text-gray-500 hover:text-gray-300 text-lg leading-none">×</button>
+        {/* FIXED (#580): Transformed paragraph into a proper heading paired to the section landmark label */}
+        <h2 id="settings-heading" className="text-sm font-semibold text-white inline-flex items-center gap-1.5">
+          <SettingsIcon className="w-4 h-4" aria-hidden="true" />Settings
+        </h2>
+        <button 
+          onClick={onClose} 
+          aria-label="Close settings panel" 
+          className="text-gray-500 hover:text-gray-300 text-lg leading-none"
+        >
+          ×
+        </button>
       </div>
 
+      {/* FIXED (#580): Provided unique htmlId properties to bind labels explicitly to inputs */}
       <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-xs">
-        <Field label="Default Model">
-          <select value={form.default_model} onChange={e=>set("default_model",e.target.value)} className="sel">
+        <Field label="Default Model" htmlId="model-dropdown">
+          <select id="model-dropdown" value={form.default_model} onChange={e=>set("default_model",e.target.value)} className="sel">
             {MODELS.map(m => <option key={m} value={m}>{m}</option>)}
           </select>
         </Field>
-        <Field label="Default Language">
-          <select value={form.default_language} onChange={e=>set("default_language",e.target.value)} className="sel">
+        <Field label="Default Language" htmlId="lang-dropdown">
+          <select id="lang-dropdown" value={form.default_language} onChange={e=>set("default_language",e.target.value)} className="sel">
             {LANGUAGES.map(l=><option key={l.code} value={l.code}>{l.label}</option>)}
           </select>
         </Field>
-        <Field label={`Temperature: ${form.temperature}`}>
-          <input type="range" min="0" max="2" step="0.1" value={form.temperature}
+        <Field label={`Temperature: ${form.temperature}`} htmlId="temp-slider">
+          <input id="temp-slider" type="range" min="0" max="2" step="0.1" value={form.temperature}
             onChange={e=>set("temperature",parseFloat(e.target.value))}
             className="w-full accent-purple-500" />
         </Field>
-        <Field label={`RAG Context Chunks: ${form.rag_top_k}`}>
-          <input type="range" min="1" max="10" step="1" value={form.rag_top_k}
+        <Field label={`RAG Context Chunks: ${form.rag_top_k}`} htmlId="rag-slider">
+          <input id="rag-slider" type="range" min="1" max="10" step="1" value={form.rag_top_k}
             onChange={e=>set("rag_top_k",parseInt(e.target.value))}
             className="w-full accent-purple-500" />
         </Field>
-        <Field label={`History Turns: ${form.max_history_turns}`}>
-          <input type="range" min="2" max="20" step="2" value={form.max_history_turns}
+        <Field label={`History Turns: ${form.max_history_turns}`} htmlId="history-slider">
+          <input id="history-slider" type="range" min="2" max="20" step="2" value={form.max_history_turns}
             onChange={e=>set("max_history_turns",parseInt(e.target.value))}
             className="w-full accent-purple-500" />
         </Field>
-        <Field label="Theme">
-          <select value={form.theme} onChange={e=>set("theme",e.target.value)} className="sel">
+        <Field label="Theme" htmlId="theme-dropdown">
+          <select id="theme-dropdown" value={form.theme} onChange={e=>set("theme",e.target.value)} className="sel">
             <option value="dark">Dark</option>
             <option value="light">Light</option>
           </select>
@@ -69,14 +83,15 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
       </div>
 
       <style>{`.sel { width:100%; background:#1f2937; color:#e5e7eb; border:1px solid #374151; border-radius:8px; padding:4px 8px; outline:none; font-size:11px; }`}</style>
-    </div>
+    </section>
   );
 }
 
-function Field({ label, children }) {
+/* FIXED (#580): Mapped the incoming unique htmlId prop explicitly to the label's htmlFor target */
+function Field({ label, htmlId, children }) {
   return (
     <div>
-      <label className="text-gray-500 block mb-1">{label}</label>
+      <label htmlFor={htmlId} className="text-gray-500 block mb-1">{label}</label>
       {children}
     </div>
   );
