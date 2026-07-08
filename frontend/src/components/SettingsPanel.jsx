@@ -23,6 +23,11 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
     minimal_mode:      settings?.minimal_mode ?? false,
   });
 
+  // FIXED (#583): State to manage copy animation/feedback visibility
+  const [copied, setCopied] = useState(false);
+  const [errors, setErrors] = useState({});
+  const [isSaving, setIsSaving] = useState(false);
+
   // --- FIXED (#585): LocalStorage Drafts Management State Hooks ---
   const [drafts, setDrafts] = useState(() => {
     try {
@@ -38,12 +43,9 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
     localStorage.setItem("localmind_settings_drafts", JSON.stringify(drafts));
   }, [drafts]);
 
-  const [errors, setErrors] = useState({});
-  const [isSaving, setIsSaving] = useState(false);
-
+  // SINGLE UNIFIED HELPER: Updates form state and manages live error clearing
   function set(key, val) { 
     setForm(p => ({ ...p, [key]: val })); 
-    // Clear inline error layout instantly as user corrects the field input values
     if (errors[key]) {
       setErrors(p => ({ ...p, [key]: "" }));
     }
@@ -86,6 +88,20 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
 
   const handleDeleteDraft = (id) => {
     setDrafts(p => p.filter(d => d.id !== id));
+  };
+
+  // FIXED (#583): Core clipboard injection logic with state clear trigger
+  const handleCopySummary = () => {
+    const summaryText = `LocalMind Configuration Summary:\n- Model: ${form.default_model}\n- Language: ${form.default_language}\n- Temperature: ${form.temperature}\n- RAG Chunks: ${form.rag_top_k}\n- Max Turns: ${form.max_history_turns}\n- Theme: ${form.theme}`;
+    
+    navigator.clipboard.writeText(summaryText)
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000); // Resets state back after 2 seconds
+      })
+      .catch((err) => {
+        console.error("Failed to copy settings summary: ", err);
+      });
   };
 
   return (
@@ -205,16 +221,37 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
         )}
       </div>
 
-      <div className="flex gap-2 mt-5 pt-3 border-t border-gray-800">
+      {/* Action panel row */}
+      <div className="flex gap-2 mt-5 pt-3 border-t border-gray-800 justify-between items-center">
+        <div className="flex gap-2">
+          <button 
+            onClick={handleSave}
+            disabled={isSaving}
+            className="text-xs bg-purple-700 hover:bg-purple-600 disabled:bg-gray-800 text-white px-4 py-1.5 rounded-lg transition font-medium shadow-md">
+            {isSaving ? "Saving..." : "Save Settings"}
+          </button>
+          <button onClick={onClose}
+            className="text-xs border border-gray-700 text-gray-400 hover:bg-gray-800 px-4 py-1.5 rounded-lg transition">
+            Cancel
+          </button>
+        </div>
+
+        {/* FIXED (#583): Dynamic feedback component rendering state transitions */}
         <button 
-          onClick={handleSave}
-          disabled={isSaving}
-          className="text-xs bg-purple-700 hover:bg-purple-600 disabled:bg-gray-800 text-white px-4 py-1.5 rounded-lg transition font-medium shadow-md">
-          {isSaving ? "Saving..." : "Save Settings"}
-        </button>
-        <button onClick={onClose}
-          className="text-xs border border-gray-700 text-gray-400 hover:bg-gray-800 px-4 py-1.5 rounded-lg transition">
-          Cancel
+          onClick={handleCopySummary}
+          className={`text-[11px] px-3 py-1.5 rounded-lg transition font-medium border flex items-center gap-1.5 duration-200
+            ${copied 
+              ? "bg-green-950/40 border-green-900/60 text-green-400" 
+              : "border-gray-700 text-gray-400 hover:bg-gray-800"}`}
+        >
+          {copied ? (
+            <>
+              <span>✓</span>
+              <span>Copied!</span>
+            </>
+          ) : (
+            <span>Copy Config Summary</span>
+          )}
         </button>
       </div>
 

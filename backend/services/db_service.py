@@ -6,6 +6,7 @@ Handles: sessions, messages, documents, settings, plugins log
 import sqlite3
 import json
 import os
+import logging
 from contextlib import contextmanager
 import uuid
 import time
@@ -115,6 +116,7 @@ def restore_db(src_path: str) -> None:
 
 DB_PATH = os.getenv("DB_PATH", "./data/localmind.db")
 os.makedirs(os.path.dirname(DB_PATH) if os.path.dirname(DB_PATH) else ".", exist_ok=True)
+logger = logging.getLogger(__name__)
 
 
 @contextmanager
@@ -133,10 +135,16 @@ def get_db():
             break
 
         except OperationalError as e:
-            if "locked" in str(e).lower() and attempt < retries - 1:
-                time.sleep(delay)
-                continue
-            raise
+             if "locked" in str(e).lower() and attempt < retries - 1:
+                    logger.warning(
+                        "Database locked (attempt %d/%d). Retrying...",
+                        attempt + 1,
+                        retries,
+                    )
+                    time.sleep(delay)
+                    continue
+             raise
+
 
     try:
         yield conn
