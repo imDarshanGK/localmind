@@ -23,18 +23,23 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
     minimal_mode:      settings?.minimal_mode ?? false,
   });
 
-  // FIXED (#581): Core persistent view initialization state hook matching localStorage
+ 
+  // SOLVES (#581): Persistent Collapse State Hooks
+  
   const [isExpanded, setIsExpanded] = useState(() => {
     const savedState = localStorage.getItem("localmind_settings_expanded");
-    return savedState !== null ? JSON.parse(savedState) : true; // Defaults to fully open
+    return savedState !== null ? JSON.parse(savedState) : true;
   });
 
-  // FIXED (#581): Sync hook to keep browser local storage updated when state changes
   useEffect(() => {
     localStorage.setItem("localmind_settings_expanded", JSON.stringify(isExpanded));
   }, [isExpanded]);
+ 
 
-  // FIXED (#585): LocalStorage Drafts Management State Hooks from main branch
+  const [copied, setCopied] = useState(false);
+  const [errors, setErrors] = useState({});
+  const [isSaving, setIsSaving] = useState(false);
+
   const [drafts, setDrafts] = useState(() => {
     try {
       const saved = localStorage.getItem("localmind_settings_drafts");
@@ -49,9 +54,6 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
     localStorage.setItem("localmind_settings_drafts", JSON.stringify(drafts));
   }, [drafts]);
 
-  const [errors, setErrors] = useState({});
-  const [isSaving, setIsSaving] = useState(false);
-
   function set(key, val) { 
     setForm(p => ({ ...p, [key]: val })); 
     if (errors[key]) {
@@ -62,7 +64,6 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
   async function handleSave() {
     setIsSaving(true);
     setErrors({});
-  
     try {
       await onSave(form);
     } catch (err) {
@@ -94,6 +95,18 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
     setDrafts(p => p.filter(d => d.id !== id));
   };
 
+  const handleCopySummary = () => {
+    const summaryText = `LocalMind Configuration Summary:\n- Model: ${form.default_model}\n- Language: ${form.default_language}\n- Temperature: ${form.temperature}\n- RAG Chunks: ${form.rag_top_k}\n- Max Turns: ${form.max_history_turns}\n- Theme: ${form.theme}`;
+    navigator.clipboard.writeText(summaryText)
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      })
+      .catch((err) => {
+        console.error("Failed to copy settings summary: ", err);
+      });
+  };
+
   return (
     <div data-testid="settings-panel" className="border-b border-gray-800 bg-gray-900 px-5 py-4 shrink-0 transition-all duration-300">
       <div className="flex items-center justify-between mb-4">
@@ -101,12 +114,12 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
           <p className="text-sm font-semibold text-white inline-flex items-center gap-1.5">
             <SettingsIcon className="w-4 h-4" />Settings
           </p>
-          {/* FIXED (#581): View persistent switch button controller */}
+          
+          {/* SOLVES (#581): Persistent Collapse Button Controller */}
           <button 
             type="button"
             onClick={() => setIsExpanded(!isExpanded)}
             className="text-[10px] bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-gray-200 px-2 py-0.5 rounded transition font-medium"
-            title={isExpanded ? "Collapse panel parameters" : "Expand panel parameters"}
           >
             {isExpanded ? "Collapse ▵" : "Expand ▿"}
           </button>
@@ -120,7 +133,7 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
         </div>
       )}
 
-      {/* FIXED (#581): Content updates collapse behind visibility check container */}
+      {/* SOLVES (#581): Controlled expanded layout rendering window wrapper */}
       {isExpanded && (
         <>
           <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-xs">
@@ -183,10 +196,8 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
             </Field>
           </div>
 
-          {/* --- Saved Drafts Scratchpad Dashboard Area from main branch --- */}
           <div className="mt-5 pt-4 border-t border-gray-800 text-xs">
             <label className="text-gray-400 font-medium block mb-2">Saved Prompt Drafts / Notes</label>
-            
             <div className="flex gap-2 mb-3">
               <input 
                 type="text" 
@@ -216,7 +227,6 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
                       type="button"
                       onClick={() => handleDeleteDraft(d.id)}
                       className="text-gray-500 hover:text-red-400 transition font-bold px-1 text-sm leading-none"
-                      title="Delete draft"
                     >
                       ×
                     </button>
@@ -226,20 +236,34 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
             )}
           </div>
 
-          <div className="flex gap-2 mt-5 pt-3 border-t border-gray-800">
+          <div className="flex gap-2 mt-5 pt-3 border-t border-gray-800 justify-between items-center">
+            <div className="flex gap-2">
+              <button 
+                type="button"
+                onClick={handleSave}
+                disabled={isSaving}
+                className="text-xs bg-purple-700 hover:bg-purple-600 disabled:bg-gray-800 text-white px-4 py-1.5 rounded-lg transition font-medium shadow-md"
+              >
+                {isSaving ? "Saving..." : "Save Settings"}
+              </button>
+              <button 
+                type="button"
+                onClick={onClose}
+                className="text-xs border border-gray-700 text-gray-400 hover:bg-gray-800 px-4 py-1.5 rounded-lg transition"
+              >
+                Cancel
+              </button>
+            </div>
+
             <button 
               type="button"
-              onClick={handleSave}
-              disabled={isSaving}
-              className="text-xs bg-purple-700 hover:bg-purple-600 disabled:bg-gray-800 text-white px-4 py-1.5 rounded-lg transition font-medium shadow-md">
-              {isSaving ? "Saving..." : "Save Settings"}
-            </button>
-            <button 
-              type="button"
-              onClick={onClose}
-              className="text-xs border border-gray-700 text-gray-400 hover:bg-gray-800 px-4 py-1.5 rounded-lg transition"
+              onClick={handleCopySummary}
+              className={`text-[11px] px-3 py-1.5 rounded-lg transition font-medium border flex items-center gap-1.5 duration-200
+                ${copied 
+                  ? "bg-green-950/40 border-green-900/60 text-green-400" 
+                  : "border-gray-700 text-gray-400 hover:bg-gray-800"}`}
             >
-              Cancel
+              {copied ? <><span>✓</span><span>Copied!</span></> : <span>Copy Config Summary</span>}
             </button>
           </div>
         </>
