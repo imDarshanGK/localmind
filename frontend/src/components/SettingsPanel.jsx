@@ -14,7 +14,24 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
     theme:            settings.theme            || "dark",
   });
 
+  // FIXED (#583): State to manage copy animation/feedback visibility
+  const [copied, setCopied] = useState(false);
+
   function set(key, val) { setForm(p => ({...p, [key]: val})); }
+
+  // FIXED (#583): Core clipboard injection logic with state clear trigger
+  const handleCopySummary = () => {
+    const summaryText = `LocalMind Configuration Summary:\n- Model: ${form.default_model}\n- Language: ${form.default_language}\n- Temperature: ${form.temperature}\n- RAG Chunks: ${form.rag_top_k}\n- Max Turns: ${form.max_history_turns}\n- Theme: ${form.theme}`;
+    
+    navigator.clipboard.writeText(summaryText)
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000); // Resets state back after 2 seconds
+      })
+      .catch((err) => {
+        console.error("Failed to copy settings summary: ", err);
+      });
+  };
 
   return (
     <div className="border-b border-gray-800 bg-gray-900 px-5 py-4 shrink-0">
@@ -57,14 +74,34 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
         </Field>
       </div>
 
-      <div className="flex gap-2 mt-4">
-        <button onClick={()=>onSave(form)}
-          className="text-xs bg-purple-700 hover:bg-purple-600 text-white px-4 py-1.5 rounded-lg transition font-medium">
-          Save Settings
-        </button>
-        <button onClick={onClose}
-          className="text-xs border border-gray-700 text-gray-400 hover:bg-gray-800 px-4 py-1.5 rounded-lg transition">
-          Cancel
+      <div className="flex gap-2 mt-4 justify-between items-center">
+        <div className="flex gap-2">
+          <button onClick={()=>onSave(form)}
+            className="text-xs bg-purple-700 hover:bg-purple-600 text-white px-4 py-1.5 rounded-lg transition font-medium shadow-md">
+            Save Settings
+          </button>
+          <button onClick={onClose}
+            className="text-xs border border-gray-700 text-gray-400 hover:bg-gray-800 px-4 py-1.5 rounded-lg transition">
+            Cancel
+          </button>
+        </div>
+
+        {/* FIXED (#583): Dynamic feedback controller rendering state transitions */}
+        <button 
+          onClick={handleCopySummary}
+          className={`text-[11px] px-3 py-1.5 rounded-lg transition font-medium border flex items-center gap-1.5 duration-200
+            ${copied 
+              ? "bg-green-950/40 border-green-900/60 text-green-400" 
+              : "border-gray-700 text-gray-400 hover:bg-gray-800"}`}
+        >
+          {copied ? (
+            <>
+              <span>✓</span>
+              <span>Copied!</span>
+            </>
+          ) : (
+            <span>Copy Config Summary</span>
+          )}
         </button>
       </div>
 
