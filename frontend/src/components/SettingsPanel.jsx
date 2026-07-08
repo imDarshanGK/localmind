@@ -1,72 +1,216 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { SettingsIcon } from "./Icons";
 
-const MODELS    = ["llama3","mistral","phi3","gemma2","deepseek-r1"];
-const LANGUAGES = [{code:"en",label:"English"},{code:"hi",label:"हिन्दी"},{code:"ta",label:"தமிழ்"},{code:"te",label:"తెలుగు"},{code:"kn",label:"ಕನ್ನಡ"},{code:"fr",label:"Français"}];
+const MODELS    = ["llama3", "mistral", "phi3", "gemma2", "deepseek-r1"];
+const LANGUAGES = [
+  { code: "en", label: "English" },
+  { code: "hi", label: "हिन्दी" },
+  { code: "ta", label: "தமிழ்" },
+  { code: "te", label: "తెలుగు" },
+  { code: "kn", label: "ಕನ್ನಡ" },
+  { code: "fr", label: "Français" }
+];
 
 export default function SettingsPanel({ settings, onSave, onClose }) {
   const [form, setForm] = useState({
-    default_model:    settings.default_model    || "llama3",
-    default_language: settings.default_language || "en",
-    temperature:      settings.temperature      ?? 0.7,
-    max_history_turns:settings.max_history_turns|| 10,
-    rag_top_k:        settings.rag_top_k        || 4,
-    theme:            settings.theme            || "dark",
+    default_model:    settings?.default_model    || "llama3",
+    default_language: settings?.default_language || "en",
+    temperature:      settings?.temperature      ?? 0.7,
+    max_history_turns:settings?.max_history_turns|| 10,
+    rag_top_k:        settings?.rag_top_k        || 4,
+    rag_chunk_overlap: settings?.rag_chunk_overlap ?? 50,
+    theme:            settings?.theme            || "dark",
+    minimal_mode:      settings?.minimal_mode ?? false,
   });
 
-  function set(key, val) { setForm(p => ({...p, [key]: val})); }
+  // --- FIXED (#585): LocalStorage Drafts Management State Hooks ---
+  const [drafts, setDrafts] = useState(() => {
+    try {
+      const saved = localStorage.getItem("localmind_settings_drafts");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [newDraft, setNewDraft] = useState("");
+
+  useEffect(() => {
+    localStorage.setItem("localmind_settings_drafts", JSON.stringify(drafts));
+  }, [drafts]);
+
+  const [errors, setErrors] = useState({});
+  const [isSaving, setIsSaving] = useState(false);
+
+  function set(key, val) { 
+    setForm(p => ({ ...p, [key]: val })); 
+    // Clear inline error layout instantly as user corrects the field input values
+    if (errors[key]) {
+      setErrors(p => ({ ...p, [key]: "" }));
+    }
+  }
+
+  async function handleSave() {
+    setIsSaving(true);
+    setErrors({}); // Wipe out previous error trackers
+  
+    try {
+      // Execute parent submission logic handler asynchronously
+      await onSave(form);
+    } catch (err) {
+      // Safely intercept standard FastAPI validation structure arrays
+      if (err.response && err.response.status === 422 && err.response.data?.detail) {
+        const pydanticErrors = err.response.data.detail;
+        const inlineErrors = {};
+
+        pydanticErrors.forEach(error => {
+          if (error.loc && error.loc.length > 0) {
+            const fieldName = error.loc[error.loc.length - 1];
+            inlineErrors[fieldName] = error.msg;
+          }
+        });
+
+        setErrors(inlineErrors);
+      } else {
+        setErrors({ global: err.message || "Failed to update configuration settings." });
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  const handleAddDraft = () => {
+    if (!newDraft.trim()) return;
+    setDrafts(p => [...p, { id: crypto.randomUUID(), text: newDraft.trim() }]);
+    setNewDraft("");
+  };
+
+  const handleDeleteDraft = (id) => {
+    setDrafts(p => p.filter(d => d.id !== id));
+  };
 
   return (
-    <div className="border-b border-gray-800 bg-gray-900 px-5 py-4 shrink-0">
+    <div data-testid="settings-panel" className="border-b border-gray-800 bg-gray-900 px-5 py-4 shrink-0">
       <div className="flex items-center justify-between mb-4">
-        <p className="text-sm font-semibold text-white inline-flex items-center gap-1.5"><SettingsIcon className="w-4 h-4" />Settings</p>
+        <p className="text-sm font-semibold text-white inline-flex items-center gap-1.5">
+          <SettingsIcon className="w-4 h-4" />Settings
+        </p>
         <button onClick={onClose} className="text-gray-500 hover:text-gray-300 text-lg leading-none">×</button>
       </div>
 
-      {/* FIXED (#582): Added explicit informative tooltip props to fields */}
+      {errors.global && (
+        <div className="mb-4 text-xs bg-red-950/50 border border-red-900/60 text-red-400 p-2 rounded-lg">
+          {errors.global}
+        </div>
+      )}
+
+      {/* FIXED (#582): Added explicit informative tooltip props to the form layout grid */}
       <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-xs">
-        <Field label="Default Model" tooltip="The default LLM model used for reasoning when starting new chat sessions.">
-          <select value={form.default_model} onChange={e=>set("default_model",e.target.value)} className="sel">
+        <Field label="Default Model" tooltip="The default LLM model brain used for reasoning when starting new chat sessions." error={errors.default_model}>
+          <select value={form.default_model} onChange={e => set("default_model", e.target.value)} className={`sel ${errors.default_model ? "border-red-500" : ""}`}>
             {MODELS.map(m => <option key={m} value={m}>{m}</option>)}
           </select>
         </Field>
-        
-        <Field label="Default Language" tooltip="Sets the language interface and system localization instructions.">
-          <select value={form.default_language} onChange={e=>set("default_language",e.target.value)} className="sel">
-            {LANGUAGES.map(l=><option key={l.code} value={l.code}>{l.label}</option>)}
+
+        <Field label="Default Language" tooltip="Sets the interface language preferences and localized system prompt defaults." error={errors.default_language}>
+          <select value={form.default_language} onChange={e => set("default_language", e.target.value)} className={`sel ${errors.default_language ? "border-red-500" : ""}`}>
+            {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
           </select>
         </Field>
-        
-        <Field label={`Temperature: ${form.temperature}`} tooltip="Controls creativity: higher values are more imaginative, lower values are precise.">
+
+        <Field label={`Temperature: ${form.temperature}`} tooltip="Controls output randomness: higher values increase creativity, lower values keep it precise." error={errors.temperature}>
           <input type="range" min="0" max="2" step="0.1" value={form.temperature}
-            onChange={e=>set("temperature",parseFloat(e.target.value))}
+            onChange={e => set("temperature", parseFloat(e.target.value))}
             className="w-full accent-purple-500" />
         </Field>
-        
-        <Field label={`RAG Context Chunks: ${form.rag_top_k}`} tooltip="The maximum number of reference context document fragments pulled from uploaded files.">
+
+        <Field label={`RAG Context Chunks: ${form.rag_top_k}`} tooltip="The maximum number of matching reference document fragments parsed into context." error={errors.rag_top_k}>
           <input type="range" min="1" max="10" step="1" value={form.rag_top_k}
-            onChange={e=>set("rag_top_k",parseInt(e.target.value))}
+            onChange={e => set("rag_top_k", parseInt(e.target.value))}
             className="w-full accent-purple-500" />
         </Field>
-        
-        <Field label={`History Turns: ${form.max_history_turns}`} tooltip="The number of past conversation exchanges included with new queries for memory retention.">
+
+        <Field label={`RAG Chunk Overlap: ${form.rag_chunk_overlap}`} tooltip="Number of shared trailing tokens between sections to maintain continuous context links." error={errors.rag_chunk_overlap}>
+          <input type="range" min="0" max="200" step="10" value={form.rag_chunk_overlap}
+            onChange={e => set("rag_chunk_overlap", parseInt(e.target.value))}
+            className="w-full accent-purple-500" />
+        </Field>
+
+        <Field label={`History Turns: ${form.max_history_turns}`} tooltip="The threshold of past message rounds bundled into downstream prompts to hold context memory." error={errors.max_history_turns}>
           <input type="range" min="2" max="20" step="2" value={form.max_history_turns}
-            onChange={e=>set("max_history_turns",parseInt(e.target.value))}
+            onChange={e => set("max_history_turns", parseInt(e.target.value))}
             className="w-full accent-purple-500" />
         </Field>
-        
-        <Field label="Theme" tooltip="Switches core user interface color profiles across the application layout.">
-          <select value={form.theme} onChange={e=>set("theme",e.target.value)} className="sel">
+
+        <Field label="Theme" tooltip="Switches core visual color layers, highlights, and canvas contrast modes." error={errors.theme}>
+          <select value={form.theme} onChange={e => set("theme", e.target.value)} className={`sel ${errors.theme ? "border-red-500" : ""}`}>
             <option value="dark">Dark</option>
             <option value="light">Light</option>
+            <option value="high-contrast">High Contrast</option>
+            <option value="sepia">Sepia (Warm)</option>
+            <option value="comfort">Comfort (Large Text)</option>
           </select>
+        </Field>
+
+        <Field label="Minimal Mode" tooltip="Disables complex background rendering and structural motions to save browser resources.">
+          <label className="flex items-center gap-2 text-gray-300 mt-1 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={form.minimal_mode}
+              onChange={e => set("minimal_mode", e.target.checked)}
+              className="accent-purple-500"
+            />
+            Low-bandwidth mode
+          </label>
         </Field>
       </div>
 
-      <div className="flex gap-2 mt-4">
-        <button onClick={()=>onSave(form)}
-          className="text-xs bg-purple-700 hover:bg-purple-600 text-white px-4 py-1.5 rounded-lg transition font-medium">
-          Save Settings
+      {/* --- Saved Drafts Scratchpad Dashboard Area --- */}
+      <div className="mt-5 pt-4 border-t border-gray-800 text-xs">
+        <label className="text-gray-400 font-medium block mb-2">Saved Prompt Drafts / Notes</label>
+        
+        <div className="flex gap-2 mb-3">
+          <input 
+            type="text" 
+            value={newDraft} 
+            onChange={e => setNewDraft(e.target.value)}
+            placeholder="Type a canned prompt snippet or scratchpad note..."
+            className="flex-1 bg-gray-800 text-gray-200 border border-gray-700 rounded-lg px-3 py-1 text-xs outline-none focus:border-purple-500 placeholder-gray-600"
+            onKeyDown={e => e.key === "Enter" && handleAddDraft()}
+          />
+          <button 
+            onClick={handleAddDraft}
+            className="bg-purple-700/40 hover:bg-purple-700 border border-purple-500/30 hover:border-purple-500 text-purple-300 hover:text-white px-3 py-1 rounded-lg font-medium transition text-xs shrink-0"
+          >
+            Add
+          </button>
+        </div>
+
+        {drafts.length === 0 ? (
+          <p className="text-[11px] text-gray-600 italic">No message drafts stored yet.</p>
+        ) : (
+          <div className="space-y-1.5 max-h-[120px] overflow-y-auto pr-1 custom-scrollbar">
+            {drafts.map(d => (
+              <div key={d.id} className="flex justify-between items-start gap-3 bg-gray-800/40 border border-gray-800/80 p-2 rounded-lg group hover:border-gray-700/60 transition">
+                <p className="text-[11px] text-gray-300 break-words flex-1 font-mono">{d.text}</p>
+                <button 
+                  onClick={() => handleDeleteDraft(d.id)}
+                  className="text-gray-500 hover:text-red-400 transition font-bold px-1 text-sm leading-none"
+                  title="Delete draft"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="flex gap-2 mt-5 pt-3 border-t border-gray-800">
+        <button 
+          onClick={handleSave}
+          disabled={isSaving}
+          className="text-xs bg-purple-700 hover:bg-purple-600 disabled:bg-gray-800 text-white px-4 py-1.5 rounded-lg transition font-medium shadow-md">
+          {isSaving ? "Saving..." : "Save Settings"}
         </button>
         <button onClick={onClose}
           className="text-xs border border-gray-700 text-gray-400 hover:bg-gray-800 px-4 py-1.5 rounded-lg transition">
@@ -74,31 +218,38 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
         </button>
       </div>
 
+      {/* FIXED (#582): Added your hover box style rules directly onto the core stylesheet sheet payload */}
       <style>{`
-        .sel { width:100%; background:#1f2937; color:#e5e7eb; border:1px solid #374151; border-radius:8px; padding:4px 8px; outline:none; font-size:11px; }
-        /* FIXED (#582): Tooltip trigger layout and hover box styles */
+        .sel { width:100%; background:#1f2937; color:#e5e7eb; border:1px solid #374151; border-radius:8px; padding:4px 8px; outline:none; font-size:11px; transition: border-color 0.15s ease; }
         .tt-trigger { position: relative; display: inline-flex; align-items: center; cursor: help; }
-        .tt-box { visibility: hidden; width: 180px; background-color: #030712; color: #d1d5db; text-align: left; border: 1px solid #374151; border-radius: 6px; padding: 6px 8px; position: absolute; z-index: 50; bottom: 125%; left: 0; opacity: 0; transition: opacity 0.15s ease, transform 0.15s ease; transform: translateY(4px); pointer-events: none; font-size: 10px; line-height: 1.4; font-weight: normal; }
+        .tt-box { visibility: hidden; width: 180px; background-color: #030712; color: #d1d5db; text-align: left; border: 1px solid #374151; border-radius: 6px; padding: 6px 8px; position: absolute; z-index: 50; bottom: 125%; left: 0; opacity: 0; transition: opacity 0.15s ease, transform 0.15s ease; transform: translateY(4px); pointer-events: none; font-size: 10px; line-height: 1.4; font-weight: normal; font-family: sans-serif; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.5); }
         .tt-trigger:hover .tt-box { visibility: visible; opacity: 1; transform: translateY(0); }
       `}</style>
     </div>
   );
 }
 
-// FIXED (#582): Integrated tooltips logic directly into Field helper mapping
-function Field({ label, tooltip, children }) {
+// FIXED (#582): Updated Field component layout template wrapper to map out info dots with hover cards
+function Field({ label, tooltip, error, children }) {
   return (
-    <div>
-      <div className="flex items-center gap-1 mb-1">
-        <label className="text-gray-500 block">{label}</label>
-        {tooltip && (
-          <span className="tt-trigger text-[10px] bg-gray-800 text-gray-400 rounded-full w-3.5 h-3.5 inline-flex items-center justify-center font-serif hover:bg-gray-700 transition" aria-label="Help info">
-            i
-            <span className="tt-box">{tooltip}</span>
-          </span>
-        )}
+    <div className="flex flex-col justify-between">
+      <div>
+        <div className="flex items-center gap-1 mb-1">
+          <label className="text-gray-500 block">{label}</label>
+          {tooltip && (
+            <span className="tt-trigger text-[10px] bg-gray-800 text-gray-400 rounded-full w-3.5 h-3.5 inline-flex items-center justify-center font-serif hover:bg-gray-700 transition" aria-label="Help info">
+              i
+              <span className="tt-box">{tooltip}</span>
+            </span>
+          )}
+        </div>
+        {children}
       </div>
-      {children}
+      {error && (
+        <p className="mt-1 text-[10px] text-red-400 font-medium leading-tight">
+          {error}
+        </p>
+      )}
     </div>
   );
 }
