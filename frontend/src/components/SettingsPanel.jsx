@@ -103,44 +103,45 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
         </div>
       )}
 
+      {/* FIXED (#582): Added explicit informative tooltip props to the form layout grid */}
       <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-xs">
-        <Field label="Default Model" error={errors.default_model}>
+        <Field label="Default Model" tooltip="The default LLM model brain used for reasoning when starting new chat sessions." error={errors.default_model}>
           <select value={form.default_model} onChange={e => set("default_model", e.target.value)} className={`sel ${errors.default_model ? "border-red-500" : ""}`}>
             {MODELS.map(m => <option key={m} value={m}>{m}</option>)}
           </select>
         </Field>
 
-        <Field label="Default Language" error={errors.default_language}>
+        <Field label="Default Language" tooltip="Sets the interface language preferences and localized system prompt defaults." error={errors.default_language}>
           <select value={form.default_language} onChange={e => set("default_language", e.target.value)} className={`sel ${errors.default_language ? "border-red-500" : ""}`}>
             {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
           </select>
         </Field>
 
-        <Field label={`Temperature: ${form.temperature}`} error={errors.temperature}>
+        <Field label={`Temperature: ${form.temperature}`} tooltip="Controls output randomness: higher values increase creativity, lower values keep it precise." error={errors.temperature}>
           <input type="range" min="0" max="2" step="0.1" value={form.temperature}
             onChange={e => set("temperature", parseFloat(e.target.value))}
             className="w-full accent-purple-500" />
         </Field>
 
-        <Field label={`RAG Context Chunks: ${form.rag_top_k}`} error={errors.rag_top_k}>
+        <Field label={`RAG Context Chunks: ${form.rag_top_k}`} tooltip="The maximum number of matching reference document fragments parsed into context." error={errors.rag_top_k}>
           <input type="range" min="1" max="10" step="1" value={form.rag_top_k}
             onChange={e => set("rag_top_k", parseInt(e.target.value))}
             className="w-full accent-purple-500" />
         </Field>
 
-        <Field label={`RAG Chunk Overlap: ${form.rag_chunk_overlap}`} error={errors.rag_chunk_overlap}>
+        <Field label={`RAG Chunk Overlap: ${form.rag_chunk_overlap}`} tooltip="Number of shared trailing tokens between sections to maintain continuous context links." error={errors.rag_chunk_overlap}>
           <input type="range" min="0" max="200" step="10" value={form.rag_chunk_overlap}
             onChange={e => set("rag_chunk_overlap", parseInt(e.target.value))}
             className="w-full accent-purple-500" />
         </Field>
 
-        <Field label={`History Turns: ${form.max_history_turns}`} error={errors.max_history_turns}>
+        <Field label={`History Turns: ${form.max_history_turns}`} tooltip="The threshold of past message rounds bundled into downstream prompts to hold context memory." error={errors.max_history_turns}>
           <input type="range" min="2" max="20" step="2" value={form.max_history_turns}
             onChange={e => set("max_history_turns", parseInt(e.target.value))}
             className="w-full accent-purple-500" />
         </Field>
 
-        <Field label="Theme" error={errors.theme}>
+        <Field label="Theme" tooltip="Switches core visual color layers, highlights, and canvas contrast modes." error={errors.theme}>
           <select value={form.theme} onChange={e => set("theme", e.target.value)} className={`sel ${errors.theme ? "border-red-500" : ""}`}>
             <option value="dark">Dark</option>
             <option value="light">Light</option>
@@ -150,7 +151,7 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
           </select>
         </Field>
 
-        <Field label="Minimal Mode">
+        <Field label="Minimal Mode" tooltip="Disables complex background rendering and structural motions to save browser resources.">
           <label className="flex items-center gap-2 text-gray-300 mt-1 cursor-pointer select-none">
             <input
               type="checkbox"
@@ -217,16 +218,31 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
         </button>
       </div>
 
-      <style>{`.sel { width:100%; background:#1f2937; color:#e5e7eb; border:1px solid #374151; border-radius:8px; padding:4px 8px; outline:none; font-size:11px; transition: border-color 0.15s ease; }`}</style>
+      {/* FIXED (#582): Added your hover box style rules directly onto the core stylesheet sheet payload */}
+      <style>{`
+        .sel { width:100%; background:#1f2937; color:#e5e7eb; border:1px solid #374151; border-radius:8px; padding:4px 8px; outline:none; font-size:11px; transition: border-color 0.15s ease; }
+        .tt-trigger { position: relative; display: inline-flex; align-items: center; cursor: help; }
+        .tt-box { visibility: hidden; width: 180px; background-color: #030712; color: #d1d5db; text-align: left; border: 1px solid #374151; border-radius: 6px; padding: 6px 8px; position: absolute; z-index: 50; bottom: 125%; left: 0; opacity: 0; transition: opacity 0.15s ease, transform 0.15s ease; transform: translateY(4px); pointer-events: none; font-size: 10px; line-height: 1.4; font-weight: normal; font-family: sans-serif; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.5); }
+        .tt-trigger:hover .tt-box { visibility: visible; opacity: 1; transform: translateY(0); }
+      `}</style>
     </div>
   );
 }
 
-function Field({ label, error, children }) {
+// FIXED (#582): Updated Field component layout template wrapper to map out info dots with hover cards
+function Field({ label, tooltip, error, children }) {
   return (
     <div className="flex flex-col justify-between">
       <div>
-        <label className="text-gray-500 block mb-1">{label}</label>
+        <div className="flex items-center gap-1 mb-1">
+          <label className="text-gray-500 block">{label}</label>
+          {tooltip && (
+            <span className="tt-trigger text-[10px] bg-gray-800 text-gray-400 rounded-full w-3.5 h-3.5 inline-flex items-center justify-center font-serif hover:bg-gray-700 transition" aria-label="Help info">
+              i
+              <span className="tt-box">{tooltip}</span>
+            </span>
+          )}
+        </div>
         {children}
       </div>
       {error && (
