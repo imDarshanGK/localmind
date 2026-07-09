@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import { describe, test, expect, vi, afterEach } from "vitest";
 import SettingsPanel from "./SettingsPanel";
 
@@ -7,16 +7,17 @@ const mockSettings = {
   default_model: "llama3",
   default_language: "en",
   temperature: 0.7,
-  max_history_turns: 10,
   rag_top_k: 4,
+  rag_chunk_overlap: 50,
   theme: "dark",
+  minimal_mode: false,
 };
 
 afterEach(() => {
   cleanup();
 });
 
-describe("SettingsPanel Accessibility Landmarks Suite (#580)", () => {
+describe("SettingsPanel Accessibility Landmarks & Validation Suite (#580)", () => {
   test("renders with correct semantic section region and aria bindings", () => {
     render(<SettingsPanel settings={mockSettings} onSave={vi.fn()} onClose={vi.fn()} />);
     
@@ -32,5 +33,44 @@ describe("SettingsPanel Accessibility Landmarks Suite (#580)", () => {
     expect(screen.getByLabelText("Default Model")).toBeDefined();
     expect(screen.getByLabelText("Default Language")).toBeDefined();
     expect(screen.getByLabelText(/temperature/i)).toBeDefined();
+  });
+
+  test("renders core settings form fields accurately with default prop values", () => {
+    render(<SettingsPanel settings={mockSettings} onSave={vi.fn()} onClose={vi.fn()} />);
+    
+    expect(screen.getByText("Default Model")).toBeDefined();
+    expect(screen.getByText("Default Language")).toBeDefined();
+    expect(screen.getByDisplayValue("llama3")).toBeDefined();
+  });
+
+  test("updates local form state variables successfully when select values shift", () => {
+    render(<SettingsPanel settings={mockSettings} onSave={vi.fn()} onClose={vi.fn()} />);
+    
+    const modelSelect = screen.getAllByRole("combobox")[0];
+    fireEvent.change(modelSelect, { target: { value: "deepseek-r1" } });
+    
+    expect(modelSelect.value).toBe("deepseek-r1");
+  });
+
+  test("triggers parent submission callback payload successfully when clicking save action button", async () => {
+    const mockOnSave = vi.fn().mockResolvedValue({});
+    render(<SettingsPanel settings={mockSettings} onSave={mockOnSave} onClose={vi.fn()} />);
+    
+    const saveButton = screen.getByText("Save Settings");
+    fireEvent.click(saveButton);
+    
+    await waitFor(() => {
+      expect(mockOnSave).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  test("triggers close panel callback wrapper cleanly when cancel button is fired", () => {
+    const mockOnClose = vi.fn();
+    render(<SettingsPanel settings={mockSettings} onSave={vi.fn()} onClose={mockOnClose} />);
+    
+    const cancelButton = screen.getByText("Cancel");
+    fireEvent.click(cancelButton);
+    
+    expect(mockOnClose).toHaveBeenCalledTimes(1);
   });
 });
