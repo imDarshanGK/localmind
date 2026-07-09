@@ -63,13 +63,17 @@ async def chat(
         "model": model,
         "messages": messages,
         "stream": False,
-        "options": {"temperature": temperature, "top_p": 0.9, "num_predict": 2048},
+        "options": {
+            "temperature": temperature,
+            "top_p": 0.9,
+            "num_predict": 2048,
+        },
     }
+
     async with httpx.AsyncClient(timeout=TIMEOUT) as client:
         response = await client.post(f"{OLLAMA_BASE_URL}/api/chat", json=payload)
         response.raise_for_status()
         return response.json()["message"]["content"]
-
 
 async def chat_stream(
     message: str,
