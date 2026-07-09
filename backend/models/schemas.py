@@ -136,6 +136,7 @@ class ExportFormat(str, Enum):
     markdown = "markdown"
     json = "json"
     txt = "txt"
+    pdf = "pdf"
 
 
 class SessionRenameItem(BaseModel):

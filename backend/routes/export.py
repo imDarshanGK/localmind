@@ -13,6 +13,57 @@ from services import db_service
 router = APIRouter()
 
 
+def generate_pdf(title: str, subtitle: str, messages: list) -> bytes:
+    # Check Whisper status
+    whisper_status = "Whisper Engine: Active"
+    try:
+        import whisper
+    except (ImportError, ModuleNotFoundError):
+        import logging
+        logging.getLogger(__name__).warning("Whisper package not found. Falling back to text-only processing for PDF export.")
+        whisper_status = "Whisper Engine: Offline (Audio features unavailable)"
+
+    from fpdf import FPDF
+    pdf = FPDF()
+    pdf.add_page()
+    
+    title_latin1 = title.encode("latin-1", errors="replace").decode("latin-1")
+    pdf.set_font("helvetica", "B", 16)
+    pdf.cell(0, 10, title_latin1, new_x="LMARGIN", new_y="NEXT")
+    
+    sub = f"{subtitle} | {whisper_status}"
+    sub_latin1 = sub.encode("latin-1", errors="replace").decode("latin-1")
+    pdf.set_font("helvetica", "I", 10)
+    pdf.cell(0, 8, sub_latin1, new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(5)
+    
+    for m in messages:
+        role = "YOU" if m["role"] == "user" else "LOCALMIND"
+        pdf.set_font("helvetica", "B", 11)
+        pdf.cell(0, 6, f"[{role}]", new_x="LMARGIN", new_y="NEXT")
+        
+        pdf.set_font("helvetica", "", 10)
+        content = m["content"].strip()
+        content_latin1 = content.encode("latin-1", errors="replace").decode("latin-1")
+        pdf.multi_cell(0, 5, content_latin1, new_x="LMARGIN", new_y="NEXT")
+        
+        if m["role"] == "assistant" and m.get("sources"):
+            source_names = []
+            for src in m["sources"]:
+                if isinstance(src, dict):
+                    source_names.append(src.get("source", ""))
+                else:
+                    source_names.append(str(src))
+            source_names = [s for s in source_names if s]
+            if source_names:
+                pdf.set_font("helvetica", "I", 9)
+                pdf.cell(0, 5, f"Sources: {', '.join(source_names)}", new_x="LMARGIN", new_y="NEXT")
+        
+        pdf.ln(5)
+        
+    return bytes(pdf.output())
+
+
 class ExportMessagesRequest(BaseModel):
     message_ids: List[str]
     format: ExportFormat
@@ -107,22 +158,27 @@ async def export_session(session_id: str, fmt: ExportFormat):
         safe_title = "localmind_chat"
 
     if fmt == ExportFormat.json:
-        content = export_session_json(session, messages, ts)
+        content = export_session_json(session, messages, ts).encode("utf-8")
         media = "application/json"
         filename = f"{safe_title}.json"
 
     elif fmt == ExportFormat.markdown:
-        content = export_session_markdown(session, messages, ts)
+        content = export_session_markdown(session, messages, ts).encode("utf-8")
         media = "text/markdown"
         filename = f"{safe_title}.md"
 
+    elif fmt == ExportFormat.pdf:
+        content = generate_pdf(title, f"Exported: {ts} | Model: {session.get('model', '?')}", messages)
+        media = "application/pdf"
+        filename = f"{safe_title}.pdf"
+
     else:  # txt
-        content = export_session_txt(session, messages, ts)
+        content = export_session_txt(session, messages, ts).encode("utf-8")
         media = "text/plain"
         filename = f"{safe_title}.txt"
 
     return Response(
-        content=content.encode("utf-8"),
+        content=content,
         media_type=media,
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
@@ -195,7 +251,7 @@ async def export_messages(req: ExportMessagesRequest):
     safe_title = f"localmind_messages_{ts.replace(' ', '_').replace(':', '-')}"
 
     if req.format == ExportFormat.json:
-        content = json.dumps({"messages": messages, "exported_at": ts}, indent=2, ensure_ascii=False)
+        content = json.dumps({"messages": messages, "exported_at": ts}, indent=2, ensure_ascii=False).encode("utf-8")
         media = "application/json"
         filename = f"{safe_title}.json"
 
@@ -219,9 +275,14 @@ async def export_messages(req: ExportMessagesRequest):
             lines.append(msg_block + "\n")
             lines.append("\n\n---\n\n")
 
-        content = "\n".join(lines)
+        content = "\n".join(lines).encode("utf-8")
         media = "text/markdown"
         filename = f"{safe_title}.md"
+
+    elif req.format == ExportFormat.pdf:
+        content = generate_pdf("LocalMind – Exported Messages", f"Exported: {ts}", messages)
+        media = "application/pdf"
+        filename = f"{safe_title}.pdf"
 
     else:
         lines = ["LocalMind Export — Selected Messages", f"Exported: {ts}", "=" * 50, ""]
@@ -241,12 +302,12 @@ async def export_messages(req: ExportMessagesRequest):
                     msg_block += f"\nSources: {', '.join(source_names)}"
                 
             lines += [msg_block, ""]
-        content = "\n".join(lines)
+        content = "\n".join(lines).encode("utf-8")
         media = "text/plain"
         filename = f"{safe_title}.txt"
 
     return Response(
-        content=content.encode("utf-8"),
+        content=content,
         media_type=media,
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
