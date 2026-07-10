@@ -6,24 +6,25 @@ const LANGUAGES = [{code:"en",label:"English"},{code:"hi",label:"हिन्द
 
 export default function SettingsPanel({ settings, onSave, onClose }) {
   const [form, setForm] = useState({
-    default_model:    settings.default_model    || "llama3",
-    default_language: settings.default_language || "en",
-    temperature:      settings.temperature      ?? 0.7,
-    max_history_turns:settings.max_history_turns|| 10,
-    rag_top_k:        settings.rag_top_k        || 4,
-    theme:            settings.theme            || "dark",
+    default_model:    settings?.default_model    || "llama3",
+    default_language: settings?.default_language || "en",
+    temperature:      settings?.temperature      ?? 0.7,
+    max_history_turns:settings?.max_history_turns|| 10,
+    rag_top_k:        settings?.rag_top_k        || 4,
+    theme:            settings?.theme            || "dark",
   });
 
   function set(key, val) { setForm(p => ({...p, [key]: val})); }
 
   return (
-    <div className="border-b border-gray-800 bg-gray-900 px-5 py-4 shrink-0">
+    <div className="border-b border-gray-800 bg-gray-900 px-5 py-4 shrink-0 w-full">
       <div className="flex items-center justify-between mb-4">
         <p className="text-sm font-semibold text-white inline-flex items-center gap-1.5"><SettingsIcon className="w-4 h-4" />Settings</p>
         <button onClick={onClose} className="text-gray-500 hover:text-gray-300 text-lg leading-none">×</button>
       </div>
 
-      <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-xs">
+      {/* FIXED (#579): Fluid responsive grid layout adapting from 1 column on mobile screens to 2 columns on desktop viewports */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-xs">
         <Field label="Default Model">
           <select value={form.default_model} onChange={e=>set("default_model",e.target.value)} className="sel">
             {MODELS.map(m => <option key={m} value={m}>{m}</option>)}
@@ -57,13 +58,14 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
         </Field>
       </div>
 
-      <div className="flex gap-2 mt-4">
+      {/* FIXED (#579): Action wrapper scales vertically on thin interfaces to eliminate action text truncation */}
+      <div className="flex flex-col sm:flex-row gap-2 mt-4">
         <button onClick={()=>onSave(form)}
-          className="text-xs bg-purple-700 hover:bg-purple-600 text-white px-4 py-1.5 rounded-lg transition font-medium">
+          className="text-xs bg-purple-700 hover:bg-purple-600 text-white px-4 py-1.5 rounded-lg transition font-medium w-full sm:w-auto text-center">
           Save Settings
         </button>
         <button onClick={onClose}
-          className="text-xs border border-gray-700 text-gray-400 hover:bg-gray-800 px-4 py-1.5 rounded-lg transition">
+          className="text-xs border border-gray-700 text-gray-400 hover:bg-gray-800 px-4 py-1.5 rounded-lg transition w-full sm:w-auto text-center">
           Cancel
         </button>
       </div>
