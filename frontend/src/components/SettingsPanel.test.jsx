@@ -29,7 +29,7 @@ describe("SettingsPanel Inline Error Banner & Feature Integration Suite (#577)",
     
     const saveBtn = screen.getByRole("button", { name: /save settings/i });
     fireEvent.click(saveBtn);
-
+    
     await waitFor(() => {
       expect(screen.getByTestId("error-banner")).toBeDefined();
       expect(screen.getByText(/Database write connection failed./i)).toBeDefined();
@@ -37,11 +37,27 @@ describe("SettingsPanel Inline Error Banner & Feature Integration Suite (#577)",
   });
 });
 
+describe("SettingsPanel Empty State & Guidance Suite (#576)", () => {
+  test("renders empty guidance card view when an empty settings object is supplied", () => {
+    render(<SettingsPanel settings={{}} onSave={vi.fn()} onClose={vi.fn()} />);
+    
+    expect(screen.getByText("No Profile Configuration Found")).toBeDefined();
+    expect(screen.getByText("Load System Defaults")).toBeDefined();
+  });
+
+  test("renders standard parameters layout when data is properly provisioned", () => {
+    const validSettings = { default_model: "llama3", default_language: "en" };
+    render(<SettingsPanel settings={validSettings} onSave={vi.fn()} onClose={vi.fn()} />);
+    
+    expect(screen.queryByText("No Profile Configuration Found")).toBeNull();
+    expect(screen.getByText("Default Model")).toBeDefined();
+  });
+});
+
 describe("SettingsPanel Accessibility Landmarks & Validation Suite (#580)", () => {
   test("renders with correct semantic section region and aria bindings", () => {
     render(<SettingsPanel settings={mockSettings} onSave={vi.fn()} onClose={vi.fn()} />);
     
-    // Verifies the entire component is enclosed in a landmark region labeled by the title heading
     const section = screen.getByRole("region", { name: /settings/i });
     expect(section).toBeDefined();
   });
@@ -49,7 +65,6 @@ describe("SettingsPanel Accessibility Landmarks & Validation Suite (#580)", () =
   test("associates form control fields cleanly to their accessibility labels", () => {
     render(<SettingsPanel settings={mockSettings} onSave={vi.fn()} onClose={vi.fn()} />);
     
-    // Verifies the labels are programmatically associated with inputs using htmlFor / id
     expect(screen.getByLabelText("Default Model")).toBeDefined();
     expect(screen.getByLabelText("Default Language")).toBeDefined();
     expect(screen.getByLabelText(/temperature/i)).toBeDefined();
