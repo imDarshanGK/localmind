@@ -3,7 +3,6 @@ import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/re
 import { describe, test, expect, vi, afterEach } from "vitest";
 import SettingsPanel from "./SettingsPanel";
 
-// Mock standard props setup payload
 const mockSettings = {
   default_model: "llama3",
   default_language: "en",
@@ -35,6 +34,25 @@ describe("SettingsPanel Inline Error Banner & Feature Integration Suite (#577)",
       expect(screen.getByTestId("error-banner")).toBeDefined();
       expect(screen.getByText(/Database write connection failed./i)).toBeDefined();
     });
+  });
+});
+
+describe("SettingsPanel Accessibility Landmarks & Validation Suite (#580)", () => {
+  test("renders with correct semantic section region and aria bindings", () => {
+    render(<SettingsPanel settings={mockSettings} onSave={vi.fn()} onClose={vi.fn()} />);
+    
+    // Verifies the entire component is enclosed in a landmark region labeled by the title heading
+    const section = screen.getByRole("region", { name: /settings/i });
+    expect(section).toBeDefined();
+  });
+
+  test("associates form control fields cleanly to their accessibility labels", () => {
+    render(<SettingsPanel settings={mockSettings} onSave={vi.fn()} onClose={vi.fn()} />);
+    
+    // Verifies the labels are programmatically associated with inputs using htmlFor / id
+    expect(screen.getByLabelText("Default Model")).toBeDefined();
+    expect(screen.getByLabelText("Default Language")).toBeDefined();
+    expect(screen.getByLabelText(/temperature/i)).toBeDefined();
   });
 
   test("renders core settings form fields accurately with default prop values", () => {

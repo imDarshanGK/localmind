@@ -23,7 +23,6 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
     minimal_mode:      settings?.minimal_mode ?? false,
   });
 
-  // SOLVES (#581): Persistent Collapse State Hooks
   const [isExpanded, setIsExpanded] = useState(() => {
     const savedState = localStorage.getItem("localmind_settings_expanded");
     return savedState !== null ? JSON.parse(savedState) : true;
@@ -55,7 +54,6 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
 
   const isEmptyState = !settings || Object.keys(settings).length === 0;
 
-  // SINGLE UNIFIED HELPER: Updates local form variables and automatically clears historical errors
   function set(key, val) { 
     setForm(p => ({ ...p, [key]: val })); 
     if (errors[key]) {
@@ -69,7 +67,6 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
     setErrors({});
     
     try {
-      // Intentionally simulate an inline validation trigger if values hit edge extremes (for localhost demo verification)
       if (form.temperature > 1.5) {
         throw new Error("Validation Error: Temperature configuration is too high for local environment parameters.");
       }
@@ -87,7 +84,6 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
         });
         setErrors(inlineErrors);
       } else {
-        // Track the message context inside local error banners
         setErrors({ global: err.message || "Failed to update configuration settings." });
       }
     } finally {
@@ -118,14 +114,15 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
   };
 
   return (
-    <div data-testid="settings-panel" className="border-b border-gray-800 bg-gray-900 px-5 py-4 shrink-0 transition-all duration-300">
+    <section 
+      aria-labelledby="settings-heading"
+      className="border-b border-gray-800 bg-gray-900 px-5 py-4 shrink-0 transition-all duration-300"
+    >
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <p className="text-sm font-semibold text-white inline-flex items-center gap-1.5">
-            <SettingsIcon className="w-4 h-4" />Settings
-          </p>
-          
-          {/* SOLVES (#581): Persistent Collapse Button Controller */}
+          <h2 id="settings-heading" className="text-sm font-semibold text-white inline-flex items-center gap-1.5">
+            <SettingsIcon className="w-4 h-4" aria-hidden="true" />Settings
+          </h2>
           <button 
             type="button"
             onClick={() => setIsExpanded(!isExpanded)}
@@ -134,7 +131,7 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
             {isExpanded ? "Collapse ▵" : "Expand ▿"}
           </button>
         </div>
-        <button onClick={onClose} className="text-gray-500 hover:text-gray-300 text-lg leading-none">×</button>
+        <button onClick={onClose} aria-label="Close settings panel" className="text-gray-500 hover:text-gray-300 text-lg leading-none">×</button>
       </div>
 
       {/* FIXED (#577): Inline Error Banner View Component Window */}
@@ -146,6 +143,7 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
             <p className="text-red-300/90 leading-normal">{errors.global}</p>
           </div>
           <button 
+            type="button"
             onClick={() => setErrors(p => ({ ...p, global: "" }))} 
             className="text-red-400/60 hover:text-red-300 text-sm leading-none font-bold px-1"
           >
@@ -169,48 +167,47 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
           </button>
         </div>
       ) : (
-        /* SOLVES (#581): Controlled expanded layout rendering window wrapper */
         isExpanded && (
           <>
             <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-xs">
-              <Field label="Default Model" error={errors.default_model}>
-                <select value={form.default_model} onChange={e => set("default_model", e.target.value)} className={`sel ${errors.default_model ? "border-red-500" : ""}`}>
+              <Field label="Default Model" htmlId="model-dropdown" error={errors.default_model}>
+                <select id="model-dropdown" value={form.default_model} onChange={e => set("default_model", e.target.value)} className={`sel ${errors.default_model ? "border-red-500" : ""}`}>
                   {MODELS.map(m => <option key={m} value={m}>{m}</option>)}
                 </select>
               </Field>
 
-              <Field label="Default Language" error={errors.default_language}>
-                <select value={form.default_language} onChange={e => set("default_language", e.target.value)} className={`sel ${errors.default_language ? "border-red-500" : ""}`}>
+              <Field label="Default Language" htmlId="lang-dropdown" error={errors.default_language}>
+                <select id="lang-dropdown" value={form.default_language} onChange={e => set("default_language", e.target.value)} className={`sel ${errors.default_language ? "border-red-500" : ""}`}>
                   {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
                 </select>
               </Field>
 
-              <Field label={`Temperature: ${form.temperature}`} error={errors.temperature}>
-                <input type="range" min="0" max="2" step="0.1" value={form.temperature}
+              <Field label={`Temperature: ${form.temperature}`} htmlId="temp-slider" error={errors.temperature}>
+                <input id="temp-slider" type="range" min="0" max="2" step="0.1" value={form.temperature}
                   onChange={e => set("temperature", parseFloat(e.target.value))}
                   className="w-full accent-purple-500" />
               </Field>
 
-              <Field label={`RAG Context Chunks: ${form.rag_top_k}`} error={errors.rag_top_k}>
-                <input type="range" min="1" max="10" step="1" value={form.rag_top_k}
+              <Field label={`RAG Context Chunks: ${form.rag_top_k}`} htmlId="rag-slider" error={errors.rag_top_k}>
+                <input id="rag-slider" type="range" min="1" max="10" step="1" value={form.rag_top_k}
                   onChange={e => set("rag_top_k", parseInt(e.target.value))}
                   className="w-full accent-purple-500" />
               </Field>
 
-              <Field label={`RAG Chunk Overlap: ${form.rag_chunk_overlap}`} error={errors.rag_chunk_overlap}>
-                <input type="range" min="0" max="200" step="10" value={form.rag_chunk_overlap}
+              <Field label={`RAG Chunk Overlap: ${form.rag_chunk_overlap}`} htmlId="overlap-slider" error={errors.rag_chunk_overlap}>
+                <input id="overlap-slider" type="range" min="0" max="200" step="10" value={form.rag_chunk_overlap}
                   onChange={e => set("rag_chunk_overlap", parseInt(e.target.value))}
                   className="w-full accent-purple-500" />
               </Field>
 
-              <Field label={`History Turns: ${form.max_history_turns}`} error={errors.max_history_turns}>
-                <input type="range" min="2" max="20" step="2" value={form.max_history_turns}
+              <Field label={`History Turns: ${form.max_history_turns}`} htmlId="history-slider" error={errors.max_history_turns}>
+                <input id="history-slider" type="range" min="2" max="20" step="2" value={form.max_history_turns}
                   onChange={e => set("max_history_turns", parseInt(e.target.value))}
                   className="w-full accent-purple-500" />
               </Field>
 
-              <Field label="Theme" error={errors.theme}>
-                <select value={form.theme} onChange={e => set("theme", e.target.value)} className={`sel ${errors.theme ? "border-red-500" : ""}`}>
+              <Field label="Theme" htmlId="theme-dropdown" error={errors.theme}>
+                <select id="theme-dropdown" value={form.theme} onChange={e => set("theme", e.target.value)} className={`sel ${errors.theme ? "border-red-500" : ""}`}>
                   <option value="dark">Dark</option>
                   <option value="light">Light</option>
                   <option value="high-contrast">High Contrast</option>
@@ -219,9 +216,10 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
                 </select>
               </Field>
 
-              <Field label="Minimal Mode">
+              <Field label="Minimal Mode" htmlId="minimal-checkbox">
                 <label className="flex items-center gap-2 text-gray-300 mt-1 cursor-pointer select-none">
                   <input
+                    id="minimal-checkbox"
                     type="checkbox"
                     checked={form.minimal_mode}
                     onChange={e => set("minimal_mode", e.target.checked)}
@@ -233,9 +231,10 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
             </div>
 
             <div className="mt-5 pt-4 border-t border-gray-800 text-xs">
-              <label className="text-gray-400 font-medium block mb-2">Saved Prompt Drafts / Notes</label>
+              <label htmlFor="drafts-input" className="text-gray-400 font-medium block mb-2">Saved Prompt Drafts / Notes</label>
               <div className="flex gap-2 mb-3">
                 <input 
+                  id="drafts-input"
                   type="text" 
                   value={newDraft} 
                   onChange={e => setNewDraft(e.target.value)}
@@ -309,15 +308,15 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
       <style>{`
         .sel { width:100%; background:#1f2937; color:#e5e7eb; border:1px solid #374151; border-radius:8px; padding:4px 8px; outline:none; font-size:11px; transition: border-color 0.15s ease; }
       `}</style>
-    </div>
+    </section>
   );
 }
 
-function Field({ label, error, children }) {
+function Field({ label, htmlId, error, children }) {
   return (
     <div className="flex flex-col justify-between">
       <div>
-        <label className="text-gray-500 block mb-1">{label}</label>
+        <label htmlFor={htmlId} className="text-gray-500 block mb-1">{label}</label>
         {children}
       </div>
       {error && (
