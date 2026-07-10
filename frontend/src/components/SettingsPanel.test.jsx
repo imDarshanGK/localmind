@@ -1,8 +1,8 @@
+// @vitest-environment jsdom
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import { describe, test, expect, vi, afterEach } from "vitest";
 import SettingsPanel from "./SettingsPanel";
 
-// Mock standard props setup payload
 const mockSettings = {
   default_model: "llama3",
   default_language: "en",
@@ -13,16 +13,31 @@ const mockSettings = {
   minimal_mode: false,
 };
 
-// FIXED (#584): Clean out the DOM matrix sandbox completely after every test run
 afterEach(() => {
   cleanup();
 });
 
-describe("SettingsPanel Interaction Suite (#584)", () => {
+describe("SettingsPanel Accessibility Landmarks & Validation Suite (#580)", () => {
+  test("renders with correct semantic section region and aria bindings", () => {
+    render(<SettingsPanel settings={mockSettings} onSave={vi.fn()} onClose={vi.fn()} />);
+    
+    // Verifies the entire component is enclosed in a landmark region labeled by the title heading
+    const section = screen.getByRole("region", { name: /settings/i });
+    expect(section).toBeDefined();
+  });
+
+  test("associates form control fields cleanly to their accessibility labels", () => {
+    render(<SettingsPanel settings={mockSettings} onSave={vi.fn()} onClose={vi.fn()} />);
+    
+    // Verifies the labels are programmatically associated with inputs using htmlFor / id
+    expect(screen.getByLabelText("Default Model")).toBeDefined();
+    expect(screen.getByLabelText("Default Language")).toBeDefined();
+    expect(screen.getByLabelText(/temperature/i)).toBeDefined();
+  });
+
   test("renders core settings form fields accurately with default prop values", () => {
     render(<SettingsPanel settings={mockSettings} onSave={vi.fn()} onClose={vi.fn()} />);
     
-    // FIXED (#584): Replaced external jest-dom assertions with native DOM check elements
     expect(screen.getByText("Default Model")).toBeDefined();
     expect(screen.getByText("Default Language")).toBeDefined();
     expect(screen.getByDisplayValue("llama3")).toBeDefined();
