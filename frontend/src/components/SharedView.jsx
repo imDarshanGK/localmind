@@ -71,36 +71,67 @@ export default function SharedView() {
 
       {/* Message History Timeline View */}
       <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
-        {snapshot.messages.map((msg, i) => (
-          <div key={msg.id || i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-            <div className={`max-w-2xl ${msg.role === "user" ? "max-w-xl" : "max-w-2xl"}`}>
-              {msg.role === "assistant" && (
-                <div className="flex items-center gap-1.5 mb-1.5 ml-1">
-                  <AppLogoIcon className="w-4 h-4 text-purple-400" />
-                  <span className="text-xs font-semibold text-purple-400">LocalMind</span>
-                </div>
-              )}
-              <div className={`px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words
-                ${msg.role === "user"
-                  ? "bg-purple-700 text-white rounded-br-sm"
-                  : "bg-gray-800 text-gray-100 rounded-bl-sm border border-gray-700"}`}>
-                {msg.content}
-              </div>
-              {msg.sources?.length > 0 && (
-                <div className="mt-1.5 ml-1 flex flex-wrap gap-1">
-                  {msg.sources.map((s, idx) => (
-                    <span key={idx} className="text-xs bg-gray-800 text-blue-400 px-2 py-0.5 rounded-full border border-gray-700">
-                      <span className="inline-flex items-center gap-1">
-                        <FileIcon className="w-3 h-3" />
-                        <span>{s}</span>
-                      </span>
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
+        {snapshot.messages.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full text-center text-gray-500">
+            <p className="text-sm font-medium">
+              No messages in this shared transcript.
+            </p>
+            <p className="text-xs mt-1">
+              The conversation history is empty or was not included in the snapshot.
+            </p>
           </div>
-        ))}
+        ) : (
+          snapshot.messages.map((msg, i) => (
+            <div
+              key={msg.id || i}
+              className={`flex ${
+                msg.role === "user" ? "justify-end" : "justify-start"
+              }`}
+            >
+              <div
+                className={`max-w-2xl ${
+                  msg.role === "user" ? "max-w-xl" : "max-w-2xl"
+                }`}
+              >
+                {msg.role === "assistant" && (
+                  <div className="flex items-center gap-1.5 mb-1.5 ml-1">
+                    <AppLogoIcon className="w-4 h-4 text-purple-400" />
+                    <span className="text-xs font-semibold text-purple-400">
+                      LocalMind
+                    </span>
+                  </div>
+                )}
+
+                <div
+                  className={`px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words
+                    ${
+                      msg.role === "user"
+                        ? "bg-purple-700 text-white rounded-br-sm"
+                        : "bg-gray-800 text-gray-100 rounded-bl-sm border border-gray-700"
+                    }`}
+                >
+                  {msg.content}
+                </div>
+
+                {msg.sources?.length > 0 && (
+                  <div className="mt-1.5 ml-1 flex flex-wrap gap-1">
+                    {msg.sources.map((s, idx) => (
+                      <span
+                        key={idx}
+                        className="text-xs bg-gray-800 text-blue-400 px-2 py-0.5 rounded-full border border-gray-700"
+                      >
+                        <span className="inline-flex items-center gap-1">
+                          <FileIcon className="w-3 h-3" />
+                          <span>{s}</span>
+                        </span>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          ))
+        )}
       </div>
 
       {/* Read-Only Footer Banner */}
