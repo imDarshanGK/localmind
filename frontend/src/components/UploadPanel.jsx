@@ -1,35 +1,72 @@
-import { useState, useRef } from "react";
-import { uploadDocument, deleteDocument } from "../utils/api";
+import { useState, useRef, useEffect } from "react";
+import { uploadDocument, deleteDocument, previewDocument } from "../utils/api";
 import { CheckIcon, DocumentsIcon, ErrorIcon, SpinnerIcon, UploadIcon, FileIcon } from "./Icons";
 
-export default function UploadPanel({ sessionId, documents, onUploaded, onClose }) {
+export default function UploadPanel({ sessionId, documents, onUploaded, onClose, show, minimalMode }) {
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [result,    setResult]    = useState(null);
-  const [error,     setError]     = useState("");
+  
+  // Preview UI local states
+  const [previewContent, setPreviewContent] = useState(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
+  const [previewFilename, setPreviewFilename] = useState("");
+
+  const [uploadResults, setUploadResults] = useState([]);
   const fileRef = useRef();
 
-  async function handleFile(file) {
-    if (!file) return;
-    setUploading(true); setError(""); setResult(null);
-    try {
-      const data = await uploadDocument(file, sessionId);
-      setResult(data);
-      onUploaded(data.filename);
-    } catch(e) { setError(e.message); }
-    finally { setUploading(false); }
+  // Poll for document status updates if any are queued/processing
+  useEffect(() => {
+    if (minimalMode || !show) return;
+    const isProcessing = documents.some(d => d.status === "queued" || d.status === "processing");
+    if (!isProcessing) return;
+    const interval = setInterval(() => {
+      onUploaded(); // Triggers refreshDocuments
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [documents, onUploaded, minimalMode, show]);
+
+  async function handleFiles(filelist) {
+    const files = Array.from(filelist || []);
+    if (files.length === 0) return;
+    setUploading(true); 
+    setUploadResults([]);
+    for (const file of files) {
+      try {
+        const data = await uploadDocument(file, sessionId);
+        setUploadResults(prev => [...prev, { filename: data.filename || file.name, status: "success", message: data.message }]);
+        onUploaded(data.filename);
+      } catch(e) { 
+        setUploadResults(prev => [...prev, { filename: file.name, status: "error", message: e.message }]);
+      }
+    }
+    setUploading(false); 
   }
 
   function onDrop(e) {
-    e.preventDefault(); setDragging(false);
-    handleFile(e.dataTransfer.files[0]);
+    e.preventDefault(); 
+    setDragging(false);
+    handleFiles(e.dataTransfer.files);
+  }
+
+  async function handleTriggerPreview(filename) {
+    setLoadingPreview(true);
+    setPreviewFilename(filename);
+    try {
+      const data = await previewDocument(filename, sessionId);
+      setPreviewContent(data.content || "No textual content available to display.");
+    } catch (e) {
+      setPreviewContent(`Error loading preview: ${e.message}`);
+    } finally {
+      setLoadingPreview(false);
+    }
   }
 
   return (
     // FIXED (#569): Converted container outer div to a semantic <section> with an accessibility landmark label
     <section 
+      data-testid="upload-panel"
       aria-labelledby="upload-panel-title"
-      className="border-b border-gray-800 bg-gray-900 px-5 py-4 shrink-0"
+      className={`border-b border-gray-800 bg-gray-900 px-5 py-4 shrink-0 ${show ? 'block' : 'hidden'}`}
     >
       <div className="flex items-center justify-between mb-3">
         {/* FIXED (#569): Added id matching the section landmark header reference */}
@@ -48,42 +85,96 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose 
 
       {/* Drop zone */}
       <div
-        onDragOver={e=>{e.preventDefault();setDragging(true)}}
-        onDragLeave={()=>setDragging(false)}
+        onDragOver={e => { e.preventDefault(); setDragging(true); }}
+        onDragLeave={() => setDragging(false)}
         onDrop={onDrop}
-        onClick={()=>fileRef.current.click()}
+        onClick={() => fileRef.current.click()}
         className={`border-2 border-dashed rounded-xl px-4 py-5 text-center cursor-pointer transition mb-3
-          ${dragging ? "border-purple-500 bg-purple-900/20" : "border-gray-700 hover:border-purple-600 hover:bg-gray-800/50"}`}>
-        <input ref={fileRef} type="file" accept=".pdf,.txt,.csv,.docx,.md,.html" className="hidden"
+          ${dragging ? "border-purple-500 bg-purple-900/20" : "border-gray-700 hover:border-purple-600 hover:bg-gray-800/50"}`}
+      >
+        <input ref={fileRef} type="file" accept=".pdf,.txt,.csv,.docx,.md,.html,.srt,.vtt" className="hidden" multiple
           aria-label="Upload document input"
-          onChange={e=>handleFile(e.target.files[0])} />
-        <p className="text-2xl mb-1 flex justify-center">{uploading ? <SpinnerIcon className="w-7 h-7 text-purple-400" /> : <UploadIcon className="w-7 h-7 text-gray-300" />}</p>
-        <p className="text-sm text-gray-400">{uploading ? "Indexing document..." : "Drop file here or click to browse"}</p>
-        <p className="text-xs text-gray-600 mt-1">PDF · TXT · CSV · DOCX · MD · HTML · max 50MB</p>
+          onChange={e => handleFiles(e.target.files)} />
+        
+        <p className="text-2xl mb-1 flex justify-center">
+          {uploading ? <SpinnerIcon className="w-7 h-7 text-purple-400" /> : <UploadIcon className="w-7 h-7 text-gray-300" />}
+        </p>
+        <p className="text-sm text-gray-400">{uploading ? "Indexing documents..." : "Drop files here or click to browse"}</p>
+        <p className="text-xs text-gray-600 mt-1">PDF · TXT · CSV · DOCX · MD · HTML · SRT · VTT · max 50MB</p>
       </div>
 
       {/* FIXED (#569): Wrapped asynchronous operation results inside an explicit live area status landmark region */}
       <div role="status" aria-live="polite" className="empty:hidden">
-        {result && <p className="text-xs text-green-400 mb-2 inline-flex items-center gap-1"><CheckIcon className="w-3.5 h-3.5" />{result.message}</p>}
-        {error  && <p className="text-xs text-red-400 mb-2 inline-flex items-center gap-1"><ErrorIcon className="w-3.5 h-3.5" />{error}</p>}
+        {uploadResults.length > 0 && (
+          <div className="mb-2">
+            {uploadResults.map((r, i) => (
+              <p key={i} className={`text-xs mb-1 inline-flex items-center gap-1 ${r.status === "success" ? "text-green-400" : "text-red-400"}`}>
+                {r.status === "success" ? <CheckIcon className="w-3.5 h-3.5" /> : <ErrorIcon className="w-3.5 h-3.5" />}
+                <span className="truncate">{r.filename}{r.status === "error" ? `: ${r.message}` : ""}</span>
+              </p>
+            ))}
+          </div>
+        )}
       </div>
-
+      
       {/* Uploaded docs list */}
       {documents.length > 0 && (
-        // FIXED (#569): Converted text labels and items into a semantic accessible list element tree structure
+        // FIXED (#569): Converted labels and items into a semantic accessible list element tree structure
         <div aria-label="Indexed documents collection">
           <p className="text-xs text-gray-500 mb-1">Indexed documents:</p>
           <ul className="space-y-1">
-            {documents.map((d, i) => (
-              <li key={i} className="flex items-center justify-between text-xs bg-gray-800 rounded-lg px-3 py-1.5">
-                <span className="text-gray-300 truncate inline-flex items-center gap-1">
-                  <FileIcon className="w-3.5 h-3.5" aria-hidden="true" />
-                  {d.filename || d}
-                </span>
-                {d.chunks_indexed && <span className="text-gray-500 ml-2 shrink-0">{d.chunks_indexed} chunks</span>}
-              </li>
-            ))}
+            {documents.map((d, i) => {
+              const currentFilename = d.filename || d;
+              return (
+                <li key={i} className="flex items-center justify-between text-xs bg-gray-800 rounded-lg px-3 py-1.5 mb-1 hover:bg-gray-750 transition">
+                  <span className="text-gray-300 truncate inline-flex items-center gap-1 max-w-[65%]">
+                    <FileIcon className="w-3.5 h-3.5" aria-hidden="true" />
+                    {currentFilename}
+                  </span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {d.chunks_indexed && <span className="text-gray-500">{d.chunks_indexed} chunks</span>}
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); handleTriggerPreview(currentFilename); }}
+                      className="p-1 text-gray-400 hover:text-purple-400 rounded transition"
+                      title="Preview Document Content"
+                      disabled={loadingPreview}
+                    >
+                      {loadingPreview && previewFilename === currentFilename ? (
+                        <SpinnerIcon className="w-3.5 h-3.5" />
+                      ) : (
+                        "👁️"
+                      )}
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
+        </div>
+      )}
+
+      {/* Read-Only Modal Viewport Overlay */}
+      {previewContent !== null && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-900 border border-gray-800 w-full max-w-2xl rounded-2xl max-h-[80vh] flex flex-col shadow-2xl">
+            <div className="p-4 border-b border-gray-800 flex items-center justify-between">
+              <div className="truncate pr-4">
+                <span className="text-[10px] text-purple-400 font-semibold uppercase tracking-wider block">Read-Only Preview</span>
+                <h3 className="text-sm font-medium text-white truncate">{previewFilename}</h3>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setPreviewContent(null)}
+                className="text-gray-400 hover:text-white px-2 py-1 text-sm bg-gray-800 border border-gray-700 rounded-lg transition"
+              >
+                Close
+              </button>
+            </div>
+            <div className="p-5 overflow-y-auto flex-1 text-xs text-gray-300 font-mono whitespace-pre-wrap leading-relaxed bg-gray-950/40 selection:bg-purple-900">
+              {previewContent}
+            </div>
+          </div>
         </div>
       )}
     </section>
