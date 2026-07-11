@@ -30,6 +30,18 @@ describe("SettingsPanel Responsive Layout Suite (#579)", () => {
   });
 });
 
+describe("SettingsPanel Keyboard Navigation Suite (#578)", () => {
+  test("fires the onClose callback trigger instantly when the Escape key is pressed", () => {
+    const mockOnClose = vi.fn();
+    render(<SettingsPanel settings={mockSettings} onSave={vi.fn()} onClose={mockOnClose} />);
+    
+    // Simulates standard window keyboard Escape sequence tracking
+    fireEvent.keyDown(window, { key: "Escape" });
+    
+    expect(mockOnClose).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("SettingsPanel Empty State & Guidance Suite (#576)", () => {
   test("renders empty guidance card view when an empty settings object is supplied", () => {
     render(<SettingsPanel settings={{}} onSave={vi.fn()} onClose={vi.fn()} />);
