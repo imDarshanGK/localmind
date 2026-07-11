@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { uploadDocument, deleteDocument } from "../utils/api";
 import { CheckIcon, DocumentsIcon, ErrorIcon, SpinnerIcon, UploadIcon, FileIcon } from "./Icons";
 
@@ -8,6 +8,17 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose 
   const [result,    setResult]    = useState(null);
   const [error,     setError]     = useState("");
   const fileRef = useRef();
+
+  // FIXED (#567): Global event listener to dismiss panel when Escape key is pressed
+  useEffect(() => {
+    function handleKeyDown(e) {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
 
   async function handleFile(file) {
     if (!file) return;
@@ -25,20 +36,39 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose 
     handleFile(e.dataTransfer.files[0]);
   }
 
+  // FIXED (#567): Trigger file selection drawer when pressing Space or Enter on the focusable drop zone
+  function handleKeyDown(e) {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      fileRef.current.click();
+    }
+  }
+
   return (
     <div className="border-b border-gray-800 bg-gray-900 px-5 py-4 shrink-0">
       <div className="flex items-center justify-between mb-3">
         <p className="text-sm font-semibold text-white inline-flex items-center gap-1.5"><DocumentsIcon className="w-4 h-4" />Documents</p>
-        <button onClick={onClose} className="text-gray-500 hover:text-gray-300 text-lg leading-none">×</button>
+        <button 
+          onClick={onClose} 
+          className="text-gray-500 hover:text-gray-300 text-lg leading-none rounded p-0.5 focus:outline-none focus:ring-2 focus:ring-purple-500"
+          aria-label="Close upload panel"
+        >
+          ×
+        </button>
       </div>
 
       {/* Drop zone */}
+      {/* FIXED (#567): Added tabIndex, interactive role, aria-label, keydown support, and visible focus outline ring */}
       <div
+        tabIndex={0}
+        role="button"
+        aria-label="File upload drop zone. Press Enter or Space to browse."
         onDragOver={e=>{e.preventDefault();setDragging(true)}}
         onDragLeave={()=>setDragging(false)}
         onDrop={onDrop}
         onClick={()=>fileRef.current.click()}
-        className={`border-2 border-dashed rounded-xl px-4 py-5 text-center cursor-pointer transition mb-3
+        onKeyDown={handleKeyDown}
+        className={`border-2 border-dashed rounded-xl px-4 py-5 text-center cursor-pointer transition mb-3 outline-none focus:ring-2 focus:ring-purple-500
           ${dragging ? "border-purple-500 bg-purple-900/20" : "border-gray-700 hover:border-purple-600 hover:bg-gray-800/50"}`}>
         <input ref={fileRef} type="file" accept=".pdf,.txt,.csv,.docx,.md,.html" className="hidden"
           onChange={e=>handleFile(e.target.files[0])} />
