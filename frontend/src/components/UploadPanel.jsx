@@ -1,33 +1,89 @@
-import { useState, useRef } from "react";
-import { uploadDocument, deleteDocument } from "../utils/api";
+import { useState, useRef, useEffect } from "react";
+import { uploadDocument, deleteDocument, previewDocument } from "../utils/api";
 import { CheckIcon, DocumentsIcon, ErrorIcon, SpinnerIcon, UploadIcon, FileIcon } from "./Icons";
 
-export default function UploadPanel({ sessionId, documents, onUploaded, onClose }) {
+export default function UploadPanel({ sessionId, documents, onUploaded, onClose, show, minimalMode }) {
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [result,    setResult]    = useState(null);
-  const [error,     setError]     = useState("");
+  
+  // Preview UI local states
+  const [previewContent, setPreviewContent] = useState(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
+  const [previewFilename, setPreviewFilename] = useState("");
+
+  const [uploadResults, setUploadResults] = useState([]);
   const fileRef = useRef();
 
-  async function handleFile(file) {
-    if (!file) return;
-    setUploading(true); setError(""); setResult(null);
-    try {
-      const data = await uploadDocument(file, sessionId);
-      setResult(data);
-      onUploaded(data.filename);
-    } catch(e) { setError(e.message); }
-    finally { setUploading(false); }
+  // Poll for document status updates if any are queued/processing
+  useEffect(() => {
+    if (minimalMode || !show) return;
+    const isProcessing = documents.some(d => d.status === "queued" || d.status === "processing");
+    if (!isProcessing) return;
+    const interval = setInterval(() => {
+      onUploaded(); // Triggers refreshDocuments
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [documents, onUploaded, minimalMode, show]);
+
+  async function handleFiles(filelist) {
+    const files = Array.from(filelist || []);
+    if (files.length === 0) return;
+    setUploading(true); 
+    setUploadResults([]);
+    for (const file of files) {
+      try {
+        const data = await uploadDocument(file, sessionId);
+        setUploadResults(prev => [...prev, { filename: data.filename || file.name, status: "success", message: data.message }]);
+        onUploaded(data.filename);
+      } catch(e) { 
+        setUploadResults(prev => [...prev, { filename: file.name, status: "error", message: e.message }]);
+      }
+    }
+    setUploading(false); 
   }
 
+  // FIXED (#567): Global event listener to dismiss panel when Escape key is pressed
+  useEffect(() => {
+    if (!show) return;
+    function handleGlobalKeyDown(e) {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    }
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, [show, onClose]);
+
   function onDrop(e) {
-    e.preventDefault(); setDragging(false);
-    handleFile(e.dataTransfer.files[0]);
+    e.preventDefault(); 
+    setDragging(false);
+    handleFiles(e.dataTransfer.files);
+  }
+
+  // FIXED (#567): Intercept keyboard interactions (Space/Enter) on the interactive dropzone box layout
+  function handleDropzoneKeyDown(e) {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      fileRef.current.click();
+    }
+  }
+
+  async function handleTriggerPreview(filename) {
+    setLoadingPreview(true);
+    setPreviewFilename(filename);
+    try {
+      const data = await previewDocument(filename, sessionId);
+      setPreviewContent(data.content || "No textual content available to display.");
+    } catch (e) {
+      setPreviewContent(`Error loading preview: ${e.message}`);
+    } finally {
+      setLoadingPreview(false);
+    }
   }
 
   return (
     // FIXED (#568): Implemented dynamic responsive padding adjustments across mobile vs desktop breaks
-    <div className="border-b border-gray-800 bg-gray-900 px-4 py-3 sm:px-5 sm:py-4 shrink-0 w-full">
+    <div data-testid="upload-panel" className={`border-b border-gray-800 bg-gray-900 px-4 py-3 sm:px-5 sm:py-4 shrink-0 w-full ${show ? 'block' : 'hidden'}`}>
       <div className="flex items-center justify-between mb-3">
         <p className="text-sm font-semibold text-white inline-flex items-center gap-1.5">
           <DocumentsIcon className="w-4 h-4" />Documents
@@ -35,7 +91,7 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose 
         {/* FIXED (#568): Optimized tap/touch interaction targets for mobile close actions */}
         <button 
           onClick={onClose} 
-          className="text-gray-500 hover:text-gray-300 text-2xl sm:text-lg leading-none p-2 sm:p-0 -mr-2 sm:mr-0 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:block"
+          className="text-gray-500 hover:text-gray-300 text-2xl sm:text-lg leading-none p-2 sm:p-0 -mr-2 sm:mr-0 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:block focus:outline-none focus:ring-2 focus:ring-purple-500"
           aria-label="Close upload panel"
         >
           ×
@@ -43,38 +99,96 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose 
       </div>
 
       {/* Drop zone */}
-      {/* FIXED (#568): Scaled inner padding sizes dynamically for mobile touch regions */}
+      {/* FIXED (#568 / #567): Scaled inner padding sizes dynamically for mobile touch regions and added keyboard navigation binds */}
       <div
-        onDragOver={e=>{e.preventDefault();setDragging(true)}}
-        onDragLeave={()=>setDragging(false)}
+        tabIndex={0}
+        role="button"
+        aria-label="File upload drop zone. Press Enter or Space to browse."
+        onDragOver={e => { e.preventDefault(); setDragging(true); }}
+        onDragLeave={() => setDragging(false)}
         onDrop={onDrop}
-        onClick={()=>fileRef.current.click()}
-        className={`border-2 border-dashed rounded-xl px-3 py-4 sm:px-4 sm:py-5 text-center cursor-pointer transition mb-3
-          ${dragging ? "border-purple-500 bg-purple-900/20" : "border-gray-700 hover:border-purple-600 hover:bg-gray-800/50"}`}>
-        <input ref={fileRef} type="file" accept=".pdf,.txt,.csv,.docx,.md,.html" className="hidden"
-          onChange={e=>handleFile(e.target.files[0])} />
-        <p className="text-2xl mb-1 flex justify-center">{uploading ? <SpinnerIcon className="w-7 h-7 text-purple-400" /> : <UploadIcon className="w-7 h-7 text-gray-300" />}</p>
-        <p className="text-xs sm:text-sm text-gray-400">{uploading ? "Indexing document..." : "Tap to browse or drop file here"}</p>
-        <p className="text-[10px] sm:text-xs text-gray-600 mt-1">PDF · TXT · CSV · DOCX · MD · HTML · max 50MB</p>
+        onClick={() => fileRef.current.click()}
+        onKeyDown={handleDropzoneKeyDown}
+        className={`border-2 border-dashed rounded-xl px-3 py-4 sm:px-4 sm:py-5 text-center cursor-pointer transition mb-3 outline-none focus:ring-2 focus:ring-purple-500
+          ${dragging ? "border-purple-500 bg-purple-900/20" : "border-gray-700 hover:border-purple-600 hover:bg-gray-800/50"}`}
+      >
+        <input ref={fileRef} type="file" accept=".pdf,.txt,.csv,.docx,.md,.html,.srt,.vtt" className="hidden" multiple
+          onChange={e => handleFiles(e.target.files)} />
+        
+        <p className="text-2xl mb-1 flex justify-center">
+          {uploading ? <SpinnerIcon className="w-7 h-7 text-purple-400" /> : <UploadIcon className="w-7 h-7 text-gray-300" />}
+        </p>
+        <p className="text-xs sm:text-sm text-gray-400">{uploading ? "Indexing documents..." : "Drop files here or click to browse"}</p>
+        <p className="text-[10px] sm:text-xs text-gray-600 mt-1">PDF · TXT · CSV · DOCX · MD · HTML · SRT · VTT · max 50MB</p>
       </div>
 
-      {result && <p className="text-xs text-green-400 mb-2 inline-flex items-center gap-1"><CheckIcon className="w-3.5 h-3.5" />{result.message}</p>}
-      {error  && <p className="text-xs text-red-400 mb-2 inline-flex items-center gap-1"><ErrorIcon className="w-3.5 h-3.5" />{error}</p>}
-
+      {uploadResults.length > 0 && (
+        <div className="mb-2">
+          {uploadResults.map((r, i) => (
+            <p key={i} className={`text-xs mb-1 inline-flex items-center gap-1 ${r.status === "success" ? "text-green-400" : "text-red-400"}`}>
+              {r.status === "success" ? <CheckIcon className="w-3.5 h-3.5" /> : <ErrorIcon className="w-3.5 h-3.5" />}
+              <span className="truncate">{r.filename}{r.status === "error" ? `: ${r.message}` : ""}</span>
+            </p>
+          ))}
+        </div>
+      )}
+      
       {/* Uploaded docs list */}
       {documents.length > 0 && (
         <div>
           <p className="text-xs text-gray-500 mb-1">Indexed documents:</p>
-          {documents.map((d, i) => (
-            // FIXED (#568): Enforced padding sizing metrics matching touch standards
-            <div key={i} className="flex items-center justify-between text-xs bg-gray-800 rounded-lg px-3 py-2 sm:py-1.5 mb-1 min-h-[36px]">
-              <span className="text-gray-300 truncate inline-flex items-center gap-1 max-w-[70%]">
-                <FileIcon className="w-3.5 h-3.5 shrink-0" />
-                <span className="truncate">{d.filename || d}</span>
-              </span>
-              {d.chunks_indexed && <span className="text-gray-500 ml-2 shrink-0 text-[11px] sm:text-xs">{d.chunks_indexed} chunks</span>}
+          {documents.map((d, i) => {
+            const currentFilename = d.filename || d;
+            return (
+              // FIXED (#568): Enforced padding sizing metrics matching mobile touch targets standard bounds
+              <div key={i} className="flex items-center justify-between text-xs bg-gray-800 rounded-lg px-3 py-2 sm:py-1.5 mb-1 hover:bg-gray-750 transition min-h-[36px]">
+                <span className="text-gray-300 truncate inline-flex items-center gap-1 max-w-[65%]">
+                  <FileIcon className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">{currentFilename}</span>
+                </span>
+                <div className="flex items-center gap-2 shrink-0">
+                  {d.chunks_indexed && <span className="text-gray-500 text-[11px] sm:text-xs">{d.chunks_indexed} chunks</span>}
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); handleTriggerPreview(currentFilename); }}
+                    className="p-2 sm:p-1 text-gray-400 hover:text-purple-400 rounded transition min-w-[32px] min-h-[32px] sm:min-w-0 sm:min-h-0 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    title="Preview Document Content"
+                    disabled={loadingPreview}
+                  >
+                    {loadingPreview && previewFilename === currentFilename ? (
+                      <SpinnerIcon className="w-3.5 h-3.5" />
+                    ) : (
+                      "👁️"
+                    )}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Read-Only Modal Viewport Overlay */}
+      {previewContent !== null && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-900 border border-gray-800 w-full max-w-2xl rounded-2xl max-h-[80vh] flex flex-col shadow-2xl">
+            <div className="p-4 border-b border-gray-800 flex items-center justify-between">
+              <div className="truncate pr-4">
+                <span className="text-[10px] text-purple-400 font-semibold uppercase tracking-wider block">Read-Only Preview</span>
+                <h3 className="text-sm font-medium text-white truncate">{previewFilename}</h3>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setPreviewContent(null)}
+                className="text-gray-400 hover:text-white px-3 py-1.5 sm:px-2 sm:py-1 text-sm bg-gray-800 border border-gray-700 rounded-lg transition focus:outline-none focus:ring-2 focus:ring-purple-500"
+              >
+                Close
+              </button>
             </div>
-          ))}
+            <div className="p-5 overflow-y-auto flex-1 text-xs text-gray-300 font-mono whitespace-pre-wrap leading-relaxed bg-gray-950/40 selection:bg-purple-900">
+              {previewContent}
+            </div>
+          </div>
         </div>
       )}
     </div>
