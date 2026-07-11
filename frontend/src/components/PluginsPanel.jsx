@@ -29,10 +29,19 @@ export default function PluginsPanel({ sessionId, onClose }) {
     }
   };
 
-  useEffect(() => {
-    getPlugins().then(d => setPlugins(d.plugins || [])).catch(()=>{});
+    useEffect(() => {
+    // --- COMBINED: Handles both loading state and your custom error catching hooks safely ---
+    setLoading(true);
+    setError("");
+    getPlugins()
+      .then(d => setPlugins(d.plugins || []))
+      .catch((err) => {
+        setError(err.message || "Failed to fetch plugins from server.");
+      })
+      .finally(() => setLoading(false));
     fetchLogs();
   }, []);
+
 
   async function run() {
     if (!selected || !input.trim() || running) return;
@@ -58,6 +67,25 @@ export default function PluginsPanel({ sessionId, onClose }) {
         <button onClick={onClose} className="text-gray-500 hover:text-gray-300 text-2xl md:text-lg leading-none p-1" aria-label="Close panel">×</button>
       </div>
 
+      {/* --- FIXED (#588): Top-Level Prominent Global Inline Error Banner --- */}
+      {error && (
+        <div className="mb-3 text-xs bg-red-950/40 border border-red-900/50 text-red-400 p-2.5 rounded-xl flex items-start gap-2 shadow-sm transition-all duration-200">
+          <ErrorIcon className="w-4 h-4 mt-0.5 shrink-0 text-red-400" />
+          <div className="flex-1">
+            <span className="font-semibold block mb-0.5">Plugin Error</span>
+            <p className="text-red-300/90 leading-relaxed">{error}</p>
+          </div>
+          <button 
+            onClick={() => setError("")} 
+            className="text-red-500 hover:text-red-300 transition font-bold text-sm leading-none px-1"
+            title="Dismiss error"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
+      
       {/* Plugin selector row */}
       <div className="flex flex-wrap gap-2 mb-4 md:mb-3 shrink-0">
         {plugins.map(p => (
@@ -95,7 +123,6 @@ export default function PluginsPanel({ sessionId, onClose }) {
               {output}
             </pre>
           )}
-          {error && <p className="text-xs text-red-400 inline-flex items-center gap-1 mt-1"><ErrorIcon className="w-3.5 h-3.5" />{error}</p>}
         </div>
       ) : (
         /* FIXED (#587): Added Empty-State Guidance Layout Placeholder Card */
