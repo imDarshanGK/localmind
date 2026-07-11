@@ -29,6 +29,23 @@ describe("SettingsPanel Keyboard Navigation Suite (#578)", () => {
   });
 });
 
+describe("SettingsPanel Empty State & Guidance Suite (#576)", () => {
+  test("renders empty guidance card view when an empty settings object is supplied", () => {
+    render(<SettingsPanel settings={{}} onSave={vi.fn()} onClose={vi.fn()} />);
+    
+    expect(screen.getByText("No Profile Configuration Found")).toBeDefined();
+    expect(screen.getByText("Load System Defaults")).toBeDefined();
+  });
+
+  test("renders standard parameters layout when data is properly provisioned", () => {
+    const validSettings = { default_model: "llama3", default_language: "en" };
+    render(<SettingsPanel settings={validSettings} onSave={vi.fn()} onClose={vi.fn()} />);
+    
+    expect(screen.queryByText("No Profile Configuration Found")).toBeNull();
+    expect(screen.getByText("Default Model")).toBeDefined();
+  });
+});
+
 describe("SettingsPanel Accessibility Landmarks & Validation Suite (#580)", () => {
   test("renders with correct semantic section region and aria bindings", () => {
     render(<SettingsPanel settings={mockSettings} onSave={vi.fn()} onClose={vi.fn()} />);
@@ -46,7 +63,6 @@ describe("SettingsPanel Accessibility Landmarks & Validation Suite (#580)", () =
     expect(screen.getByLabelText("Default Language")).toBeDefined();
     expect(screen.getByLabelText(/temperature/i)).toBeDefined();
   });
-
 
   test("renders core settings form fields accurately with default prop values", () => {
     render(<SettingsPanel settings={mockSettings} onSave={vi.fn()} onClose={vi.fn()} />);
