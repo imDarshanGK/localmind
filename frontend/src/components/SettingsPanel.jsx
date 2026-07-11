@@ -34,6 +34,8 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
   }, [isExpanded]);
 
   const [copied, setCopied] = useState(false);
+  
+  // FIXED (#577): Local error tracking states for structural inline validations
   const [errors, setErrors] = useState({});
   const [isSaving, setIsSaving] = useState(false);
 
@@ -51,6 +53,17 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
     localStorage.setItem("localmind_settings_drafts", JSON.stringify(drafts));
   }, [drafts]);
 
+  // FIXED (#578): Programmatic keyboard event tracking for panel dismissal sequences
+  useEffect(() => {
+    function handleKeyDown(e) {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
   // FIXED (#576): Check if settings object is completely empty, missing, or explicitly empty
   const isEmptyState = !settings || Object.keys(settings).length === 0;
 
@@ -61,10 +74,16 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
     }
   }
 
+  // FIXED (#577): Wrapped save actions within an async try/catch loop to parse errors elegantly
   async function handleSave() {
     setIsSaving(true);
     setErrors({});
+    
     try {
+      if (form.temperature > 1.5) {
+        throw new Error("Validation Error: Temperature configuration is too high for local environment parameters.");
+      }
+      
       await onSave(form);
     } catch (err) {
       if (err.response && err.response.status === 422 && err.response.data?.detail) {
@@ -108,37 +127,50 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
   };
 
   return (
-    /* FIXED (#580): Changed top wrapper from a generic <div> to a semantic section landmark region */
     <section 
-      aria-labelledby="settings-heading" 
-      className="border-b border-gray-800 bg-gray-900 px-5 py-4 shrink-0 transition-all duration-300"
+      aria-labelledby="settings-heading"
+      className="border-b border-gray-800 bg-gray-900 px-5 py-4 shrink-0 transition-all duration-300 outline-none"
     >
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          {/* FIXED (#580): Transformed paragraph into a proper heading paired to the section landmark label */}
           <h2 id="settings-heading" className="text-sm font-semibold text-white inline-flex items-center gap-1.5">
             <SettingsIcon className="w-4 h-4" aria-hidden="true" />Settings
           </h2>
-          
-         
           <button 
             type="button"
             onClick={() => setIsExpanded(!isExpanded)}
-            className="text-[10px] bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-gray-200 px-2 py-0.5 rounded transition font-medium"
+            className="text-[10px] bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-gray-200 px-2 py-0.5 rounded transition font-medium focus:outline-none focus:ring-2 focus:ring-purple-500"
           >
             {isExpanded ? "Collapse ▵" : "Expand ▿"}
           </button>
         </div>
-        <button onClick={onClose} aria-label="Close settings panel" className="text-gray-500 hover:text-gray-300 text-lg leading-none">×</button>
+        <button 
+          onClick={onClose} 
+          aria-label="Close settings panel" 
+          className="text-gray-500 hover:text-gray-300 text-lg leading-none rounded focus:outline-none focus:ring-2 focus:ring-purple-500 px-1"
+        >
+          ×
+        </button>
       </div>
 
+      {/* FIXED (#577): Inline Error Banner View Component Window */}
       {errors.global && (
-        <div className="mb-4 text-xs bg-red-950/50 border border-red-900/60 text-red-400 p-2 rounded-lg">
-          {errors.global}
+        <div data-testid="error-banner" className="mb-4 text-xs bg-red-950/40 border border-red-900/60 text-red-400 p-2.5 rounded-lg flex items-start gap-2">
+          <span className="text-sm font-bold leading-none mt-0.5">⚠️</span>
+          <div className="flex-1">
+            <p className="font-semibold mb-0.5">Configuration Error</p>
+            <p className="text-red-300/90 leading-normal">{errors.global}</p>
+          </div>
+          <button 
+            type="button"
+            onClick={() => setErrors(p => ({ ...p, global: "" }))} 
+            className="text-red-400/60 hover:text-red-300 text-sm leading-none font-bold px-1"
+          >
+            ×
+          </button>
         </div>
       )}
 
-      {/* FIXED (#576): Elegant fallback visual layout wrapper for empty states */}
       {isEmptyState ? (
         <div className="border border-dashed border-gray-800 rounded-xl bg-gray-950/40 p-6 text-center my-2">
           <p className="text-xs font-medium text-gray-400 mb-1">No Profile Configuration Found</p>
@@ -148,25 +180,24 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
           <button 
             type="button"
             onClick={() => onSave(form)}
-            className="text-[11px] bg-purple-700/20 hover:bg-purple-700/30 text-purple-400 border border-purple-500/20 px-3 py-1 rounded-lg transition font-medium"
+            className="text-[11px] bg-purple-700/20 hover:bg-purple-700/30 text-purple-400 border border-purple-500/20 px-3 py-1 rounded-lg transition font-medium focus:outline-none focus:ring-2 focus:ring-purple-500"
           >
             Load System Defaults
           </button>
         </div>
       ) : (
-       
         isExpanded && (
           <>
-            {/* FIXED (#580): Programmatic accessibility input bindings via exact htmlId keys */}
-            <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-xs">
+            {/* FIXED (#579): Fluid responsive column setup changing gracefully from mobile to desktop layouts */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-xs">
               <Field label="Default Model" htmlId="model-dropdown" error={errors.default_model}>
-                <select id="model-dropdown" value={form.default_model} onChange={e => set("default_model", e.target.value)} className={`sel ${errors.default_model ? "border-red-500" : ""}`}>
+                <select id="model-dropdown" value={form.default_model} onChange={e => set("default_model", e.target.value)} className="sel focus:ring-2 focus:ring-purple-500">
                   {MODELS.map(m => <option key={m} value={m}>{m}</option>)}
                 </select>
               </Field>
 
               <Field label="Default Language" htmlId="lang-dropdown" error={errors.default_language}>
-                <select id="lang-dropdown" value={form.default_language} onChange={e => set("default_language", e.target.value)} className={`sel ${errors.default_language ? "border-red-500" : ""}`}>
+                <select id="lang-dropdown" value={form.default_language} onChange={e => set("default_language", e.target.value)} className="sel focus:ring-2 focus:ring-purple-500">
                   {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
                 </select>
               </Field>
@@ -174,29 +205,29 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
               <Field label={`Temperature: ${form.temperature}`} htmlId="temp-slider" error={errors.temperature}>
                 <input id="temp-slider" type="range" min="0" max="2" step="0.1" value={form.temperature}
                   onChange={e => set("temperature", parseFloat(e.target.value))}
-                  className="w-full accent-purple-500" />
+                  className="w-full accent-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500 rounded" />
               </Field>
 
               <Field label={`RAG Context Chunks: ${form.rag_top_k}`} htmlId="rag-slider" error={errors.rag_top_k}>
                 <input id="rag-slider" type="range" min="1" max="10" step="1" value={form.rag_top_k}
                   onChange={e => set("rag_top_k", parseInt(e.target.value))}
-                  className="w-full accent-purple-500" />
+                  className="w-full accent-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500 rounded" />
               </Field>
 
               <Field label={`RAG Chunk Overlap: ${form.rag_chunk_overlap}`} htmlId="overlap-slider" error={errors.rag_chunk_overlap}>
                 <input id="overlap-slider" type="range" min="0" max="200" step="10" value={form.rag_chunk_overlap}
                   onChange={e => set("rag_chunk_overlap", parseInt(e.target.value))}
-                  className="w-full accent-purple-500" />
+                  className="w-full accent-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500 rounded" />
               </Field>
 
               <Field label={`History Turns: ${form.max_history_turns}`} htmlId="history-slider" error={errors.max_history_turns}>
                 <input id="history-slider" type="range" min="2" max="20" step="2" value={form.max_history_turns}
                   onChange={e => set("max_history_turns", parseInt(e.target.value))}
-                  className="w-full accent-purple-500" />
+                  className="w-full accent-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500 rounded" />
               </Field>
 
               <Field label="Theme" htmlId="theme-dropdown" error={errors.theme}>
-                <select id="theme-dropdown" value={form.theme} onChange={e => set("theme", e.target.value)} className={`sel ${errors.theme ? "border-red-500" : ""}`}>
+                <select id="theme-dropdown" value={form.theme} onChange={e => set("theme", e.target.value)} className="sel focus:ring-2 focus:ring-purple-500">
                   <option value="dark">Dark</option>
                   <option value="light">Light</option>
                   <option value="high-contrast">High Contrast</option>
@@ -212,7 +243,7 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
                     type="checkbox"
                     checked={form.minimal_mode}
                     onChange={e => set("minimal_mode", e.target.checked)}
-                    className="accent-purple-500"
+                    className="accent-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500 rounded"
                   />
                   Low-bandwidth mode
                 </label>
@@ -228,13 +259,13 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
                   value={newDraft} 
                   onChange={e => setNewDraft(e.target.value)}
                   placeholder="Type a canned prompt snippet or scratchpad note..."
-                  className="flex-1 bg-gray-800 text-gray-200 border border-gray-700 rounded-lg px-3 py-1 text-xs outline-none focus:border-purple-500 placeholder-gray-600"
+                  className="flex-1 bg-gray-800 text-gray-200 border border-gray-700 rounded-lg px-3 py-1 text-xs outline-none focus:border-purple-500 placeholder-gray-600 focus:ring-2 focus:ring-purple-500"
                   onKeyDown={e => e.key === "Enter" && handleAddDraft()}
                 />
                 <button 
                   type="button"
                   onClick={handleAddDraft}
-                  className="bg-purple-700/40 hover:bg-purple-700 border border-purple-500/30 hover:border-purple-500 text-purple-300 hover:text-white px-3 py-1 rounded-lg font-medium transition text-xs shrink-0"
+                  className="bg-purple-700/40 hover:bg-purple-700 border border-purple-500/30 hover:border-purple-500 text-purple-300 hover:text-white px-3 py-1 rounded-lg font-medium transition text-xs shrink-0 focus:outline-none focus:ring-2 focus:ring-purple-500"
                 >
                   Add
                 </button>
@@ -250,7 +281,7 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
                       <button 
                         type="button"
                         onClick={() => handleDeleteDraft(d.id)}
-                        className="text-gray-500 hover:text-red-400 transition font-bold px-1 text-sm leading-none"
+                        className="text-gray-500 hover:text-red-400 transition font-bold px-1 text-sm leading-none focus:outline-none focus:ring-2 focus:ring-purple-500 rounded"
                       >
                         ×
                       </button>
@@ -260,20 +291,21 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
               )}
             </div>
 
-            <div className="flex gap-2 mt-5 pt-3 border-t border-gray-800 justify-between items-center">
-              <div className="flex gap-2">
+            {/* FIXED (#579): Fluid responsive button bar for narrow screen setups */}
+            <div className="flex flex-col sm:flex-row gap-2 mt-5 pt-3 border-t border-gray-800 justify-between items-center w-full">
+              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                 <button 
                   type="button"
                   onClick={handleSave}
                   disabled={isSaving}
-                  className="text-xs bg-purple-700 hover:bg-purple-600 disabled:bg-gray-800 text-white px-4 py-1.5 rounded-lg transition font-medium shadow-md"
+                  className="text-xs bg-purple-700 hover:bg-purple-600 disabled:bg-gray-800 text-white px-4 py-1.5 rounded-lg transition font-medium shadow-md w-full sm:w-auto text-center focus:outline-none focus:ring-2 focus:ring-purple-500"
                 >
                   {isSaving ? "Saving..." : "Save Settings"}
                 </button>
                 <button 
                   type="button"
                   onClick={onClose}
-                  className="text-xs border border-gray-700 text-gray-400 hover:bg-gray-800 px-4 py-1.5 rounded-lg transition"
+                  className="text-xs border border-gray-700 text-gray-400 hover:bg-gray-800 px-4 py-1.5 rounded-lg transition w-full sm:w-auto text-center focus:outline-none focus:ring-2 focus:ring-purple-500"
                 >
                   Cancel
                 </button>
@@ -282,7 +314,7 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
               <button 
                 type="button"
                 onClick={handleCopySummary}
-                className={`text-[11px] px-3 py-1.5 rounded-lg transition font-medium border flex items-center gap-1.5 duration-200
+                className={`text-[11px] px-3 py-1.5 rounded-lg transition font-medium border flex items-center justify-center gap-1.5 duration-200 w-full sm:w-auto mt-2 sm:mt-0 focus:outline-none focus:ring-2 focus:ring-purple-500
                   ${copied 
                     ? "bg-green-950/40 border-green-900/60 text-green-400" 
                     : "border-gray-700 text-gray-400 hover:bg-gray-800"}`}

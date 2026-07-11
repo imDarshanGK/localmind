@@ -17,6 +17,26 @@ afterEach(() => {
   cleanup();
 });
 
+describe("SettingsPanel Inline Error Banner & Feature Integration Suite (#577)", () => {
+  test("avoids rendering an error banner container by default during steady state", () => {
+    render(<SettingsPanel settings={mockSettings} onSave={vi.fn()} onClose={vi.fn()} />);
+    expect(screen.queryByTestId("error-banner")).toBeNull();
+  });
+
+  test("triggers and renders the inline error banner box when validation or save promises collapse", async () => {
+    const brokenSaveMock = vi.fn().mockRejectedValue(new Error("Database write connection failed."));
+    render(<SettingsPanel settings={mockSettings} onSave={brokenSaveMock} onClose={vi.fn()} />);
+    
+    const saveBtn = screen.getByRole("button", { name: /save settings/i });
+    fireEvent.click(saveBtn);
+    
+    await waitFor(() => {
+      expect(screen.getByTestId("error-banner")).toBeDefined();
+      expect(screen.getByText(/Database write connection failed./i)).toBeDefined();
+    });
+  });
+});
+
 describe("SettingsPanel Empty State & Guidance Suite (#576)", () => {
   test("renders empty guidance card view when an empty settings object is supplied", () => {
     render(<SettingsPanel settings={{}} onSave={vi.fn()} onClose={vi.fn()} />);
@@ -38,7 +58,6 @@ describe("SettingsPanel Accessibility Landmarks & Validation Suite (#580)", () =
   test("renders with correct semantic section region and aria bindings", () => {
     render(<SettingsPanel settings={mockSettings} onSave={vi.fn()} onClose={vi.fn()} />);
     
-    // Verifies the entire component is enclosed in a landmark region labeled by the title heading
     const section = screen.getByRole("region", { name: /settings/i });
     expect(section).toBeDefined();
   });
@@ -46,7 +65,6 @@ describe("SettingsPanel Accessibility Landmarks & Validation Suite (#580)", () =
   test("associates form control fields cleanly to their accessibility labels", () => {
     render(<SettingsPanel settings={mockSettings} onSave={vi.fn()} onClose={vi.fn()} />);
     
-    // Verifies the labels are programmatically associated with inputs using htmlFor / id
     expect(screen.getByLabelText("Default Model")).toBeDefined();
     expect(screen.getByLabelText("Default Language")).toBeDefined();
     expect(screen.getByLabelText(/temperature/i)).toBeDefined();
