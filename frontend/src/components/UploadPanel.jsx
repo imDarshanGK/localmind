@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { uploadDocument, deleteDocument } from "../utils/api";
+import { uploadDocument } from "../utils/api";
 import { CheckIcon, DocumentsIcon, ErrorIcon, SpinnerIcon, UploadIcon, FileIcon } from "./Icons";
 
 export default function UploadPanel({ sessionId, documents, onUploaded, onClose }) {
@@ -16,7 +16,10 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose 
       const data = await uploadDocument(file, sessionId);
       setResult(data);
       onUploaded(data.filename);
-    } catch(e) { setError(e.message); }
+    } catch(e) { 
+      // FIXED (#566): Standardized localized error strings passed securely to tracking states
+      setError(e.message || "An unexpected error occurred during document processing."); 
+    }
     finally { setUploading(false); }
   }
 
@@ -31,6 +34,25 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose 
         <p className="text-sm font-semibold text-white inline-flex items-center gap-1.5"><DocumentsIcon className="w-4 h-4" />Documents</p>
         <button onClick={onClose} className="text-gray-500 hover:text-gray-300 text-lg leading-none">×</button>
       </div>
+
+      {/* FIXED (#566): Structured inline error notification container block equipped with standalone close triggers */}
+      {error && (
+        <div data-testid="upload-error-banner" className="mb-3 text-xs bg-red-950/40 border border-red-900/60 text-red-400 p-2.5 rounded-lg flex items-start gap-2">
+          <ErrorIcon className="w-4 h-4 text-red-400 shrink-0 mt-0.5" aria-hidden="true" />
+          <div className="flex-1">
+            <p className="font-semibold text-red-300">Upload Failure</p>
+            <p className="text-red-400/90 leading-relaxed mt-0.5">{error}</p>
+          </div>
+          <button 
+            type="button" 
+            onClick={() => setError("")}
+            className="text-red-400/60 hover:text-red-300 text-base font-bold leading-none px-1 rounded focus:outline-none focus:ring-1 focus:ring-red-500"
+            aria-label="Dismiss failure banner"
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       {/* Drop zone */}
       <div
@@ -48,7 +70,6 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose 
       </div>
 
       {result && <p className="text-xs text-green-400 mb-2 inline-flex items-center gap-1"><CheckIcon className="w-3.5 h-3.5" />{result.message}</p>}
-      {error  && <p className="text-xs text-red-400 mb-2 inline-flex items-center gap-1"><ErrorIcon className="w-3.5 h-3.5" />{error}</p>}
 
       {/* Uploaded docs list */}
       {documents.length > 0 && (
