@@ -56,8 +56,26 @@ export const exportSession = (id, fmt) => window.open(`${BASE}/export/${id}/${fm
 export const deleteDocument = (docId) => req(`/upload/${docId}`, { method: "DELETE" });
 
 // --- Issue #265: Fetch Read-Only Plain Text Document Preview ---
-export const previewDocument = (filename, sessionId) => 
-  req(`/upload/preview?filename=${encodeURIComponent(filename)}&session_id=${encodeURIComponent(sessionId)}`);
+export const previewDocument = async (filename, sessionId, maxAttempts = 3, initialDelay = 500) => {
+  let attempt = 1;
+  let delay = initialDelay;
+  while (true) {
+    try {
+      return await req(`/upload/preview?filename=${encodeURIComponent(filename)}&session_id=${encodeURIComponent(sessionId)}`);
+    } catch (e) {
+      if (attempt >= maxAttempts) {
+        throw e;
+      }
+      if (e.message && (e.message.toLowerCase().includes("not found") || e.message.includes("404"))) {
+        throw e;
+      }
+      console.warn(`Preview fetch failed: ${e.message}. Retrying in ${delay}ms... (Attempt ${attempt}/${maxAttempts})`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      attempt++;
+      delay *= 2;
+    }
+  }
+};
 
 // Prompt Templates
 export const getPromptTemplates      = ()     => req("/prompt-templates/");
