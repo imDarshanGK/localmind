@@ -16,6 +16,7 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [previewFilename, setPreviewFilename] = useState("");
 
+  const [uploadResults, setUploadResults] = useState([]);
   const fileRef = useRef();
 
   // Poll for document status updates if any are queued/processing
@@ -54,6 +55,26 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
     }
   }
 
+  async function handleFiles(filelist) {
+    const files = Array.from(filelist || []);
+    if (files.length === 0) return;
+    setUploading(true); 
+    setError("");
+    setUploadResults([]);
+    for (const file of files) {
+      try {
+        const data = await uploadDocument(file, sessionId);
+        setUploadResults(prev => [...prev, { filename: data.filename || file.name, status: "success", message: data.message }]);
+        onUploaded(data.filename);
+      } catch(e) { 
+        const errorMessage = e.message || "An unexpected error occurred during document processing.";
+        setError(errorMessage);
+        setUploadResults(prev => [...prev, { filename: file.name, status: "error", message: errorMessage }]);
+      }
+    }
+    setUploading(false);
+  }
+
   function onDrop(e) {
     e.preventDefault(); 
     setDragging(false);
@@ -82,6 +103,25 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
         <button onClick={onClose} className="text-gray-500 hover:text-gray-300 text-lg leading-none focus:outline-none" aria-label="Close panel">×</button>
       </div>
 
+      {/* FIXED (#566): Structured inline error notification container block equipped with standalone close triggers */}
+      {error && (
+        <div data-testid="upload-error-banner" className="mb-3 text-xs bg-red-950/40 border border-red-900/60 text-red-400 p-2.5 rounded-lg flex items-start gap-2">
+          <ErrorIcon className="w-4 h-4 text-red-400 shrink-0 mt-0.5" aria-hidden="true" />
+          <div className="flex-1">
+            <p className="font-semibold text-red-300">Upload Failure</p>
+            <p className="text-red-400/90 leading-relaxed mt-0.5">{error}</p>
+          </div>
+          <button 
+            type="button" 
+            onClick={() => setError("")}
+            className="text-red-400/60 hover:text-red-300 text-base font-bold leading-none px-1 rounded focus:outline-none focus:ring-1 focus:ring-red-500"
+            aria-label="Dismiss failure banner"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
       {/* Drop zone */}
       <div
         onDragOver={e => { e.preventDefault(); setDragging(true); }}
@@ -91,13 +131,14 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
         className={`border-2 border-dashed rounded-xl px-4 py-5 text-center cursor-pointer transition mb-3
           ${dragging ? "border-purple-500 bg-purple-900/20" : "border-gray-700 hover:border-purple-600 hover:bg-gray-800/50"}`}
       >
-        <input ref={fileRef} type="file" accept=".pdf,.txt,.csv,.docx,.md,.html" className="hidden"
-          onChange={e => handleFileSelect(e.target.files[0])} />
+        <input ref={fileRef} type="file" accept=".pdf,.txt,.csv,.docx,.md,.html,.srt,.vtt" className="hidden" multiple
+          onChange={e => handleFiles(e.target.files)} />
+        
         <p className="text-2xl mb-1 flex justify-center">
           {uploading ? <SpinnerIcon className="w-7 h-7 text-purple-400" /> : <UploadIcon className="w-7 h-7 text-gray-300" />}
         </p>
-        <p className="text-sm text-gray-400">{uploading ? "Indexing document..." : "Drop file here or click to browse"}</p>
-        <p className="text-xs text-gray-600 mt-1">PDF · TXT · CSV · DOCX · MD · HTML · max 50MB</p>
+        <p className="text-sm text-gray-400">{uploading ? "Indexing documents..." : "Drop files here or click to browse"}</p>
+        <p className="text-xs text-gray-600 mt-1">PDF · TXT · CSV · DOCX · MD · HTML · SRT · VTT · max 50MB</p>
       </div>
 
       {/* FIXED (#574): Staged draft workspace block rendering */}
@@ -128,8 +169,18 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
         </div>
       )}
 
+      {uploadResults.length > 0 && (
+        <div className="mb-2">
+          {uploadResults.map((r, i) => (
+            <p key={i} className={`text-xs mb-1 inline-flex items-center gap-1 ${r.status === "success" ? "text-green-400" : "text-red-400"}`}>
+              {r.status === "success" ? <CheckIcon className="w-3.5 h-3.5" /> : <ErrorIcon className="w-3.5 h-3.5" />}
+              <span className="truncate">{r.filename}{r.status === "error" ? `: ${r.message}` : ""}</span>
+            </p>
+          ))}
+        </div>
+      )}
+
       {result && <p className="text-xs text-green-400 mb-2 inline-flex items-center gap-1"><CheckIcon className="w-3.5 h-3.5" />{result.message}</p>}
-      {error  && <p className="text-xs text-red-400 mb-2 inline-flex items-center gap-1"><ErrorIcon className="w-3.5 h-3.5" />{error}</p>}
 
       {/* Uploaded docs list */}
       {documents.length > 0 && (
