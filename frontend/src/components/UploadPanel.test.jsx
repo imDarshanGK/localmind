@@ -21,7 +21,6 @@ describe("UploadPanel Keyboard Navigation Accessibility Suite (#567)", () => {
     const mockOnClose = vi.fn();
     render(<UploadPanel sessionId="test-session" documents={[]} onUploaded={vi.fn()} onClose={mockOnClose} show={true} />);
     
-    // FIXED (#567): Using matching standard Vitest keyDown parameters
     fireEvent.keyDown(window, { key: "Escape" });
     expect(mockOnClose).toHaveBeenCalledTimes(1);
   });
@@ -33,9 +32,55 @@ describe("UploadPanel Keyboard Navigation Accessibility Suite (#567)", () => {
     expect(dropzone).toBeDefined();
     expect(dropzone.tabIndex).toBe(0);
 
-    // FIXED (#567): Using matching standard Vitest keyDown parameters
+    // Verify key triggers do not crash execution boundaries
     fireEvent.keyDown(dropzone, { key: "Enter" });
     fireEvent.keyDown(dropzone, { key: " " });
+  });
+});
+
+describe("UploadPanel Global Error Banner Interface Suite (#566)", () => {
+  test("avoids compiling alert nodes inside default view frames", () => {
+    render(<UploadPanel sessionId="session-123" documents={[]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />);
+    expect(screen.queryByTestId("upload-error-banner")).toBeNull();
+  });
+
+  test("renders full structured banner details successfully when request fails", async () => {
+    api.uploadDocument.mockRejectedValueOnce(new Error("File allocation table mapping rejected context bounds."));
+    
+    render(<UploadPanel sessionId="session-123" documents={[]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />);
+    
+    const file = new File(["test data payload"], "matrix.txt", { type: "text/plain" });
+    const dropzone = screen.getByText(/Drop files here or click to browse/i);
+    
+    fireEvent.drop(dropzone, {
+      dataTransfer: { files: [file] }
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("upload-error-banner")).toBeDefined();
+      expect(screen.getByText("Upload Failure")).toBeDefined();
+      expect(screen.getByText("File allocation table mapping rejected context bounds.")).toBeDefined();
+    });
+  });
+
+  test("clears current alert state wrapper when firing click events on layout close button", async () => {
+    api.uploadDocument.mockRejectedValueOnce(new Error("Storage block exhausted."));
+    
+    render(<UploadPanel sessionId="session-123" documents={[]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />);
+    
+    const file = new File(["data"], "log.txt", { type: "text/plain" });
+    const dropzone = screen.getByText(/Drop files here or click to browse/i);
+    
+    fireEvent.drop(dropzone, { dataTransfer: { files: [file] } });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("upload-error-banner")).toBeDefined();
+    });
+
+    const closeButton = screen.getByLabelText("Dismiss failure banner");
+    fireEvent.click(closeButton);
+
+    expect(screen.queryByTestId("upload-error-banner")).toBeNull();
   });
 });
 
@@ -46,10 +91,6 @@ function makeFile(name) {
 describe("UploadPanel multi-select upload", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-  });
-
-  afterEach(() => {
-    cleanup();
   });
 
   it("renders the file input with the multiple attribute", () => {
@@ -98,6 +139,7 @@ describe("UploadPanel multi-select upload", () => {
 
     await waitFor(() => expect(api.uploadDocument).toHaveBeenCalledTimes(2));
     expect(screen.getByText(/good\.pdf/)).toBeDefined();
+    expect(screen.getByText(/bad\.exe/)).toBeDefined();
     expect(onUploaded).toHaveBeenCalledTimes(1);
   });
 });
