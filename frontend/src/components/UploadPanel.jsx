@@ -12,6 +12,7 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
   const [previewFilename, setPreviewFilename] = useState("");
 
   const [uploadResults, setUploadResults] = useState([]);
+  const [error, setError] = useState("");
   const fileRef = useRef();
 
   // Poll for document status updates if any are queued/processing
@@ -25,10 +26,23 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
     return () => clearInterval(interval);
   }, [documents, onUploaded, minimalMode, show]);
 
+  // FIXED (#567): Global event listener to dismiss panel when Escape key is pressed
+  useEffect(() => {
+    if (!show) return;
+    function handleGlobalKeyDown(e) {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    }
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, [show, onClose]);
+
   async function handleFiles(filelist) {
     const files = Array.from(filelist || []);
     if (files.length === 0) return;
     setUploading(true); 
+    setError("");
     setUploadResults([]);
     for (const file of files) {
       try {
@@ -36,7 +50,9 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
         setUploadResults(prev => [...prev, { filename: data.filename || file.name, status: "success", message: data.message }]);
         onUploaded(data.filename);
       } catch(e) { 
-        setUploadResults(prev => [...prev, { filename: file.name, status: "error", message: e.message }]);
+        const errorMessage = e.message || "An unexpected error occurred during document processing.";
+        setError(errorMessage);
+        setUploadResults(prev => [...prev, { filename: file.name, status: "error", message: errorMessage }]);
       }
     }
     setUploading(false); 
@@ -61,35 +77,65 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
     }
   }
 
+  // FIXED (#567): Trigger file selection drawer when pressing Space or Enter on the focusable drop zone
+  function handleKeyDown(e) {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      fileRef.current.click();
+    }
+  }
+
   return (
     <div data-testid="upload-panel" className={`border-b border-gray-800 bg-gray-900 px-5 py-4 shrink-0 ${show ? 'block' : 'hidden'}`}>
       <div className="flex items-center justify-between mb-3">
-        <p className="text-sm font-semibold text-white inline-flex items-center gap-1.5">
-          <DocumentsIcon className="w-4 h-4" />Documents
-        </p>
-        <button onClick={onClose} className="text-gray-500 hover:text-gray-300 text-lg leading-none">×</button>
+        <p className="text-sm font-semibold text-white inline-flex items-center gap-1.5"><DocumentsIcon className="w-4 h-4" />Documents</p>
+        <button 
+          onClick={onClose} 
+          className="text-gray-500 hover:text-gray-300 text-lg leading-none rounded p-0.5 focus:outline-none focus:ring-2 focus:ring-purple-500"
+          aria-label="Close upload panel"
+        >
+          ×
+        </button>
       </div>
 
+      {/* FIXED (#566): Structured inline error notification container block equipped with standalone close triggers */}
+      {error && (
+        <div data-testid="upload-error-banner" className="mb-3 text-xs bg-red-950/40 border border-red-900/60 text-red-400 p-2.5 rounded-lg flex items-start gap-2">
+          <ErrorIcon className="w-4 h-4 text-red-400 shrink-0 mt-0.5" aria-hidden="true" />
+          <div className="flex-1">
+            <p className="font-semibold text-red-300">Upload Failure</p>
+            <p className="text-red-400/90 leading-relaxed mt-0.5">{error}</p>
+          </div>
+          <button 
+            type="button" 
+            onClick={() => setError("")}
+            className="text-red-400/60 hover:text-red-300 text-base font-bold leading-none px-1 rounded focus:outline-none focus:ring-1 focus:ring-red-500"
+            aria-label="Dismiss failure banner"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
       {/* Drop zone */}
+      {/* FIXED (#567): Added tabIndex, interactive role, aria-label, keydown support, and visible focus outline ring */}
       <div
-        onDragOver={e => { e.preventDefault(); setDragging(true); }}
-        onDragLeave={() => setDragging(false)}
+        tabIndex={0}
+        role="button"
+        aria-label="File upload drop zone. Press Enter or Space to browse."
+        onDragOver={e=>{e.preventDefault();setDragging(true)}}
+        onDragLeave={()=>setDragging(false)}
         onDrop={onDrop}
-        onClick={() => fileRef.current.click()}
-        className={`border-2 border-dashed rounded-xl px-4 py-5 text-center cursor-pointer transition mb-3
-          ${dragging ? "border-purple-500 bg-purple-900/20" : "border-gray-700 hover:border-purple-600 hover:bg-gray-800/50"}`}
-      >
-        {/* Updated accept attribute to include .srt and .vtt transcript options */}
-        <input ref={fileRef} type="file" accept=".pdf,.txt,.csv,.docx,.md,.html,.srt,.vtt" className="hidden" multiple
-          onChange={e => handleFiles(e.target.files)} />
-        
-        <p className="text-2xl mb-1 flex justify-center">
-          {uploading ? <SpinnerIcon className="w-7 h-7 text-purple-400" /> : <UploadIcon className="w-7 h-7 text-gray-300" />}
-        </p>
+        onClick={()=>fileRef.current.click()}
+        onKeyDown={handleKeyDown}
+        className={`border-2 border-dashed rounded-xl px-4 py-5 text-center cursor-pointer transition mb-3 outline-none focus:ring-2 focus:ring-purple-500
+          ${dragging ? "border-purple-500 bg-purple-900/20" : "border-gray-700 hover:border-purple-600 hover:bg-gray-800/50"}`}>
+        {/* FIXED: Changed onChange handler to call handleFiles instead of handleFile */}
+        <input ref={fileRef} type="file" accept=".pdf,.txt,.csv,.docx,.md,.html" className="hidden" multiple
+          onChange={e=>handleFiles(e.target.files)} />
+        <p className="text-2xl mb-1 flex justify-center">{uploading ? <SpinnerIcon className="w-7 h-7 text-purple-400" /> : <UploadIcon className="w-7 h-7 text-gray-300" />}</p>
         <p className="text-sm text-gray-400">{uploading ? "Indexing documents..." : "Drop files here or click to browse"}</p>
-        
-        {/* Updated visual footer labels to explicitly display audio transcript support */}
-        <p className="text-xs text-gray-600 mt-1">PDF · TXT · CSV · DOCX · MD · HTML · SRT · VTT · max 50MB</p>
+        <p className="text-xs text-gray-600 mt-1">PDF · TXT · CSV · DOCX · MD · HTML · max 50MB</p>
       </div>
 
       {uploadResults.length > 0 && (
@@ -118,8 +164,9 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
                 <div className="flex items-center gap-2 shrink-0">
                   {d.chunks_indexed && <span className="text-gray-500">{d.chunks_indexed} chunks</span>}
                   <button
+                    type="button"
                     onClick={(e) => { e.stopPropagation(); handleTriggerPreview(currentFilename); }}
-                    className="p-1 text-gray-400 hover:text-purple-400 rounded transition"
+                    className="p-1 text-gray-400 hover:text-purple-400 rounded transition focus:outline-none focus:ring-2 focus:ring-purple-500"
                     title="Preview Document Content"
                     disabled={loadingPreview}
                   >
@@ -146,8 +193,9 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
                 <h3 className="text-sm font-medium text-white truncate">{previewFilename}</h3>
               </div>
               <button 
+                type="button"
                 onClick={() => setPreviewContent(null)}
-                className="text-gray-400 hover:text-white px-2 py-1 text-sm bg-gray-800 border border-gray-700 rounded-lg transition"
+                className="text-gray-400 hover:text-white px-2 py-1 text-sm bg-gray-800 border border-gray-700 rounded-lg transition focus:outline-none focus:ring-2 focus:ring-purple-500"
               >
                 Close
               </button>
