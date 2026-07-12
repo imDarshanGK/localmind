@@ -108,8 +108,29 @@ async def delete_document(doc_id: int):
 
 
 # --- Issue #265: Fetch Read-Only Document Preview Endpoint ---
+def read_file_sync(file_path: str, ext: str) -> dict:
+    if not os.path.exists(file_path):
+        raise FileNotFoundError("Document storage path not found.")
+        
+    # If it's a standard clear-text format file layout, parse it cleanly
+    if ext in [".txt", ".md", ".csv", ".html", ".srt", ".vtt"]:
+        with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+            content = f.read(50000) # Capped at 50k characters for UI fast loading optimization
+        return {"content": content}
+        
+    # For non-trivial binary sets (PDFs/DOCX), offer a safe notice for version 1
+    else:
+        return {
+            "content": f"[Binary Formatter Notice]\nPreviews for '{ext}' files are natively processed. Content indexed safely for Chat retrieval contexts."
+        }
+
+
 @router.get("/preview")
-async def preview_document(filename: str = Query(...), session_id: str = Query(...)):
+async def preview_document(
+    filename: str = Query(...),
+    session_id: str = Query(...),
+    timeout: float = Query(5.0, description="Timeout in seconds for preview reading operations")
+):
     file_path = os.path.join(".", "data", "uploads", session_id, filename)
     ext = Path(filename).suffix.lower()
     
@@ -118,21 +139,24 @@ async def preview_document(filename: str = Query(...), session_id: str = Query(.
     
     for attempt in range(1, max_attempts + 1):
         try:
-            if not os.path.exists(file_path):
-                raise FileNotFoundError("Document storage path not found.")
-                
-            # If it's a standard clear-text format file layout, parse it cleanly
-            if ext in [".txt", ".md", ".csv", ".html", ".srt", ".vtt"]:
-                with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-                    content = f.read(50000) # Capped at 50k characters for UI fast loading optimization
-                return {"content": content}
-                
-            # For non-trivial binary sets (PDFs/DOCX), offer a safe notice for version 1
-            else:
-                return {
-                    "content": f"[Binary Formatter Notice]\nPreviews for '{ext}' files are natively processed. Content indexed safely for Chat retrieval contexts."
-                }
-                
+            # Enforce timeout using asyncio.wait_for and asyncio.to_thread
+            res = await asyncio.wait_for(
+                asyncio.to_thread(read_file_sync, file_path, ext),
+                timeout=timeout
+            )
+            return res
+            
+        except (TimeoutError, asyncio.TimeoutError) as e:
+            if attempt == max_attempts:
+                raise HTTPException(status_code=408, detail="Preview request timed out.")
+            
+            logger.warning(
+                "preview_retry_timeout route=/preview session=%s filename=%s attempt=%d/%d",
+                session_id, filename, attempt, max_attempts
+            )
+            await asyncio.sleep(backoff)
+            backoff *= 2
+            
         except (FileNotFoundError, PermissionError, OSError) as e:
             if attempt == max_attempts:
                 if isinstance(e, FileNotFoundError):

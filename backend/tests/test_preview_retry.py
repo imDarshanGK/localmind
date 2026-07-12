@@ -111,3 +111,50 @@ def test_preview_file_not_found():
             assert "Document storage path not found" in response.json()["detail"]
             assert mock_exists.call_count == 3
             assert mock_sleep.call_count == 2
+
+def test_preview_timeout_exhaustion():
+    session_id = "session_timeout_exhaust"
+    filename = "timeout_exhaust.txt"
+    dir_path = f"./data/uploads/{session_id}"
+    os.makedirs(dir_path, exist_ok=True)
+    file_path = os.path.join(dir_path, filename)
+    with open(file_path, "w", encoding="utf-8") as f:
+        f.write("Timeout Content")
+        
+    def mock_read(*args, **kwargs):
+        import time
+        time.sleep(0.05)
+        return {"content": "Timeout Content"}
+        
+    with patch("routes.upload.read_file_sync", side_effect=mock_read):
+        with patch("asyncio.sleep", return_value=None) as mock_sleep:
+            response = client.get(f"/api/upload/preview?filename={filename}&session_id={session_id}&timeout=0.01")
+            assert response.status_code == 408
+            assert "Preview request timed out" in response.json()["detail"]
+            assert mock_sleep.call_count == 2
+
+def test_preview_timeout_transient_recovery():
+    session_id = "session_timeout_transient"
+    filename = "timeout_transient.txt"
+    dir_path = f"./data/uploads/{session_id}"
+    os.makedirs(dir_path, exist_ok=True)
+    file_path = os.path.join(dir_path, filename)
+    with open(file_path, "w", encoding="utf-8") as f:
+        f.write("Recovered Content")
+        
+    call_count = 0
+    def mock_read(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            import time
+            time.sleep(0.05)
+        return {"content": "Recovered Content"}
+        
+    with patch("routes.upload.read_file_sync", side_effect=mock_read):
+        with patch("asyncio.sleep", return_value=None) as mock_sleep:
+            response = client.get(f"/api/upload/preview?filename={filename}&session_id={session_id}&timeout=0.01")
+            assert response.status_code == 200
+            assert response.json()["content"] == "Recovered Content"
+            assert call_count == 2
+            mock_sleep.assert_called_once()

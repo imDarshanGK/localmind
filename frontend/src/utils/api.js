@@ -56,20 +56,31 @@ export const exportSession = (id, fmt) => window.open(`${BASE}/export/${id}/${fm
 export const deleteDocument = (docId) => req(`/upload/${docId}`, { method: "DELETE" });
 
 // --- Issue #265: Fetch Read-Only Plain Text Document Preview ---
-export const previewDocument = async (filename, sessionId, maxAttempts = 3, initialDelay = 500) => {
+export const previewDocument = async (filename, sessionId, maxAttempts = 3, initialDelay = 500, timeoutMs = 5000) => {
   let attempt = 1;
   let delay = initialDelay;
   while (true) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      return await req(`/upload/preview?filename=${encodeURIComponent(filename)}&session_id=${encodeURIComponent(sessionId)}`);
+      const url = `/upload/preview?filename=${encodeURIComponent(filename)}&session_id=${encodeURIComponent(sessionId)}&timeout=${timeoutMs / 1000}`;
+      const res = await req(url, { signal: controller.signal });
+      clearTimeout(timeoutId);
+      return res;
     } catch (e) {
+      clearTimeout(timeoutId);
+      const isTimeout = e.name === "AbortError" || (typeof DOMException !== "undefined" && e instanceof DOMException && e.name === "AbortError");
       if (attempt >= maxAttempts) {
+        if (isTimeout) {
+          throw new Error("Preview request timed out");
+        }
         throw e;
       }
       if (e.message && (e.message.toLowerCase().includes("not found") || e.message.includes("404"))) {
         throw e;
       }
-      console.warn(`Preview fetch failed: ${e.message}. Retrying in ${delay}ms... (Attempt ${attempt}/${maxAttempts})`);
+      const errorMsg = isTimeout ? "Timeout" : e.message;
+      console.warn(`Preview fetch failed: ${errorMsg}. Retrying in ${delay}ms... (Attempt ${attempt}/${maxAttempts})`);
       await new Promise(resolve => setTimeout(resolve, delay));
       attempt++;
       delay *= 2;
