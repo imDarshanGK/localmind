@@ -10,6 +10,7 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
   const [previewContent, setPreviewContent] = useState(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [previewFilename, setPreviewFilename] = useState("");
+  const [previewError, setPreviewError] = useState(null);
 
   const [uploadResults, setUploadResults] = useState([]);
   const [error, setError] = useState("");
@@ -67,11 +68,13 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
   async function handleTriggerPreview(filename) {
     setLoadingPreview(true);
     setPreviewFilename(filename);
+    setPreviewError(null);
     try {
       const data = await previewDocument(filename, sessionId);
       setPreviewContent(data.content || "No textual content available to display.");
     } catch (e) {
-      setPreviewContent(`Error loading preview: ${e.message}`);
+      setPreviewError(e.message || "Failed to load document preview");
+      setPreviewContent(null);
     } finally {
       setLoadingPreview(false);
     }
@@ -184,7 +187,7 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
       )}
 
       {/* Read-Only Modal Viewport Overlay */}
-      {previewContent !== null && (
+      {(previewContent !== null || previewError !== null) && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-gray-900 border border-gray-800 w-full max-w-2xl rounded-2xl max-h-[80vh] flex flex-col shadow-2xl">
             <div className="p-4 border-b border-gray-800 flex items-center justify-between">
@@ -194,15 +197,47 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
               </div>
               <button 
                 type="button"
-                onClick={() => setPreviewContent(null)}
+                onClick={() => {
+                  setPreviewContent(null);
+                  setPreviewError(null);
+                  setPreviewFilename("");
+                }}
                 className="text-gray-400 hover:text-white px-2 py-1 text-sm bg-gray-800 border border-gray-700 rounded-lg transition focus:outline-none focus:ring-2 focus:ring-purple-500"
               >
                 Close
               </button>
             </div>
-            <div className="p-5 overflow-y-auto flex-1 text-xs text-gray-300 font-mono whitespace-pre-wrap leading-relaxed bg-gray-950/40 selection:bg-purple-900">
-              {previewContent}
-            </div>
+            {previewError ? (
+              <div className="p-8 flex flex-col items-center justify-center text-center">
+                <div className="w-12 h-12 bg-red-900/30 border border-red-500/30 rounded-full flex items-center justify-center text-red-500 mb-4">
+                  ⚠️
+                </div>
+                <h4 className="text-white font-medium mb-2">Failed to Load Preview</h4>
+                <p className="text-gray-400 text-xs max-w-md mb-6">{previewError}</p>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => {
+                      setPreviewContent(null);
+                      setPreviewError(null);
+                      setPreviewFilename("");
+                    }}
+                    className="px-4 py-2 text-xs font-medium text-gray-300 hover:text-white bg-gray-800 hover:bg-gray-750 border border-gray-700 rounded-lg transition"
+                  >
+                    Clear Selection
+                  </button>
+                  <button
+                    onClick={() => handleTriggerPreview(previewFilename)}
+                    className="px-4 py-2 text-xs font-medium text-white bg-purple-600 hover:bg-purple-750 rounded-lg transition shadow-md shadow-purple-900/20"
+                  >
+                    Retry
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="p-5 overflow-y-auto flex-1 text-xs text-gray-300 font-mono whitespace-pre-wrap leading-relaxed bg-gray-950/40 selection:bg-purple-900">
+                {previewContent}
+              </div>
+            )}
           </div>
         </div>
       )}
