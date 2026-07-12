@@ -18,7 +18,7 @@ def generate_pdf(title: str, subtitle: str, messages: list) -> bytes:
     whisper_status = "Whisper Engine: Active"
     try:
         import whisper
-    except (ImportError, ModuleNotFoundError):
+    except (ImportError, ModuleNotFoundError, TypeError):
         import logging
         logging.getLogger(__name__).warning("Whisper package not found. Falling back to text-only processing for PDF export.")
         whisper_status = "Whisper Engine: Offline (Audio features unavailable)"
