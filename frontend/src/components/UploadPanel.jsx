@@ -28,8 +28,29 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose 
   return (
     <div className="border-b border-gray-800 bg-gray-900 px-5 py-4 shrink-0">
       <div className="flex items-center justify-between mb-3">
-        <p className="text-sm font-semibold text-white inline-flex items-center gap-1.5"><DocumentsIcon className="w-4 h-4" />Documents</p>
-        <button onClick={onClose} className="text-gray-500 hover:text-gray-300 text-lg leading-none">×</button>
+        <div className="flex items-center gap-1.5">
+          <p className="text-sm font-semibold text-white inline-flex items-center gap-1.5">
+            <DocumentsIcon className="w-4 h-4" />Documents
+          </p>
+          
+          {/* FIXED (#571): Pure CSS/Tailwind interactive help tooltip utility box */}
+          <div className="group relative inline-block">
+            <button
+              type="button"
+              className="text-gray-500 hover:text-purple-400 text-xs font-mono border border-gray-700 hover:border-purple-500/40 rounded-full w-4 h-4 inline-flex items-center justify-center bg-gray-950 cursor-help transition-colors focus:outline-none focus:ring-1 focus:ring-purple-500"
+              aria-label="Upload limits information description"
+            >
+              i
+            </button>
+            <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 hidden group-hover:block group-focus-within:block w-48 bg-gray-950 border border-gray-800 text-gray-400 text-[10px] p-2 rounded shadow-xl z-50 pointer-events-none leading-relaxed">
+              <span className="font-semibold text-white block mb-0.5">Supported Upload Formats:</span>
+              PDF, TXT, CSV, DOCX, MD, HTML files up to a maximum limit of 50MB.
+              <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-950"></div>
+            </div>
+          </div>
+        </div>
+        
+        <button onClick={onClose} className="text-gray-500 hover:text-gray-300 text-lg leading-none" aria-label="Close panel">×</button>
       </div>
 
       {/* Drop zone */}
