@@ -5,6 +5,7 @@ import { CheckIcon, DocumentsIcon, ErrorIcon, SpinnerIcon, UploadIcon, FileIcon 
 export default function UploadPanel({ sessionId, documents, onUploaded, onClose, show, minimalMode }) {
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState(""); // Key fix: Restored missing validation error binding tracking hooks
   
   // Preview UI local states
   const [previewContent, setPreviewContent] = useState(null);
@@ -29,6 +30,7 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
     const files = Array.from(filelist || []);
     if (files.length === 0) return;
     setUploading(true); 
+    setError("");
     setUploadResults([]);
     for (const file of files) {
       try {
@@ -36,7 +38,9 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
         setUploadResults(prev => [...prev, { filename: data.filename || file.name, status: "success", message: data.message }]);
         onUploaded(data.filename);
       } catch(e) { 
-        setUploadResults(prev => [...prev, { filename: file.name, status: "error", message: e.message }]);
+        const errorMessage = e.message || "An unexpected error occurred during document processing.";
+        setError(errorMessage);
+        setUploadResults(prev => [...prev, { filename: file.name, status: "error", message: errorMessage }]);
       }
     }
     setUploading(false); 
@@ -62,14 +66,12 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
   }
 
   return (
-    // FIXED (#569): Converted container outer div to a semantic <section> with an accessibility landmark label
     <section 
       data-testid="upload-panel"
       aria-labelledby="upload-panel-title"
       className={`border-b border-gray-800 bg-gray-900 px-5 py-4 shrink-0 ${show ? 'block' : 'hidden'}`}
     >
       <div className="flex items-center justify-between mb-3">
-        {/* FIXED (#569): Added id matching the section landmark header reference */}
         <h2 id="upload-panel-title" className="text-sm font-semibold text-white inline-flex items-center gap-1.5">
           <DocumentsIcon className="w-4 h-4" aria-hidden="true" />
           Documents
@@ -82,6 +84,24 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
           ×
         </button>
       </div>
+
+      {error && (
+        <div data-testid="upload-error-banner" className="mb-3 text-xs bg-red-950/40 border border-red-900/60 text-red-400 p-2.5 rounded-lg flex items-start gap-2">
+          <ErrorIcon className="w-4 h-4 text-red-400 shrink-0 mt-0.5" aria-hidden="true" />
+          <div className="flex-1">
+            <p className="font-semibold text-red-300">Upload Failure</p>
+            <p className="text-red-400/90 leading-relaxed mt-0.5">{error}</p>
+          </div>
+          <button 
+            type="button" 
+            onClick={() => setError("")}
+            className="text-red-400/60 hover:text-red-300 text-base font-bold leading-none px-1 rounded focus:outline-none focus:ring-1 focus:ring-red-500"
+            aria-label="Dismiss failure banner"
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       {/* Drop zone */}
       <div
@@ -103,7 +123,6 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
         <p className="text-xs text-gray-600 mt-1">PDF · TXT · CSV · DOCX · MD · HTML · SRT · VTT · max 50MB</p>
       </div>
 
-      {/* FIXED (#569): Wrapped asynchronous operation results inside an explicit live area status landmark region */}
       <div role="status" aria-live="polite" className="empty:hidden">
         {uploadResults.length > 0 && (
           <div className="mb-2">
@@ -119,7 +138,6 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
       
       {/* Uploaded docs list */}
       {documents.length > 0 && (
-        // FIXED (#569): Converted labels and items into a semantic accessible list element tree structure
         <div aria-label="Indexed documents collection">
           <p className="text-xs text-gray-500 mb-1">Indexed documents:</p>
           <ul className="space-y-1">
