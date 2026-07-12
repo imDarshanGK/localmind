@@ -8,6 +8,7 @@ import * as api from "../utils/api";
 vi.mock("../utils/api", () => ({
   uploadDocument: vi.fn(),
   deleteDocument: vi.fn(),
+  previewDocument: vi.fn(),
 }));
 
 describe("UploadPanel Persistence State Interface Suite (#570)", () => {
@@ -41,6 +42,57 @@ describe("UploadPanel Persistence State Interface Suite (#570)", () => {
     fireEvent.click(toggleButton);
 
     expect(localStorage.setItem).toHaveBeenCalledWith("upload-panel-collapsed:session-abc", "true");
+  });
+});
+
+describe("UploadPanel Global Error Banner Interface Suite (#566)", () => {
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+
+  test("avoids compiling alert nodes inside default view frames", () => {
+    render(<UploadPanel sessionId="session-123" documents={[]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />);
+    expect(screen.queryByTestId("upload-error-banner")).toBeNull();
+  });
+
+  test("renders full structured banner details successfully when request fails", async () => {
+    api.uploadDocument.mockRejectedValueOnce(new Error("File allocation table mapping rejected context bounds."));
+    
+    render(<UploadPanel sessionId="session-123" documents={[]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />);
+    
+    const file = new File(["test data payload"], "matrix.txt", { type: "text/plain" });
+    const dropzone = screen.getByText(/Drop files here or click to browse/i);
+    
+    fireEvent.drop(dropzone, {
+      dataTransfer: { files: [file] }
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("upload-error-banner")).toBeDefined();
+      expect(screen.getByText("Upload Failure")).toBeDefined();
+      expect(screen.getByText("File allocation table mapping rejected context bounds.")).toBeDefined();
+    });
+  });
+
+  test("clears current alert state wrapper when firing click events on layout close button", async () => {
+    api.uploadDocument.mockRejectedValueOnce(new Error("Storage block exhausted."));
+    
+    render(<UploadPanel sessionId="session-123" documents={[]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />);
+    
+    const file = new File(["data"], "log.txt", { type: "text/plain" });
+    const dropzone = screen.getByText(/Drop files here or click to browse/i);
+    
+    fireEvent.drop(dropzone, { dataTransfer: { files: [file] } });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("upload-error-banner")).toBeDefined();
+    });
+
+    const closeButton = screen.getByLabelText("Dismiss failure banner");
+    fireEvent.click(closeButton);
+
+    expect(screen.queryByTestId("upload-error-banner")).toBeNull();
   });
 });
 
@@ -103,6 +155,7 @@ describe("UploadPanel multi-select upload", () => {
 
     await waitFor(() => expect(api.uploadDocument).toHaveBeenCalledTimes(2));
     expect(screen.getByText(/good\.pdf/)).toBeDefined();
+    expect(screen.getByText(/bad\.exe/)).toBeDefined();
     expect(onUploaded).toHaveBeenCalledTimes(1);
   });
 });

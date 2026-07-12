@@ -12,6 +12,7 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
   const [previewFilename, setPreviewFilename] = useState("");
 
   const [uploadResults, setUploadResults] = useState([]);
+  const [error, setError] = useState("");
   const fileRef = useRef();
 
   // FIXED (#570): Initialize persistence layer state from localStorage based on active sessionId
@@ -48,6 +49,7 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
     const files = Array.from(filelist || []);
     if (files.length === 0) return;
     setUploading(true); 
+    setError("");
     setUploadResults([]);
     for (const file of files) {
       try {
@@ -55,7 +57,9 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
         setUploadResults(prev => [...prev, { filename: data.filename || file.name, status: "success", message: data.message }]);
         onUploaded(data.filename);
       } catch(e) { 
-        setUploadResults(prev => [...prev, { filename: file.name, status: "error", message: e.message || "Upload failed" }]);
+        const errorMessage = e.message || "An unexpected error occurred during document processing.";
+        setError(errorMessage);
+        setUploadResults(prev => [...prev, { filename: file.name, status: "error", message: errorMessage }]);
       }
     }
     setUploading(false); 
