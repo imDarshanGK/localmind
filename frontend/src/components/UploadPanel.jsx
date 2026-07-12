@@ -26,6 +26,18 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
     return () => clearInterval(interval);
   }, [documents, onUploaded, minimalMode, show]);
 
+  // FIXED (#567): Global event listener to dismiss panel when Escape key is pressed
+  useEffect(() => {
+    if (!show) return;
+    function handleGlobalKeyDown(e) {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    }
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, [show, onClose]);
+
   async function handleFiles(filelist) {
     const files = Array.from(filelist || []);
     if (files.length === 0) return;
@@ -45,18 +57,6 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
     }
     setUploading(false); 
   }
-
-  // FIXED (#567): Global event listener to dismiss panel when Escape key is pressed
-  useEffect(() => {
-    if (!show) return;
-    function handleGlobalKeyDown(e) {
-      if (e.key === "Escape") {
-        onClose();
-      }
-    }
-    window.addEventListener("keydown", handleGlobalKeyDown);
-    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
-  }, [show, onClose]);
 
   function onDrop(e) {
     e.preventDefault(); 
@@ -86,13 +86,11 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
   }
 
   return (
-    // FIXED (#568): Implemented dynamic responsive padding adjustments across mobile vs desktop breaks
     <div data-testid="upload-panel" className={`border-b border-gray-800 bg-gray-900 px-4 py-3 sm:px-5 sm:py-4 shrink-0 w-full ${show ? 'block' : 'hidden'}`}>
       <div className="flex items-center justify-between mb-3">
         <p className="text-sm font-semibold text-white inline-flex items-center gap-1.5">
           <DocumentsIcon className="w-4 h-4" />Documents
         </p>
-        {/* FIXED (#568): Optimized tap/touch interaction targets for mobile close actions */}
         <button 
           onClick={onClose} 
           className="text-gray-500 hover:text-gray-300 text-2xl sm:text-lg leading-none p-2 sm:p-0 -mr-2 sm:mr-0 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:block focus:outline-none focus:ring-2 focus:ring-purple-500"
@@ -102,7 +100,6 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
         </button>
       </div>
 
-      {/* FIXED (#566): Structured inline error notification container block equipped with standalone close triggers */}
       {error && (
         <div data-testid="upload-error-banner" className="mb-3 text-xs bg-red-950/40 border border-red-900/60 text-red-400 p-2.5 rounded-lg flex items-start gap-2">
           <ErrorIcon className="w-4 h-4 text-red-400 shrink-0 mt-0.5" aria-hidden="true" />
@@ -122,7 +119,6 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
       )}
 
       {/* Drop zone */}
-      {/* FIXED (#568 / #567): Scaled inner padding sizes dynamically for mobile touch regions and added keyboard navigation binds */}
       <div
         tabIndex={0}
         role="button"
@@ -163,7 +159,6 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
           {documents.map((d, i) => {
             const currentFilename = d.filename || d;
             return (
-              // FIXED (#568): Enforced padding sizing metrics matching mobile touch targets standard bounds
               <div key={i} className="flex items-center justify-between text-xs bg-gray-800 rounded-lg px-3 py-2 sm:py-1.5 mb-1 hover:bg-gray-750 transition min-h-[36px]">
                 <span className="text-gray-300 truncate inline-flex items-center gap-1 max-w-[65%]">
                   <FileIcon className="w-3.5 h-3.5 shrink-0" />
