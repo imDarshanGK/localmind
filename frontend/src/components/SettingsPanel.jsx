@@ -151,7 +151,6 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
         </div>
       )}
 
-      {/* FIXED (#576): Fallback layout wrapper for empty states */}
       {isEmptyState ? (
         <div className="border border-dashed border-gray-800 rounded-xl bg-gray-950/40 p-6 text-center my-2">
           <p className="text-xs font-medium text-gray-400 mb-1">No Profile Configuration Found</p>
@@ -161,7 +160,7 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
           <button 
             type="button"
             onClick={() => onSave(form)}
-            className="text-[11px] bg-purple-700/20 hover:bg-purple-700/30 text-purple-400 border border-purple-500/20 px-3 py-1 rounded-lg transition font-medium"
+            className="text-[11px] bg-purple-700/20 hover:bg-purple-700/30 text-purple-400 border border-purple-500/20 px-3 py-1 rounded-lg transition font-medium focus:outline-none focus:ring-2 focus:ring-purple-500"
           >
             Load System Defaults
           </button>
@@ -169,16 +168,17 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
       ) : (
         isExpanded && (
           <>
+            {/* FIXED (#579): Fluid responsive grid layout adapting from 1 column on mobile to 2 columns on desktop viewports */}
             {/* FIXED (#580): Programmatic accessibility input bindings via exact htmlId keys */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-xs">
               <Field label="Default Model" htmlId="model-dropdown" error={errors.default_model}>
-                <select id="model-dropdown" value={form.default_model} onChange={e => set("default_model", e.target.value)} className={`sel ${errors.default_model ? "border-red-500" : ""}`}>
+                <select id="model-dropdown" value={form.default_model} onChange={e => set("default_model", e.target.value)} className={`sel ${errors.default_model ? "border-red-500" : ""} focus:ring-2 focus:ring-purple-500`}>
                   {MODELS.map(m => <option key={m} value={m}>{m}</option>)}
                 </select>
               </Field>
 
               <Field label="Default Language" htmlId="lang-dropdown" error={errors.default_language}>
-                <select id="lang-dropdown" value={form.default_language} onChange={e => set("default_language", e.target.value)} className={`sel ${errors.default_language ? "border-red-500" : ""}`}>
+                <select id="lang-dropdown" value={form.default_language} onChange={e => set("default_language", e.target.value)} className={`sel ${errors.default_language ? "border-red-500" : ""} focus:ring-2 focus:ring-purple-500`}>
                   {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
                 </select>
               </Field>
@@ -231,7 +231,6 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
               </Field>
             </div>
 
-            {/* FIXED (#579): Single clean instance of drafts control window */}
             <div className="mt-5 pt-4 border-t border-gray-800 text-xs">
               <label htmlFor="drafts-input" className="text-gray-400 font-medium block mb-2">Saved Prompt Drafts / Notes</label>
               <div className="flex gap-2 mb-3">
@@ -273,7 +272,7 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
               )}
             </div>
 
-            {/* FIXED (#579): Flex actions row matches column alignment boundaries perfectly */}
+            {/* FIXED (#579): Flex actions row matches column alignment boundaries perfectly on mobile screens */}
             <div className="flex flex-col sm:flex-row gap-2 mt-5 pt-3 border-t border-gray-800 justify-between items-center w-full">
               <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                 <button 

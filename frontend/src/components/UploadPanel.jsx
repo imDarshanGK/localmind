@@ -12,6 +12,7 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
   const [previewFilename, setPreviewFilename] = useState("");
 
   const [uploadResults, setUploadResults] = useState([]);
+  const [error, setError] = useState("");
   const fileRef = useRef();
 
   // Poll for document status updates if any are queued/processing
@@ -29,6 +30,7 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
     const files = Array.from(filelist || []);
     if (files.length === 0) return;
     setUploading(true); 
+    setError("");
     setUploadResults([]);
     for (const file of files) {
       try {
@@ -36,7 +38,9 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
         setUploadResults(prev => [...prev, { filename: data.filename || file.name, status: "success", message: data.message }]);
         onUploaded(data.filename);
       } catch(e) { 
-        setUploadResults(prev => [...prev, { filename: file.name, status: "error", message: e.message }]);
+        const errorMessage = e.message || "An unexpected error occurred during document processing.";
+        setError(errorMessage);
+        setUploadResults(prev => [...prev, { filename: file.name, status: "error", message: errorMessage }]);
       }
     }
     setUploading(false); 
@@ -97,6 +101,25 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
           ×
         </button>
       </div>
+
+      {/* FIXED (#566): Structured inline error notification container block equipped with standalone close triggers */}
+      {error && (
+        <div data-testid="upload-error-banner" className="mb-3 text-xs bg-red-950/40 border border-red-900/60 text-red-400 p-2.5 rounded-lg flex items-start gap-2">
+          <ErrorIcon className="w-4 h-4 text-red-400 shrink-0 mt-0.5" aria-hidden="true" />
+          <div className="flex-1">
+            <p className="font-semibold text-red-300">Upload Failure</p>
+            <p className="text-red-400/90 leading-relaxed mt-0.5">{error}</p>
+          </div>
+          <button 
+            type="button" 
+            onClick={() => setError("")}
+            className="text-red-400/60 hover:text-red-300 text-base font-bold leading-none px-1 rounded focus:outline-none focus:ring-1 focus:ring-red-500"
+            aria-label="Dismiss failure banner"
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       {/* Drop zone */}
       {/* FIXED (#568 / #567): Scaled inner padding sizes dynamically for mobile touch regions and added keyboard navigation binds */}
