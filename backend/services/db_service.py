@@ -592,7 +592,7 @@ def log_plugin(session_id: str, plugin: str, inp: str, out: str, success: bool =
 def get_export_logs(limit: int = 50) -> list[dict]:
     with get_db() as conn:
         rows = conn.execute(
-            "SELECT * FROM export_logs ORDER BY created_at DESC LIMIT ?",
+            "SELECT * FROM export_logs ORDER BY id DESC LIMIT ?",
             (limit,)
         ).fetchall()
         return [dict(r) for r in rows]
