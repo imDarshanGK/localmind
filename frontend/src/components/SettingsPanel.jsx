@@ -12,6 +12,7 @@ const LANGUAGES = [
 ];
 
 export default function SettingsPanel({ settings, onSave, onClose }) {
+  // FIXED (#576): Safeguarded initialization via optional chaining to prevent property access crashes on null/empty payloads
   const [form, setForm] = useState({
     default_model:    settings?.default_model    || "llama3",
     default_language: settings?.default_language || "en",
@@ -23,7 +24,6 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
     minimal_mode:      settings?.minimal_mode ?? false,
   });
 
-  // SOLVES (#581): Persistent Collapse State Hooks
   const [isExpanded, setIsExpanded] = useState(() => {
     const savedState = localStorage.getItem("localmind_settings_expanded");
     return savedState !== null ? JSON.parse(savedState) : true;
@@ -50,6 +50,20 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
   useEffect(() => {
     localStorage.setItem("localmind_settings_drafts", JSON.stringify(drafts));
   }, [drafts]);
+
+  // FIXED (#578): Global keyboard listener listening for Escape key panel dismiss signals
+  useEffect(() => {
+    function handleKeyDown(e) {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  // FIXED (#576): Check if settings object is completely empty, missing, or explicitly empty
+  const isEmptyState = !settings || Object.keys(settings).length === 0;
 
   function set(key, val) { 
     setForm(p => ({ ...p, [key]: val })); 
@@ -105,28 +119,30 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
   };
 
   return (
-    /* FIXED (#580): Changed top wrapper from a generic <div> to a semantic section landmark region */
     <section 
-      aria-labelledby="settings-heading" 
-      className="border-b border-gray-800 bg-gray-900 px-5 py-4 shrink-0 transition-all duration-300"
+      aria-label="Application Settings"
+      className="border-b border-gray-800 bg-gray-900 px-5 py-4 shrink-0 transition-all duration-300 outline-none"
     >
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          {/* FIXED (#580): Transformed paragraph into a proper heading paired to the section landmark label */}
           <h2 id="settings-heading" className="text-sm font-semibold text-white inline-flex items-center gap-1.5">
             <SettingsIcon className="w-4 h-4" aria-hidden="true" />Settings
           </h2>
-          
-          {/* SOLVES (#581): Persistent Collapse Button Controller */}
           <button 
             type="button"
             onClick={() => setIsExpanded(!isExpanded)}
-            className="text-[10px] bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-gray-200 px-2 py-0.5 rounded transition font-medium"
+            className="text-[10px] bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-gray-200 px-2 py-0.5 rounded transition font-medium focus:outline-none focus:ring-2 focus:ring-purple-500"
           >
             {isExpanded ? "Collapse ▵" : "Expand ▿"}
           </button>
         </div>
-        <button onClick={onClose} aria-label="Close settings panel" className="text-gray-500 hover:text-gray-300 text-lg leading-none">×</button>
+        <button 
+          onClick={onClose} 
+          aria-label="Close settings panel" 
+          className="text-gray-500 hover:text-gray-300 text-lg leading-none rounded focus:outline-none focus:ring-2 focus:ring-purple-500 px-1"
+        >
+          ×
+        </button>
       </div>
 
       {errors.global && (
@@ -135,143 +151,161 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
         </div>
       )}
 
-      {/* SOLVES (#581): Controlled expanded layout rendering window wrapper */}
-      {isExpanded && (
-        <>
-          {/* FIXED (#580): Provided unique htmlId properties to bind labels explicitly to inputs */}
-          <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-xs">
-            <Field label="Default Model" htmlId="model-dropdown" error={errors.default_model}>
-              <select id="model-dropdown" value={form.default_model} onChange={e=>set("default_model",e.target.value)} className={`sel ${errors.default_model ? "border-red-500" : ""}`}>
-                {MODELS.map(m => <option key={m} value={m}>{m}</option>)}
-              </select>
-            </Field>
-            
-            <Field label="Default Language" htmlId="lang-dropdown" error={errors.default_language}>
-              <select id="lang-dropdown" value={form.default_language} onChange={e => set("default_language", e.target.value)} className={`sel ${errors.default_language ? "border-red-500" : ""}`}>
-                {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
-              </select>
-            </Field>
+      {/* FIXED (#576): Fallback layout wrapper for empty states */}
+      {isEmptyState ? (
+        <div className="border border-dashed border-gray-800 rounded-xl bg-gray-950/40 p-6 text-center my-2">
+          <p className="text-xs font-medium text-gray-400 mb-1">No Profile Configuration Found</p>
+          <p className="text-[11px] text-gray-600 max-w-sm mx-auto mb-4">
+            It looks like your local configuration profile is empty. Click the button below to provision standard defaults.
+          </p>
+          <button 
+            type="button"
+            onClick={() => onSave(form)}
+            className="text-[11px] bg-purple-700/20 hover:bg-purple-700/30 text-purple-400 border border-purple-500/20 px-3 py-1 rounded-lg transition font-medium"
+          >
+            Load System Defaults
+          </button>
+        </div>
+      ) : (
+        isExpanded && (
+          <>
+            {/* FIXED (#580): Programmatic accessibility input bindings via exact htmlId keys */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-xs">
+              <Field label="Default Model" htmlId="model-dropdown" error={errors.default_model}>
+                <select id="model-dropdown" value={form.default_model} onChange={e => set("default_model", e.target.value)} className={`sel ${errors.default_model ? "border-red-500" : ""}`}>
+                  {MODELS.map(m => <option key={m} value={m}>{m}</option>)}
+                </select>
+              </Field>
 
-            <Field label={`Temperature: ${form.temperature}`} htmlId="temp-slider" error={errors.temperature}>
-              <input id="temp-slider" type="range" min="0" max="2" step="0.1" value={form.temperature}
-                onChange={e => set("temperature", parseFloat(e.target.value))}
-                className="w-full accent-purple-500" />
-            </Field>
+              <Field label="Default Language" htmlId="lang-dropdown" error={errors.default_language}>
+                <select id="lang-dropdown" value={form.default_language} onChange={e => set("default_language", e.target.value)} className={`sel ${errors.default_language ? "border-red-500" : ""}`}>
+                  {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
+                </select>
+              </Field>
 
-            <Field label={`RAG Context Chunks: ${form.rag_top_k}`} htmlId="rag-slider" error={errors.rag_top_k}>
-              <input id="rag-slider" type="range" min="1" max="10" step="1" value={form.rag_top_k}
-                onChange={e => set("rag_top_k", parseInt(e.target.value))}
-                className="w-full accent-purple-500" />
-            </Field>
+              <Field label={`Temperature: ${form.temperature}`} htmlId="temp-slider" error={errors.temperature}>
+                <input id="temp-slider" type="range" min="0" max="2" step="0.1" value={form.temperature}
+                  onChange={e => set("temperature", parseFloat(e.target.value))}
+                  className="w-full accent-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500 rounded" />
+              </Field>
 
-            <Field label={`RAG Chunk Overlap: ${form.rag_chunk_overlap}`} htmlId="overlap-slider" error={errors.rag_chunk_overlap}>
-              <input id="overlap-slider" type="range" min="0" max="200" step="10" value={form.rag_chunk_overlap}
-                onChange={e => set("rag_chunk_overlap", parseInt(e.target.value))}
-                className="w-full accent-purple-500" />
-            </Field>
+              <Field label={`RAG Context Chunks: ${form.rag_top_k}`} htmlId="rag-slider" error={errors.rag_top_k}>
+                <input id="rag-slider" type="range" min="1" max="10" step="1" value={form.rag_top_k}
+                  onChange={e => set("rag_top_k", parseInt(e.target.value))}
+                  className="w-full accent-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500 rounded" />
+              </Field>
 
-            <Field label={`History Turns: ${form.max_history_turns}`} htmlId="history-slider" error={errors.max_history_turns}>
-              <input id="history-slider" type="range" min="2" max="20" step="2" value={form.max_history_turns}
-                onChange={e => set("max_history_turns", parseInt(e.target.value))}
-                className="w-full accent-purple-500" />
-            </Field>
+              <Field label={`RAG Chunk Overlap: ${form.rag_chunk_overlap}`} htmlId="overlap-slider" error={errors.rag_chunk_overlap}>
+                <input id="overlap-slider" type="range" min="0" max="200" step="10" value={form.rag_chunk_overlap}
+                  onChange={e => set("rag_chunk_overlap", parseInt(e.target.value))}
+                  className="w-full accent-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500 rounded" />
+              </Field>
 
-            <Field label="Theme" htmlId="theme-dropdown" error={errors.theme}>
-              <select id="theme-dropdown" value={form.theme} onChange={e => set("theme", e.target.value)} className={`sel ${errors.theme ? "border-red-500" : ""}`}>
-                <option value="dark">Dark</option>
-                <option value="light">Light</option>
-                <option value="high-contrast">High Contrast</option>
-                <option value="sepia">Sepia (Warm)</option>
-                <option value="comfort">Comfort (Large Text)</option>
-              </select>
-            </Field>
+              <Field label={`History Turns: ${form.max_history_turns}`} htmlId="history-slider" error={errors.max_history_turns}>
+                <input id="history-slider" type="range" min="2" max="20" step="2" value={form.max_history_turns}
+                  onChange={e => set("max_history_turns", parseInt(e.target.value))}
+                  className="w-full accent-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500 rounded" />
+              </Field>
 
-            <Field label="Minimal Mode" htmlId="minimal-checkbox">
-              <label className="flex items-center gap-2 text-gray-300 mt-1 cursor-pointer select-none">
-                <input
-                  id="minimal-checkbox"
-                  type="checkbox"
-                  checked={form.minimal_mode}
-                  onChange={e => set("minimal_mode", e.target.checked)}
-                  className="accent-purple-500"
+              <Field label="Theme" htmlId="theme-dropdown" error={errors.theme}>
+                <select id="theme-dropdown" value={form.theme} onChange={e => set("theme", e.target.value)} className="sel focus:ring-2 focus:ring-purple-500">
+                  <option value="dark">Dark</option>
+                  <option value="light">Light</option>
+                  <option value="high-contrast">High Contrast</option>
+                  <option value="sepia">Sepia (Warm)</option>
+                  <option value="comfort">Comfort (Large Text)</option>
+                </select>
+              </Field>
+
+              <Field label="Minimal Mode" htmlId="minimal-checkbox">
+                <label className="flex items-center gap-2 text-gray-300 mt-1 cursor-pointer select-none">
+                  <input
+                    id="minimal-checkbox"
+                    type="checkbox"
+                    checked={form.minimal_mode}
+                    onChange={e => set("minimal_mode", e.target.checked)}
+                    className="accent-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500 rounded"
+                  />
+                  Low-bandwidth mode
+                </label>
+              </Field>
+            </div>
+
+            {/* FIXED (#579): Single clean instance of drafts control window */}
+            <div className="mt-5 pt-4 border-t border-gray-800 text-xs">
+              <label htmlFor="drafts-input" className="text-gray-400 font-medium block mb-2">Saved Prompt Drafts / Notes</label>
+              <div className="flex gap-2 mb-3">
+                <input 
+                  id="drafts-input"
+                  type="text" 
+                  value={newDraft} 
+                  onChange={e => setNewDraft(e.target.value)}
+                  placeholder="Type a canned prompt snippet or scratchpad note..."
+                  className="flex-1 bg-gray-800 text-gray-200 border border-gray-700 rounded-lg px-3 py-1 text-xs outline-none focus:border-purple-500 placeholder-gray-600 focus:ring-2 focus:ring-purple-500"
+                  onKeyDown={e => e.key === "Enter" && handleAddDraft()}
                 />
-                Low-bandwidth mode
-              </label>
-            </Field>
-          </div>
-
-          <div className="mt-5 pt-4 border-t border-gray-800 text-xs">
-            <label htmlFor="drafts-input" className="text-gray-400 font-medium block mb-2">Saved Prompt Drafts / Notes</label>
-            <div className="flex gap-2 mb-3">
-              <input 
-                id="drafts-input"
-                type="text" 
-                value={newDraft} 
-                onChange={e => setNewDraft(e.target.value)}
-                placeholder="Type a canned prompt snippet or scratchpad note..."
-                className="flex-1 bg-gray-800 text-gray-200 border border-gray-700 rounded-lg px-3 py-1 text-xs outline-none focus:border-purple-500 placeholder-gray-600"
-                onKeyDown={e => e.key === "Enter" && handleAddDraft()}
-              />
-              <button 
-                type="button"
-                onClick={handleAddDraft}
-                className="bg-purple-700/40 hover:bg-purple-700 border border-purple-500/30 hover:border-purple-500 text-purple-300 hover:text-white px-3 py-1 rounded-lg font-medium transition text-xs shrink-0"
-              >
-                Add
-              </button>
-            </div>
-
-            {drafts.length === 0 ? (
-              <p className="text-[11px] text-gray-600 italic">No message drafts stored yet.</p>
-            ) : (
-              <div className="space-y-1.5 max-h-[120px] overflow-y-auto pr-1 custom-scrollbar">
-                {drafts.map(d => (
-                  <div key={d.id} className="flex justify-between items-start gap-3 bg-gray-800/40 border border-gray-800/80 p-2 rounded-lg group hover:border-gray-700/60 transition">
-                    <p className="text-[11px] text-gray-300 break-words flex-1 font-mono">{d.text}</p>
-                    <button 
-                      type="button"
-                      onClick={() => handleDeleteDraft(d.id)}
-                      className="text-gray-500 hover:text-red-400 transition font-bold px-1 text-sm leading-none"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
+                <button 
+                  type="button"
+                  onClick={handleAddDraft}
+                  className="bg-purple-700/40 hover:bg-purple-700 border border-purple-500/30 hover:border-purple-500 text-purple-300 hover:text-white px-3 py-1 rounded-lg font-medium transition text-xs shrink-0 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                >
+                  Add
+                </button>
               </div>
-            )}
-          </div>
 
-          <div className="flex gap-2 mt-5 pt-3 border-t border-gray-800 justify-between items-center">
-            <div className="flex gap-2">
-              <button 
-                type="button"
-                onClick={handleSave}
-                disabled={isSaving}
-                className="text-xs bg-purple-700 hover:bg-purple-600 disabled:bg-gray-800 text-white px-4 py-1.5 rounded-lg transition font-medium shadow-md"
-              >
-                {isSaving ? "Saving..." : "Save Settings"}
-              </button>
-              <button 
-                type="button"
-                onClick={onClose}
-                className="text-xs border border-gray-700 text-gray-400 hover:bg-gray-800 px-4 py-1.5 rounded-lg transition"
-              >
-                Cancel
-              </button>
+              {drafts.length === 0 ? (
+                <p className="text-[11px] text-gray-600 italic">No message drafts stored yet.</p>
+              ) : (
+                <div className="space-y-1.5 max-h-[120px] overflow-y-auto pr-1 custom-scrollbar">
+                  {drafts.map(d => (
+                    <div key={d.id} className="flex justify-between items-start gap-3 bg-gray-800/40 border border-gray-800/80 p-2 rounded-lg group hover:border-gray-700/60 transition">
+                      <p className="text-[11px] text-gray-300 break-words flex-1 font-mono">{d.text}</p>
+                      <button 
+                        type="button"
+                        onClick={() => handleDeleteDraft(d.id)}
+                        className="text-gray-500 hover:text-red-400 transition font-bold px-1 text-sm leading-none focus:outline-none focus:ring-2 focus:ring-purple-500 rounded"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
-            <button 
-              type="button"
-              onClick={handleCopySummary}
-              className={`text-[11px] px-3 py-1.5 rounded-lg transition font-medium border flex items-center gap-1.5 duration-200
-                ${copied 
-                  ? "bg-green-950/40 border-green-900/60 text-green-400" 
-                  : "border-gray-700 text-gray-400 hover:bg-gray-800"}`}
-            >
-              {copied ? <><span>✓</span><span>Copied!</span></> : <span>Copy Config Summary</span>}
-            </button>
-          </div>
-        </>
+            {/* FIXED (#579): Flex actions row matches column alignment boundaries perfectly */}
+            <div className="flex flex-col sm:flex-row gap-2 mt-5 pt-3 border-t border-gray-800 justify-between items-center w-full">
+              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                <button 
+                  type="button"
+                  onClick={handleSave}
+                  disabled={isSaving}
+                  className="text-xs bg-purple-700 hover:bg-purple-600 disabled:bg-gray-800 text-white px-4 py-1.5 rounded-lg transition font-medium shadow-md w-full sm:w-auto text-center focus:outline-none focus:ring-2 focus:ring-purple-500"
+                >
+                  {isSaving ? "Saving..." : "Save Settings"}
+                </button>
+                <button 
+                  type="button"
+                  onClick={onClose}
+                  className="text-xs border border-gray-700 text-gray-400 hover:bg-gray-800 px-4 py-1.5 rounded-lg transition w-full sm:w-auto text-center focus:outline-none focus:ring-2 focus:ring-purple-500"
+                >
+                  Cancel
+                </button>
+              </div>
+
+              <button 
+                type="button"
+                onClick={handleCopySummary}
+                className={`text-[11px] px-3 py-1.5 rounded-lg transition font-medium border flex items-center justify-center gap-1.5 duration-200 w-full sm:w-auto mt-2 sm:mt-0 focus:outline-none focus:ring-2 focus:ring-purple-500
+                  ${copied 
+                    ? "bg-green-950/40 border-green-900/60 text-green-400" 
+                    : "border-gray-700 text-gray-400 hover:bg-gray-800"}`}
+              >
+                {copied ? <><span>✓</span><span>Copied!</span></> : <span>Copy Config Summary</span>}
+              </button>
+            </div>
+          </>
+        )
       )}
 
       <style>{`
@@ -281,7 +315,6 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
   );
 }
 
-/* FIXED (#580): Mapped the incoming unique htmlId prop explicitly to the label's htmlFor target */
 function Field({ label, htmlId, error, children }) {
   return (
     <div className="flex flex-col justify-between">

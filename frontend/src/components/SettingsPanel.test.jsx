@@ -17,6 +17,35 @@ afterEach(() => {
   cleanup();
 });
 
+describe("SettingsPanel Keyboard Navigation Suite (#578)", () => {
+  test("fires the onClose callback trigger instantly when the Escape key is pressed", () => {
+    const mockOnClose = vi.fn();
+    render(<SettingsPanel settings={mockSettings} onSave={vi.fn()} onClose={mockOnClose} />);
+    
+    // Simulates standard window keyboard Escape sequence tracking
+    fireEvent.keyDown(window, { key: "Escape" });
+    
+    expect(mockOnClose).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("SettingsPanel Empty State & Guidance Suite (#576)", () => {
+  test("renders empty guidance card view when an empty settings object is supplied", () => {
+    render(<SettingsPanel settings={{}} onSave={vi.fn()} onClose={vi.fn()} />);
+    
+    expect(screen.getByText("No Profile Configuration Found")).toBeDefined();
+    expect(screen.getByText("Load System Defaults")).toBeDefined();
+  });
+
+  test("renders standard parameters layout when data is properly provisioned", () => {
+    const validSettings = { default_model: "llama3", default_language: "en" };
+    render(<SettingsPanel settings={validSettings} onSave={vi.fn()} onClose={vi.fn()} />);
+    
+    expect(screen.queryByText("No Profile Configuration Found")).toBeNull();
+    expect(screen.getByText("Default Model")).toBeDefined();
+  });
+});
+
 describe("SettingsPanel Accessibility Landmarks & Validation Suite (#580)", () => {
   test("renders with correct semantic section region and aria bindings", () => {
     render(<SettingsPanel settings={mockSettings} onSave={vi.fn()} onClose={vi.fn()} />);
