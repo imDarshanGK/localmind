@@ -19,6 +19,25 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
   const [uploadResults, setUploadResults] = useState([]);
   const fileRef = useRef();
 
+  // FIXED (#570): Initialize persistence layer state from localStorage based on active sessionId
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`upload-panel-collapsed:${sessionId}`);
+      return saved === "true";
+    } catch (e) {
+      return false;
+    }
+  });
+
+  // FIXED (#570): Sync view state configurations safely as explicit string values
+  useEffect(() => {
+    try {
+      localStorage.setItem(`upload-panel-collapsed:${sessionId}`, String(isCollapsed));
+    } catch (e) {
+      console.warn("localStorage persistence layer allocation blocked:", e);
+    }
+  }, [isCollapsed, sessionId]);
+
   // Poll for document status updates if any are queued/processing
   useEffect(() => {
     if (minimalMode || !show) return;
@@ -55,6 +74,18 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
     }
   }
 
+  // FIXED (#567): Global event listener to dismiss panel when Escape key is pressed
+  useEffect(() => {
+    if (!show) return;
+    function handleGlobalKeyDown(e) {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    }
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, [show, onClose]);
+
   async function handleFiles(filelist) {
     const files = Array.from(filelist || []);
     if (files.length === 0) return;
@@ -81,6 +112,14 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
     handleFileSelect(e.dataTransfer.files[0]);
   }
 
+  // FIXED (#567): Intercept keyboard interactions (Space/Enter) on the interactive dropzone box layout
+  function handleDropzoneKeyDown(e) {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      fileRef.current.click();
+    }
+  }
+
   async function handleTriggerPreview(filename) {
     setLoadingPreview(true);
     setPreviewFilename(filename);
@@ -95,15 +134,54 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
   }
 
   return (
-    <div data-testid="upload-panel" className={`border-b border-gray-800 bg-gray-900 px-5 py-4 shrink-0 transition-all duration-200 ${show ? 'block' : 'hidden'}`}>
+    <section 
+      data-testid="upload-panel"
+      aria-labelledby="upload-panel-title"
+      className={`border-b border-gray-800 bg-gray-900 px-4 py-3 sm:px-5 sm:py-4 shrink-0 w-full transition-all duration-200 ${show ? 'block' : 'hidden'}`}
+    >
       <div className="flex items-center justify-between mb-3">
-        <p className="text-sm font-semibold text-white inline-flex items-center gap-1.5">
-          <DocumentsIcon className="w-4 h-4" />Documents
-        </p>
-        <button onClick={onClose} className="text-gray-500 hover:text-gray-300 text-lg leading-none focus:outline-none" aria-label="Close panel">×</button>
+        <div className="flex items-center gap-1.5">
+          {/* FIXED (#570): Persistent view collapse button trigger control toggle layout */}
+          <button
+            type="button"
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className="text-gray-400 hover:text-white text-xs p-1 focus:outline-none focus:ring-1 focus:ring-purple-500 rounded transition"
+            aria-label={isCollapsed ? "Expand upload section" : "Collapse upload section"}
+          >
+            {isCollapsed ? "▶" : "▼"}
+          </button>
+          
+          <h2 id="upload-panel-title" className="text-sm font-semibold text-white inline-flex items-center gap-1.5">
+            <DocumentsIcon className="w-4 h-4" aria-hidden="true" />
+            Documents Workspace
+          </h2>
+          
+          {/* FIXED (#571): Pure CSS/Tailwind interactive help tooltip utility box */}
+          <div className="group relative inline-block">
+            <button
+              type="button"
+              className="text-gray-500 hover:text-purple-400 text-xs font-mono border border-gray-700 hover:border-purple-500/40 rounded-full w-4 h-4 inline-flex items-center justify-center bg-gray-950 cursor-help transition-colors focus:outline-none focus:ring-1 focus:ring-purple-500"
+              aria-label="Upload limits information description"
+            >
+              i
+            </button>
+            <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 hidden group-hover:block group-focus-within:block w-48 bg-gray-950 border border-gray-800 text-gray-400 text-[10px] p-2 rounded shadow-xl z-50 pointer-events-none leading-relaxed">
+              <span className="font-semibold text-white block mb-0.5">Supported Upload Formats:</span>
+              PDF, TXT, CSV, DOCX, MD, HTML files up to a maximum limit of 50MB.
+              <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-950"></div>
+            </div>
+          </div>
+        </div>
+        
+        <button 
+          onClick={onClose} 
+          className="text-gray-500 hover:text-gray-300 text-2xl sm:text-lg leading-none p-2 sm:p-0 -mr-2 sm:mr-0 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:block focus:outline-none focus:ring-2 focus:ring-purple-500"
+          aria-label="Close upload panel"
+        >
+          ×
+        </button>
       </div>
 
-      {/* FIXED (#566): Structured inline error notification container block equipped with standalone close triggers */}
       {error && (
         <div data-testid="upload-error-banner" className="mb-3 text-xs bg-red-950/40 border border-red-900/60 text-red-400 p-2.5 rounded-lg flex items-start gap-2">
           <ErrorIcon className="w-4 h-4 text-red-400 shrink-0 mt-0.5" aria-hidden="true" />
@@ -122,97 +200,109 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
         </div>
       )}
 
-      {/* Drop zone */}
-      <div
-        onDragOver={e => { e.preventDefault(); setDragging(true); }}
-        onDragLeave={() => setDragging(false)}
-        onDrop={onDrop}
-        onClick={() => fileRef.current.click()}
-        className={`border-2 border-dashed rounded-xl px-4 py-5 text-center cursor-pointer transition mb-3
-          ${dragging ? "border-purple-500 bg-purple-900/20" : "border-gray-700 hover:border-purple-600 hover:bg-gray-800/50"}`}
-      >
-        <input ref={fileRef} type="file" accept=".pdf,.txt,.csv,.docx,.md,.html,.srt,.vtt" className="hidden" multiple
-          onChange={e => handleFiles(e.target.files)} />
-        
-        <p className="text-2xl mb-1 flex justify-center">
-          {uploading ? <SpinnerIcon className="w-7 h-7 text-purple-400" /> : <UploadIcon className="w-7 h-7 text-gray-300" />}
-        </p>
-        <p className="text-sm text-gray-400">{uploading ? "Indexing documents..." : "Drop files here or click to browse"}</p>
-        <p className="text-xs text-gray-600 mt-1">PDF · TXT · CSV · DOCX · MD · HTML · SRT · VTT · max 50MB</p>
-      </div>
-
-      {/* FIXED (#574): Staged draft workspace block rendering */}
-      {draftFile && (
-        <div className="bg-purple-950/20 border border-purple-900/40 rounded-xl p-3 mb-3 flex flex-col gap-2">
-          <div className="flex items-center justify-between text-xs text-gray-300">
-            <span className="inline-flex items-center gap-1.5 font-medium truncate max-w-[80%]">
-              <FileIcon className="w-3.5 h-3.5 text-purple-400" />
-              {draftFile.name} <span className="text-[10px] text-purple-400/80 bg-purple-950 px-1.5 py-0.5 rounded border border-purple-800/30">Draft</span>
-            </span>
-            <button 
-              type="button"
-              onClick={() => setDraftFile(null)} 
-              className="text-gray-500 hover:text-gray-300 text-sm leading-none p-1"
-              title="Cancel draft"
-            >
-              ×
-            </button>
-          </div>
-          <button
-            type="button"
-            disabled={uploading}
-            onClick={commitDraftUpload}
-            className="w-full bg-purple-600 hover:bg-purple-500 disabled:bg-gray-800 text-white font-medium text-xs py-1.5 rounded-lg transition"
-          >
-            {uploading ? "Uploading Draft..." : "Upload Draft"}
-          </button>
-        </div>
-      )}
-
-      {uploadResults.length > 0 && (
-        <div className="mb-2">
-          {uploadResults.map((r, i) => (
-            <p key={i} className={`text-xs mb-1 inline-flex items-center gap-1 ${r.status === "success" ? "text-green-400" : "text-red-400"}`}>
-              {r.status === "success" ? <CheckIcon className="w-3.5 h-3.5" /> : <ErrorIcon className="w-3.5 h-3.5" />}
-              <span className="truncate">{r.filename}{r.status === "error" ? `: ${r.message}` : ""}</span>
-            </p>
-          ))}
-        </div>
-      )}
-
-      {result && <p className="text-xs text-green-400 mb-2 inline-flex items-center gap-1"><CheckIcon className="w-3.5 h-3.5" />{result.message}</p>}
-
-      {/* Uploaded docs list */}
-      {documents.length > 0 && (
+      {/* FIXED (#570): Enforced conditional rendering block to handle DOM tree unmounting patterns */}
+      {!isCollapsed && (
         <div>
-          <p className="text-xs text-gray-500 mb-1">Indexed documents:</p>
-          {documents.map((d, i) => {
-            const currentFilename = d.filename || d;
-            return (
-              <div key={i} className="flex items-center justify-between text-xs bg-gray-800 rounded-lg px-3 py-1.5 mb-1 hover:bg-gray-750 transition">
-                <span className="text-gray-300 truncate inline-flex items-center gap-1 max-w-[65%]">
-                  <FileIcon className="w-3.5 h-3.5" />
-                  {currentFilename}
+          {/* Drop zone */}
+          <div
+            tabIndex={0}
+            role="button"
+            aria-label="File upload drop zone. Press Enter or Space to browse."
+            onDragOver={e => { e.preventDefault(); setDragging(true); }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={onDrop}
+            onClick={() => fileRef.current.click()}
+            onKeyDown={handleDropzoneKeyDown}
+            className={`border-2 border-dashed rounded-xl px-3 py-4 sm:px-4 sm:py-5 text-center cursor-pointer transition mb-3 outline-none focus:ring-2 focus:ring-purple-500
+              ${dragging ? "border-purple-500 bg-purple-900/20" : "border-gray-700 hover:border-purple-600 hover:bg-gray-800/50"}`}
+          >
+            <input ref={fileRef} type="file" accept=".pdf,.txt,.csv,.docx,.md,.html,.srt,.vtt" className="hidden" multiple
+              aria-label="Upload document input"
+              onChange={e => handleFiles(e.target.files)} />
+            
+            <p className="text-2xl mb-1 flex justify-center">
+              {uploading ? <SpinnerIcon className="w-7 h-7 text-purple-400" /> : <UploadIcon className="w-7 h-7 text-gray-300" />}
+            </p>
+            <p className="text-xs sm:text-sm text-gray-400">{uploading ? "Indexing documents..." : "Drop files here or click to browse"}</p>
+            <p className="text-[10px] sm:text-xs text-gray-600 mt-1">PDF · TXT · CSV · DOCX · MD · HTML · SRT · VTT · max 50MB</p>
+          </div>
+
+          {/* FIXED (#574): Staged draft workspace block rendering */}
+          {draftFile && (
+            <div className="bg-purple-950/20 border border-purple-900/40 rounded-xl p-3 mb-3 flex flex-col gap-2">
+              <div className="flex items-center justify-between text-xs text-gray-300">
+                <span className="inline-flex items-center gap-1.5 font-medium truncate max-w-[80%]">
+                  <FileIcon className="w-3.5 h-3.5 text-purple-400" aria-hidden="true" />
+                  {draftFile.name} <span className="text-[10px] text-purple-400/80 bg-purple-950 px-1.5 py-0.5 rounded border border-purple-800/30">Draft</span>
                 </span>
-                <div className="flex items-center gap-2 shrink-0">
-                  {d.chunks_indexed && <span className="text-gray-500">{d.chunks_indexed} chunks</span>}
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); handleTriggerPreview(currentFilename); }}
-                    className="p-1 text-gray-400 hover:text-purple-400 rounded transition"
-                    title="Preview Document Content"
-                    disabled={loadingPreview}
-                  >
-                    {loadingPreview && previewFilename === currentFilename ? (
-                      <SpinnerIcon className="w-3.5 h-3.5" />
-                    ) : (
-                      "👁️"
-                    )}
-                  </button>
-                </div>
+                <button 
+                  type="button"
+                  onClick={() => setDraftFile(null)} 
+                  className="text-gray-500 hover:text-gray-300 text-sm leading-none p-1"
+                  title="Cancel draft"
+                >
+                  ×
+                </button>
               </div>
-            );
-          })}
+              <button
+                type="button"
+                disabled={uploading}
+                onClick={commitDraftUpload}
+                className="w-full bg-purple-600 hover:bg-purple-500 disabled:bg-gray-800 text-white font-medium text-xs py-1.5 rounded-lg transition"
+              >
+                {uploading ? "Uploading Draft..." : "Upload Draft"}
+              </button>
+            </div>
+          )}
+
+          {uploadResults.length > 0 && (
+            <div className="mb-2">
+              {uploadResults.map((r, i) => (
+                <p key={i} className={`text-xs mb-1 inline-flex items-center gap-1 ${r.status === "success" ? "text-green-400" : "text-red-400"}`}>
+                  {r.status === "success" ? <CheckIcon className="w-3.5 h-3.5" /> : <ErrorIcon className="w-3.5 h-3.5" />}
+                  <span className="truncate">{r.filename}{r.status === "error" ? `: ${r.message}` : ""}</span>
+                </p>
+              ))}
+            </div>
+          )}
+
+          {result && <p className="text-xs text-green-400 mb-2 inline-flex items-center gap-1"><CheckIcon className="w-3.5 h-3.5" />{result.message}</p>}
+
+          {/* Uploaded docs list */}
+          {documents.length > 0 && (
+            <div aria-label="Indexed documents collection">
+              <p className="text-xs text-gray-500 mb-1">Indexed documents:</p>
+              <ul className="space-y-1">
+                {documents.map((d, i) => {
+                  const currentFilename = d.filename || d;
+                  return (
+                    <li key={i} className="flex items-center justify-between text-xs bg-gray-800 rounded-lg px-3 py-2 sm:py-1.5 mb-1 hover:bg-gray-750 transition min-h-[36px]">
+                      <span className="text-gray-300 truncate inline-flex items-center gap-1 max-w-[65%]">
+                        <FileIcon className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                        <span className="truncate">{currentFilename}</span>
+                      </span>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {d.chunks_indexed && <span className="text-gray-500 text-[11px] sm:text-xs">{d.chunks_indexed} chunks</span>}
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); handleTriggerPreview(currentFilename); }}
+                          className="p-2 sm:p-1 text-gray-400 hover:text-purple-400 rounded transition min-w-[32px] min-h-[32px] sm:min-w-0 sm:min-h-0 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-purple-500"
+                          title="Preview Document Content"
+                          disabled={loadingPreview}
+                        >
+                          {loadingPreview && previewFilename === currentFilename ? (
+                            <SpinnerIcon className="w-3.5 h-3.5" />
+                          ) : (
+                            "👁️"
+                          )}
+                        </button>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
         </div>
       )}
 
@@ -228,7 +318,7 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
               <button 
                 type="button"
                 onClick={() => setPreviewContent(null)}
-                className="text-gray-400 hover:text-white px-2 py-1 text-sm bg-gray-800 border border-gray-700 rounded-lg transition"
+                className="text-gray-400 hover:text-white px-3 py-1.5 sm:px-2 sm:py-1 text-sm bg-gray-800 border border-gray-700 rounded-lg transition focus:outline-none focus:ring-2 focus:ring-purple-500"
               >
                 Close
               </button>
@@ -239,6 +329,6 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
           </div>
         </div>
       )}
-    </div>
+    </section>
   );
 }
