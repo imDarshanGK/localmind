@@ -26,6 +26,18 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
     return () => clearInterval(interval);
   }, [documents, onUploaded, minimalMode, show]);
 
+  // FIXED (#567): Global event listener to dismiss panel when Escape key is pressed
+  useEffect(() => {
+    if (!show) return;
+    function handleGlobalKeyDown(e) {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    }
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, [show, onClose]);
+
   async function handleFiles(filelist) {
     const files = Array.from(filelist || []);
     if (files.length === 0) return;
@@ -50,6 +62,14 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
     e.preventDefault(); 
     setDragging(false);
     handleFiles(e.dataTransfer.files);
+  }
+
+  // FIXED (#567): Intercept keyboard interactions (Space/Enter) on the interactive dropzone box layout
+  function handleDropzoneKeyDown(e) {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      fileRef.current.click();
+    }
   }
 
   async function handleTriggerPreview(filename) {
@@ -105,11 +125,15 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
 
       {/* Drop zone */}
       <div
+        tabIndex={0}
+        role="button"
+        aria-label="File upload drop zone. Press Enter or Space to browse."
         onDragOver={e => { e.preventDefault(); setDragging(true); }}
         onDragLeave={() => setDragging(false)}
         onDrop={onDrop}
         onClick={() => fileRef.current.click()}
-        className={`border-2 border-dashed rounded-xl px-4 py-5 text-center cursor-pointer transition mb-3
+        onKeyDown={handleDropzoneKeyDown}
+        className={`border-2 border-dashed rounded-xl px-3 py-4 sm:px-4 sm:py-5 text-center cursor-pointer transition mb-3 outline-none focus:ring-2 focus:ring-purple-500
           ${dragging ? "border-purple-500 bg-purple-900/20" : "border-gray-700 hover:border-purple-600 hover:bg-gray-800/50"}`}
       >
         <input ref={fileRef} type="file" accept=".pdf,.txt,.csv,.docx,.md,.html,.srt,.vtt" className="hidden" multiple
@@ -119,8 +143,8 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
         <p className="text-2xl mb-1 flex justify-center">
           {uploading ? <SpinnerIcon className="w-7 h-7 text-purple-400" /> : <UploadIcon className="w-7 h-7 text-gray-300" />}
         </p>
-        <p className="text-sm text-gray-400">{uploading ? "Indexing documents..." : "Drop files here or click to browse"}</p>
-        <p className="text-xs text-gray-600 mt-1">PDF · TXT · CSV · DOCX · MD · HTML · SRT · VTT · max 50MB</p>
+        <p className="text-xs sm:text-sm text-gray-400">{uploading ? "Indexing documents..." : "Drop files here or click to browse"}</p>
+        <p className="text-[10px] sm:text-xs text-gray-600 mt-1">PDF · TXT · CSV · DOCX · MD · HTML · SRT · VTT · max 50MB</p>
       </div>
 
       <div role="status" aria-live="polite" className="empty:hidden">
@@ -184,7 +208,7 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
               <button 
                 type="button"
                 onClick={() => setPreviewContent(null)}
-                className="text-gray-400 hover:text-white px-2 py-1 text-sm bg-gray-800 border border-gray-700 rounded-lg transition"
+                className="text-gray-400 hover:text-white px-3 py-1.5 sm:px-2 sm:py-1 text-sm bg-gray-800 border border-gray-700 rounded-lg transition focus:outline-none focus:ring-2 focus:ring-purple-500"
               >
                 Close
               </button>
