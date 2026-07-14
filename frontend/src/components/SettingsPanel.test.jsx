@@ -17,6 +17,19 @@ afterEach(() => {
   cleanup();
 });
 
+describe("SettingsPanel Responsive Layout Suite (#579)", () => {
+  test("implements responsive class names for column flow adjustments", () => {
+    const { container } = render(
+      <SettingsPanel settings={mockSettings} onSave={vi.fn()} onClose={vi.fn()} />
+    );
+    
+    // Verifies layout contains the necessary single to double column responsive breaks
+    const gridDiv = container.querySelector(".grid");
+    expect(gridDiv.className).toContain("grid-cols-1");
+    expect(gridDiv.className).toContain("sm:grid-cols-2");
+  });
+});
+
 describe("SettingsPanel Keyboard Navigation Suite (#578)", () => {
   test("fires the onClose callback trigger instantly when the Escape key is pressed", () => {
     const mockOnClose = vi.fn();
