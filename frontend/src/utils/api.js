@@ -59,6 +59,7 @@ export const deleteDocument = (docId) => req(`/upload/${docId}`, { method: "DELE
 // --- Issue #265: Fetch Read-Only Plain Text Document Preview ---
 export const previewDocument = (filename, sessionId) => 
   req(`/upload/preview?filename=${encodeURIComponent(filename)}&session_id=${encodeURIComponent(sessionId)}`);
+
 // Prompt Templates
 export const getPromptTemplates      = ()     => req("/prompt-templates/");
 export const createPromptTemplate    = (b)    => req("/prompt-templates/", { method: "POST", body: JSON.stringify(b) });
