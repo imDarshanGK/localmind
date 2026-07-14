@@ -1,8 +1,8 @@
+// @vitest-environment jsdom
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import { describe, test, expect, vi, afterEach } from "vitest";
 import SettingsPanel from "./SettingsPanel";
 
-// Mock standard props setup payload
 const mockSettings = {
   default_model: "llama3",
   default_language: "en",
@@ -13,16 +13,73 @@ const mockSettings = {
   minimal_mode: false,
 };
 
-// FIXED (#584): Clean out the DOM matrix sandbox completely after every test run
 afterEach(() => {
   cleanup();
 });
 
-describe("SettingsPanel Interaction Suite (#584)", () => {
+describe("SettingsPanel Responsive Layout Suite (#579)", () => {
+  test("implements responsive class names for column flow adjustments", () => {
+    const { container } = render(
+      <SettingsPanel settings={mockSettings} onSave={vi.fn()} onClose={vi.fn()} />
+    );
+    
+    // Verifies layout contains the necessary single to double column responsive breaks
+    const gridDiv = container.querySelector(".grid");
+    expect(gridDiv.className).toContain("grid-cols-1");
+    expect(gridDiv.className).toContain("sm:grid-cols-2");
+  });
+});
+
+describe("SettingsPanel Keyboard Navigation Suite (#578)", () => {
+  test("fires the onClose callback trigger instantly when the Escape key is pressed", () => {
+    const mockOnClose = vi.fn();
+    render(<SettingsPanel settings={mockSettings} onSave={vi.fn()} onClose={mockOnClose} />);
+    
+    // Simulates standard window keyboard Escape sequence tracking
+    fireEvent.keyDown(window, { key: "Escape" });
+    
+    expect(mockOnClose).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("SettingsPanel Empty State & Guidance Suite (#576)", () => {
+  test("renders empty guidance card view when an empty settings object is supplied", () => {
+    render(<SettingsPanel settings={{}} onSave={vi.fn()} onClose={vi.fn()} />);
+    
+    expect(screen.getByText("No Profile Configuration Found")).toBeDefined();
+    expect(screen.getByText("Load System Defaults")).toBeDefined();
+  });
+
+  test("renders standard parameters layout when data is properly provisioned", () => {
+    const validSettings = { default_model: "llama3", default_language: "en" };
+    render(<SettingsPanel settings={validSettings} onSave={vi.fn()} onClose={vi.fn()} />);
+    
+    expect(screen.queryByText("No Profile Configuration Found")).toBeNull();
+    expect(screen.getByText("Default Model")).toBeDefined();
+  });
+});
+
+describe("SettingsPanel Accessibility Landmarks & Validation Suite (#580)", () => {
+  test("renders with correct semantic section region and aria bindings", () => {
+    render(<SettingsPanel settings={mockSettings} onSave={vi.fn()} onClose={vi.fn()} />);
+    
+    // Verifies the entire component is enclosed in a landmark region labeled by the title heading
+    const section = screen.getByRole("region", { name: /settings/i });
+    expect(section).toBeDefined();
+  });
+
+  test("associates form control fields cleanly to their accessibility labels", () => {
+    render(<SettingsPanel settings={mockSettings} onSave={vi.fn()} onClose={vi.fn()} />);
+    
+    // Verifies the labels are programmatically associated with inputs using htmlFor / id
+    expect(screen.getByLabelText("Default Model")).toBeDefined();
+    expect(screen.getByLabelText("Default Language")).toBeDefined();
+    expect(screen.getByLabelText(/temperature/i)).toBeDefined();
+  });
+
   test("renders core settings form fields accurately with default prop values", () => {
     render(<SettingsPanel settings={mockSettings} onSave={vi.fn()} onClose={vi.fn()} />);
     
-    // FIXED (#584): Replaced external jest-dom assertions with native DOM check elements
     expect(screen.getByText("Default Model")).toBeDefined();
     expect(screen.getByText("Default Language")).toBeDefined();
     expect(screen.getByDisplayValue("llama3")).toBeDefined();
