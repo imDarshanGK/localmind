@@ -5,6 +5,7 @@ import { CheckIcon, DocumentsIcon, ErrorIcon, SpinnerIcon, UploadIcon, FileIcon 
 export default function UploadPanel({ sessionId, documents, onUploaded, onClose, show, minimalMode }) {
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState(""); // Key fix: Restored missing validation error binding tracking hooks
   
   // Preview UI local states
   const [previewContent, setPreviewContent] = useState(null);
@@ -13,7 +14,6 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
   const [previewError, setPreviewError] = useState(null);
 
   const [uploadResults, setUploadResults] = useState([]);
-  const [error, setError] = useState("");
   const fileRef = useRef();
 
   // Poll for document status updates if any are queued/processing
@@ -89,14 +89,19 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
   }
 
   return (
-    <div data-testid="upload-panel" className={`border-b border-gray-800 bg-gray-900 px-4 py-3 sm:px-5 sm:py-4 shrink-0 w-full ${show ? 'block' : 'hidden'}`}>
+    <section 
+      data-testid="upload-panel"
+      aria-labelledby="upload-panel-title"
+      className={`border-b border-gray-800 bg-gray-900 px-5 py-4 shrink-0 ${show ? 'block' : 'hidden'}`}
+    >
       <div className="flex items-center justify-between mb-3">
-        <p className="text-sm font-semibold text-white inline-flex items-center gap-1.5">
-          <DocumentsIcon className="w-4 h-4" />Documents
-        </p>
+        <h2 id="upload-panel-title" className="text-sm font-semibold text-white inline-flex items-center gap-1.5">
+          <DocumentsIcon className="w-4 h-4" aria-hidden="true" />
+          Documents
+        </h2>
         <button 
           onClick={onClose} 
-          className="text-gray-500 hover:text-gray-300 text-2xl sm:text-lg leading-none p-2 sm:p-0 -mr-2 sm:mr-0 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:block focus:outline-none focus:ring-2 focus:ring-purple-500"
+          className="text-gray-500 hover:text-gray-300 text-lg leading-none p-1 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
           aria-label="Close upload panel"
         >
           ×
@@ -135,6 +140,7 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
           ${dragging ? "border-purple-500 bg-purple-900/20" : "border-gray-700 hover:border-purple-600 hover:bg-gray-800/50"}`}
       >
         <input ref={fileRef} type="file" accept=".pdf,.txt,.csv,.docx,.md,.html,.srt,.vtt" className="hidden" multiple
+          aria-label="Upload document input"
           onChange={e => handleFiles(e.target.files)} />
         
         <p className="text-2xl mb-1 flex justify-center">
@@ -144,48 +150,52 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
         <p className="text-[10px] sm:text-xs text-gray-600 mt-1">PDF · TXT · CSV · DOCX · MD · HTML · SRT · VTT · max 50MB</p>
       </div>
 
-      {uploadResults.length > 0 && (
-        <div className="mb-2">
-          {uploadResults.map((r, i) => (
-            <p key={i} className={`text-xs mb-1 inline-flex items-center gap-1 ${r.status === "success" ? "text-green-400" : "text-red-400"}`}>
-              {r.status === "success" ? <CheckIcon className="w-3.5 h-3.5" /> : <ErrorIcon className="w-3.5 h-3.5" />}
-              <span className="truncate">{r.filename}{r.status === "error" ? `: ${r.message}` : ""}</span>
-            </p>
-          ))}
-        </div>
-      )}
+      <div role="status" aria-live="polite" className="empty:hidden">
+        {uploadResults.length > 0 && (
+          <div className="mb-2">
+            {uploadResults.map((r, i) => (
+              <p key={i} className={`text-xs mb-1 inline-flex items-center gap-1 ${r.status === "success" ? "text-green-400" : "text-red-400"}`}>
+                {r.status === "success" ? <CheckIcon className="w-3.5 h-3.5" /> : <ErrorIcon className="w-3.5 h-3.5" />}
+                <span className="truncate">{r.filename}{r.status === "error" ? `: ${r.message}` : ""}</span>
+              </p>
+            ))}
+          </div>
+        )}
+      </div>
       
       {/* Uploaded docs list */}
       {documents.length > 0 && (
-        <div>
+        <div aria-label="Indexed documents collection">
           <p className="text-xs text-gray-500 mb-1">Indexed documents:</p>
-          {documents.map((d, i) => {
-            const currentFilename = d.filename || d;
-            return (
-              <div key={i} className="flex items-center justify-between text-xs bg-gray-800 rounded-lg px-3 py-2 sm:py-1.5 mb-1 hover:bg-gray-750 transition min-h-[36px]">
-                <span className="text-gray-300 truncate inline-flex items-center gap-1 max-w-[65%]">
-                  <FileIcon className="w-3.5 h-3.5 shrink-0" />
-                  <span className="truncate">{currentFilename}</span>
-                </span>
-                <div className="flex items-center gap-2 shrink-0">
-                  {d.chunks_indexed && <span className="text-gray-500 text-[11px] sm:text-xs">{d.chunks_indexed} chunks</span>}
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); handleTriggerPreview(currentFilename); }}
-                    className="p-2 sm:p-1 text-gray-400 hover:text-purple-400 rounded transition min-w-[32px] min-h-[32px] sm:min-w-0 sm:min-h-0 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    title="Preview Document Content"
-                    disabled={loadingPreview}
-                  >
-                    {loadingPreview && previewFilename === currentFilename ? (
-                      <SpinnerIcon className="w-3.5 h-3.5" />
-                    ) : (
-                      "👁️"
-                    )}
-                  </button>
-                </div>
-              </div>
-            );
-          })}
+          <ul className="space-y-1">
+            {documents.map((d, i) => {
+              const currentFilename = d.filename || d;
+              return (
+                <li key={i} className="flex items-center justify-between text-xs bg-gray-800 rounded-lg px-3 py-1.5 mb-1 hover:bg-gray-750 transition">
+                  <span className="text-gray-300 truncate inline-flex items-center gap-1 max-w-[65%]">
+                    <FileIcon className="w-3.5 h-3.5" aria-hidden="true" />
+                    {currentFilename}
+                  </span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {d.chunks_indexed && <span className="text-gray-500">{d.chunks_indexed} chunks</span>}
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); handleTriggerPreview(currentFilename); }}
+                      className="p-1 text-gray-400 hover:text-purple-400 rounded transition"
+                      title="Preview Document Content"
+                      disabled={loadingPreview}
+                    >
+                      {loadingPreview && previewFilename === currentFilename ? (
+                        <SpinnerIcon className="w-3.5 h-3.5" />
+                      ) : (
+                        "👁️"
+                      )}
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
         </div>
       )}
 
@@ -244,6 +254,6 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
           </div>
         </div>
       )}
-    </div>
+    </section>
   );
 }

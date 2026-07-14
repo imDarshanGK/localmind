@@ -25,7 +25,6 @@ export default function ChatWindow({ messages, loading, onSend, onDeleteMessage,
   }, [messages]);
 
   const [localReactions, setLocalReactions] = useState({});
-  const [copiedMsgId, setCopiedMsgId] = useState(null);
   const [hoveredStatsId, setHoveredStatsId] = useState(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
 
@@ -137,12 +136,6 @@ export default function ChatWindow({ messages, loading, onSend, onDeleteMessage,
     if (showPlusMenu) document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [showPlusMenu]);
-
-  function copyToClipboard(msgId, content) {
-    navigator.clipboard.writeText(content);
-    setCopiedMsgId(msgId);
-    setTimeout(() => setCopiedMsgId(null), 2000);
-  }
 
   function handleSelectTemplate(template) {
     setSelectedTemplate(template);
@@ -428,11 +421,11 @@ export default function ChatWindow({ messages, loading, onSend, onDeleteMessage,
                   <div className="flex justify-end mt-1.5 mr-1 items-center gap-1">
                     {renderReactionsBar(msg)}
                     <button
-                      onClick={() => copyToClipboard(msg.id, msg.content)}
+                      onClick={() => handleCopy(msg.id || i, msg.content)}
                       className="p-1 rounded hover:bg-gray-800 text-gray-500 hover:text-gray-300 transition"
                       title="Copy response"
                     >
-                      {copiedMsgId === msg.id ? (
+                      {copiedId === (msg.id || i) ? (
                         <svg className="w-4 h-4 text-green-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
                       ) : (
                         <CopyIcon className="w-4 h-4" />
