@@ -16,6 +16,31 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+describe("UploadPanel Mobile and Responsive Layout Layout Suite (#568)", () => {
+  test("implements mobile view responsive fluid layout classes", () => {
+    const { container } = render(
+      <UploadPanel sessionId="session-123" documents={[]} onUploaded={() => {}} onClose={() => {}} show={true} />
+    );
+
+    const mainPanel = container.firstChild;
+    expect(mainPanel.className).toContain("px-4");
+    expect(mainPanel.className).toContain("sm:px-5");
+    expect(mainPanel.className).toContain("w-full");
+  });
+
+  test("scales indexed list elements to accommodate mobile touch bounds targets", () => {
+    const mockDocs = [{ filename: "mobile_spec.pdf", chunks_indexed: 12 }];
+    render(
+      <UploadPanel sessionId="session-123" documents={mockDocs} onUploaded={() => {}} onClose={() => {}} show={true} />
+    );
+
+    const docText = screen.getByText("mobile_spec.pdf");
+    const containerRow = docText.closest("div");
+    
+    expect(containerRow.className).toContain("min-h-[36px]");
+  });
+});
+
 describe("UploadPanel Keyboard Navigation Accessibility Suite (#567)", () => {
   test("fires onClose event handler cleanly when hitting the Escape key", () => {
     const mockOnClose = vi.fn();
