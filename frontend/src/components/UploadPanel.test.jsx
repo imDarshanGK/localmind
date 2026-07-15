@@ -45,6 +45,23 @@ describe("UploadPanel Persistence State Interface Suite (#570)", () => {
   });
 });
 
+describe("UploadPanel Tooltip Help Interface Suite (#571)", () => {
+  test("renders the information help button trigger icon accurately", () => {
+    render(<UploadPanel sessionId="session-123" documents={[]} onUploaded={() => {}} onClose={() => {}} show={true} />);
+    
+    const infoButton = screen.getByLabelText(/Upload limits information description/i);
+    expect(infoButton).toBeDefined();
+    expect(infoButton.textContent.trim()).toBe("i");
+  });
+
+  test("contains hidden tooltip descriptions outlining file limits parameters", () => {
+    render(<UploadPanel sessionId="session-123" documents={[]} onUploaded={() => {}} onClose={() => {}} show={true} />);
+    
+    const inlineTooltipText = screen.getByText(/Supported Upload Formats:/i);
+    expect(inlineTooltipText).toBeDefined();
+  });
+});
+
 describe("UploadPanel Accessibility Landmarks Suite (#569)", () => {
   test("contains accessible section landmarks and titles", () => {
     render(<UploadPanel sessionId="session-123" documents={[]} onUploaded={() => {}} onClose={() => {}} show={true} />);
@@ -374,7 +391,6 @@ describe("UploadPanel multi-select upload", () => {
     const previewButton = screen.getByTitle("Preview Document Content");
     fireEvent.click(previewButton);
 
-    // Verify fallback UI is rendered
     await waitFor(() => expect(api.previewDocument).toHaveBeenCalledTimes(1));
     expect(screen.getByText("Failed to Load Preview")).toBeInTheDocument();
     expect(screen.getByText("Corrupt PDF structure")).toBeInTheDocument();
@@ -384,18 +400,15 @@ describe("UploadPanel multi-select upload", () => {
     expect(retryButton).toBeInTheDocument();
     expect(clearButton).toBeInTheDocument();
 
-    // Click retry
     fireEvent.click(retryButton);
     await waitFor(() => expect(api.previewDocument).toHaveBeenCalledTimes(2));
     expect(screen.getByText("Recovered content after retry")).toBeInTheDocument();
     expect(screen.queryByText("Failed to Load Preview")).not.toBeInTheDocument();
 
-    // Close preview to check clear behavior
     const closeButton = screen.getByText("Close");
     fireEvent.click(closeButton);
     expect(screen.queryByText("Recovered content after retry")).not.toBeInTheDocument();
 
-    // Now fail again to test clear selection button
     api.previewDocument.mockRejectedValueOnce(new Error("Another failure"));
     fireEvent.click(previewButton);
 
