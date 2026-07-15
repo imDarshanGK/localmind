@@ -1,3 +1,4 @@
+import { switchModelWithTimeout } from '../services/api';
 const BASE = (import.meta.env.VITE_API_BASE_URL || "/api").replace(/\/$/, "");
 
 // Helper utility to generate or append consistent headers with tracking IDs
@@ -147,3 +148,42 @@ export const createShareLink = (sessionId) =>
 
 export const getSharedSnapshot = (shareId) =>
   req(`/chat/share/${shareId}`);
+
+/**
+ * Triggers a model swap with an explicit client-side fallback timeout boundary.
+ */
+export const switchModelWithTimeout = async (modelName, timeoutMs = 15000) => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    // If your app uses an existing config variable for the backend URL (like API_URL), 
+    // you can swap out the fallback link below with that variable.
+    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+    
+    const response = await fetch(`${apiBaseUrl}/api/models/switch`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ model_name: modelName }),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const errorPayload = await response.json().catch(() => ({}));
+      throw new Error(errorPayload.detail || `Server responded with status: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    clearTimeout(timeoutId);
+    
+    if (error.name === 'AbortError') {
+      throw new Error('Model initialization timed out. The local instance took too long to load.');
+    }
+    throw error;
+  }
+};

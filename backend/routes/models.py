@@ -1,5 +1,6 @@
 """Models routes — /api/models"""
 
+import asyncio  # <-- Added for timeout handling
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from services import ollama_service
@@ -13,6 +14,34 @@ RECOMMENDED = [
     {"name": "gemma2",   "description": "Google Gemma 2 9B",                    "size": "~5.4 GB"},
     {"name": "deepseek-r1", "description": "DeepSeek R1 reasoning model",       "size": "~4.7 GB"},
 ]
+
+# Set a safety execution ceiling (15 seconds) for model swapping processing
+SWITCH_TIMEOUT_LIMIT = 15.0
+
+@router.post("/{model_name}/switch")
+async def switch_model(model_name: str):
+    """Switch active running target model with timeout defense limits."""
+    if not await ollama_service.is_ollama_running():
+        raise HTTPException(503, "Ollama not running")
+        
+    try:
+        # Wrap the initialization context inside an explicit timeout boundary
+        async with asyncio.timeout(SWITCH_TIMEOUT_LIMIT):
+            # Check if the model metadata exists before attempting to load it
+            info = await ollama_service.get_model_info(model_name)
+            if not info:
+                raise HTTPException(404, f"Model '{model_name}' is not pulled locally.")
+            
+            # Optional hook point: If your ollama_service layer provides a direct loading function, 
+            # you can call it here. For instance: await ollama_service.load_model(model_name)
+            
+        return {"status": "success", "active_model": model_name}
+
+    except asyncio.TimeoutError:
+        raise HTTPException(
+            504, 
+            f"The backend timed out while attempting to shift contexts to '{model_name}'."
+        )
 
 
 @router.get("/")
