@@ -175,7 +175,7 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
         
         <button 
           onClick={onClose} 
-          className="text-gray-500 hover:text-gray-300 text-2xl sm:text-lg leading-none p-2 sm:p-0 -mr-2 sm:mr-0 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:block focus:outline-none focus:ring-2 focus:ring-purple-500"
+          className="text-gray-500 hover:text-gray-300 text-lg leading-none p-1 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
           aria-label="Close upload panel"
         >
           ×

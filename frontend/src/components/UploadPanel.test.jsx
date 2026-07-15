@@ -16,6 +16,23 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+describe("UploadPanel Accessibility Landmarks Suite (#569)", () => {
+  test("contains accessible section landmarks and titles", () => {
+    render(<UploadPanel sessionId="session-123" documents={[]} onUploaded={() => {}} onClose={() => {}} show={true} />);
+    
+    // Verifies the presence of a section container that is properly labeled by a header item
+    const panelSection = screen.getByRole("region", { name: /documents/i });
+    expect(panelSection).toBeDefined();
+  });
+
+  test("includes a live region wrapper with role status for operational reports", () => {
+    render(<UploadPanel sessionId="session-123" documents={[]} onUploaded={() => {}} onClose={() => {}} show={true} />);
+    
+    const liveRegion = screen.getByRole("status");
+    expect(liveRegion).toBeDefined();
+  });
+});
+
 describe("UploadPanel Mobile and Responsive Layout Layout Suite (#568)", () => {
   test("implements mobile view responsive fluid layout classes", () => {
     const { container } = render(
@@ -125,28 +142,23 @@ describe("UploadPanel Saved Drafts Workflow Suite (#574)", () => {
   test("stages dropped documents as a local draft item first without launching network actions", () => {
     render(<UploadPanel sessionId="s-456" documents={[]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />);
     
-    const dropzone = screen.getByText(/Drop file here or click to browse/i).parentElement;
+    const dropzone = screen.getByText(/Drop files here or click to browse/i).parentElement;
     const mockFile = new File(["draft-content"], "contract_draft.pdf", { type: "application/pdf" });
 
     fireEvent.drop(dropzone, {
       dataTransfer: { files: [mockFile] }
     });
 
-    // Verify it renders the draft badge and title information block
     expect(screen.getByText(/contract_draft\.pdf/i)).toBeDefined();
-    
-    // FIXED (#574): Targets exact string literal text node to avoid 'Upload Draft' button query conflicts
     expect(screen.getByText("Draft")).toBeDefined();
     expect(screen.getByRole("button", { name: /Upload Draft/i })).toBeDefined();
-    
-    // Ensure network API execution layer remains uncalled on staging phase
     expect(api.uploadDocument).not.toHaveBeenCalled();
   });
 
   test("clears the active draft workspace when clicking the cancel button", () => {
     render(<UploadPanel sessionId="s-456" documents={[]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />);
     
-    const dropzone = screen.getByText(/Drop file here or click to browse/i).parentElement;
+    const dropzone = screen.getByText(/Drop files here or click to browse/i).parentElement;
     const mockFile = new File(["draft-content"], "contract_draft.pdf", { type: "application/pdf" });
 
     fireEvent.drop(dropzone, {
@@ -165,7 +177,7 @@ describe("UploadPanel Saved Drafts Workflow Suite (#574)", () => {
     
     render(<UploadPanel sessionId="s-456" documents={[]} onUploaded={onUploadedSpy} onClose={vi.fn()} show={true} />);
     
-    const dropzone = screen.getByText(/Drop file here or click to browse/i).parentElement;
+    const dropzone = screen.getByText(/Drop files here or click to browse/i).parentElement;
     const mockFile = new File(["draft-content"], "contract_draft.pdf", { type: "application/pdf" });
 
     fireEvent.drop(dropzone, {
@@ -179,6 +191,70 @@ describe("UploadPanel Saved Drafts Workflow Suite (#574)", () => {
       expect(api.uploadDocument).toHaveBeenCalledWith(mockFile, "s-456");
       expect(onUploadedSpy).toHaveBeenCalledWith("contract_draft.pdf");
       expect(screen.queryByRole("button", { name: /Upload Draft/i })).toBeNull();
+    });
+  });
+});
+
+describe("UploadPanel Interaction Test Suite (#573)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  test("triggers file selection window when clicking the drop zone", () => {
+    render(<UploadPanel sessionId="s-123" documents={[]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />);
+    
+    const dropzone = screen.getByText(/Drop files here or click to browse/i).parentElement;
+    const input = dropzone.querySelector("input[type='file']");
+    
+    const clickSpy = vi.spyOn(input, "click");
+    input.addEventListener('click', (e) => e.stopPropagation(), { once: true });
+    
+    fireEvent.click(dropzone);
+    expect(clickSpy).toHaveBeenCalledTimes(1);
+  });
+
+  test("manages drag state styles when dragging items over and out of the viewport", () => {
+    render(<UploadPanel sessionId="s-123" documents={[]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />);
+    
+    const textNode = screen.getByText(/Drop files here or click to browse/i);
+    const dropzone = textNode.parentElement;
+
+    expect(dropzone.className).toContain("border-gray-700");
+
+    fireEvent.dragOver(dropzone);
+    expect(dropzone.className).toContain("border-purple-500");
+    expect(dropzone.className).toContain("bg-purple-900/20");
+
+    fireEvent.dragLeave(dropzone);
+    expect(dropzone.className).toContain("border-gray-700");
+    expect(dropzone.className).not.toContain("border-purple-500");
+  });
+
+  test("executes upload handler sequence accurately when a valid file is dropped", async () => {
+    const mockResponse = { filename: "resume.pdf", message: "Document parsed successfully" };
+    api.uploadDocument.mockResolvedValueOnce(mockResponse);
+    
+    const onUploadedSpy = vi.fn();
+    render(<UploadPanel sessionId="s-123" documents={[]} onUploaded={onUploadedSpy} onClose={vi.fn()} show={true} />);
+    
+    const dropzone = screen.getByText(/Drop files here or click to browse/i).parentElement;
+    const mockFile = new File(["content"], "resume.pdf", { type: "application/pdf" });
+
+    fireEvent.drop(dropzone, {
+      dataTransfer: {
+        files: [mockFile],
+      },
+    });
+
+    expect(screen.getByText(/Indexing documents\.\.\./i)).toBeDefined();
+
+    await waitFor(() => {
+      expect(api.uploadDocument).toHaveBeenCalledWith(mockFile, "s-123");
+      expect(onUploadedSpy).toHaveBeenCalledWith("resume.pdf");
     });
   });
 });
