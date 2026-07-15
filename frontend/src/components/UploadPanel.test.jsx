@@ -11,9 +11,38 @@ vi.mock("../utils/api", () => ({
   previewDocument: vi.fn(),
 }));
 
-afterEach(() => {
-  cleanup();
-  vi.restoreAllMocks();
+describe("UploadPanel Persistence State Interface Suite (#570)", () => {
+  let store = {};
+
+  beforeEach(() => {
+    store = {};
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation((key) => store[key] || null);
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation((key, value) => { store[key] = String(value); });
+    vi.spyOn(Storage.prototype, 'clear').mockImplementation(() => { store = {}; });
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+
+  test("loads collapsed default parameters if flags exist inside localStorage store maps", () => {
+    store["upload-panel-collapsed:session-abc"] = "true";
+
+    render(<UploadPanel sessionId="session-abc" documents={[]} onUploaded={() => {}} onClose={() => {}} show={true} />);
+    
+    const dropzoneText = screen.queryByText(/Drop files here or click to browse/i);
+    expect(dropzoneText).toBeNull(); 
+  });
+
+  test("toggles view metrics and updates localStorage states during click actions", () => {
+    render(<UploadPanel sessionId="session-abc" documents={[]} onUploaded={() => {}} onClose={() => {}} show={true} />);
+    
+    const toggleButton = screen.getByLabelText(/Collapse upload section/i);
+    fireEvent.click(toggleButton);
+
+    expect(localStorage.setItem).toHaveBeenCalledWith("upload-panel-collapsed:session-abc", "true");
+  });
 });
 
 describe("UploadPanel Accessibility Landmarks Suite (#569)", () => {
@@ -81,6 +110,11 @@ describe("UploadPanel Keyboard Navigation Accessibility Suite (#567)", () => {
 });
 
 describe("UploadPanel Global Error Banner Interface Suite (#566)", () => {
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+
   test("avoids compiling alert nodes inside default view frames", () => {
     render(<UploadPanel sessionId="session-123" documents={[]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />);
     expect(screen.queryByTestId("upload-error-banner")).toBeNull();
