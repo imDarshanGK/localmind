@@ -8,7 +8,10 @@ const LANGUAGES = [
   { code: "ta", label: "தமிழ்" },
   { code: "te", label: "తెలుగు" },
   { code: "kn", label: "ಕನ್ನಡ" },
-  { code: "fr", label: "Français" }
+  { code: "fr", label: "Français" },
+  { code: "de", label: "Deutsch" },
+  { code: "es", label: "Español" },
+  { code: "ja", label: "日本語" },
 ];
 
 export default function SettingsPanel({ settings, onSave, onClose }) {
@@ -151,16 +154,18 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
         </div>
       )}
 
+      {/* SOLVES (#581): Controlled expanded layout rendering window wrapper around upstream's empty-state guard */}
       {isEmptyState ? (
         <div className="border border-dashed border-gray-800 rounded-xl bg-gray-950/40 p-6 text-center my-2">
           <p className="text-xs font-medium text-gray-400 mb-1">No Profile Configuration Found</p>
           <p className="text-[11px] text-gray-600 max-w-sm mx-auto mb-4">
             It looks like your local configuration profile is empty. Click the button below to provision standard defaults.
           </p>
-          <button 
+          <button
             type="button"
             onClick={() => onSave(form)}
             className="text-[11px] bg-purple-700/20 hover:bg-purple-700/30 text-purple-400 border border-purple-500/20 px-3 py-1 rounded-lg transition font-medium focus:outline-none focus:ring-2 focus:ring-purple-500"
+            aria-label="Load system defaults"
           >
             Load System Defaults
           </button>
@@ -172,13 +177,13 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
             {/* FIXED (#580): Programmatic accessibility input bindings via exact htmlId keys */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-xs">
               <Field label="Default Model" htmlId="model-dropdown" error={errors.default_model}>
-                <select id="model-dropdown" value={form.default_model} onChange={e => set("default_model", e.target.value)} className={`sel ${errors.default_model ? "border-red-500" : ""} focus:ring-2 focus:ring-purple-500`}>
+                <select id="model-dropdown" value={form.default_model} onChange={e => set("default_model", e.target.value)} aria-label="Default model" className={`sel ${errors.default_model ? "border-red-500" : ""} focus:ring-2 focus:ring-purple-500`}>
                   {MODELS.map(m => <option key={m} value={m}>{m}</option>)}
                 </select>
               </Field>
 
               <Field label="Default Language" htmlId="lang-dropdown" error={errors.default_language}>
-                <select id="lang-dropdown" value={form.default_language} onChange={e => set("default_language", e.target.value)} className={`sel ${errors.default_language ? "border-red-500" : ""} focus:ring-2 focus:ring-purple-500`}>
+                <select id="lang-dropdown" value={form.default_language} onChange={e => set("default_language", e.target.value)} aria-label="Default language" className={`sel ${errors.default_language ? "border-red-500" : ""} focus:ring-2 focus:ring-purple-500`}>
                   {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
                 </select>
               </Field>
