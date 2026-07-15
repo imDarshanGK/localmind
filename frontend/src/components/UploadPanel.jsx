@@ -5,14 +5,19 @@ import { CheckIcon, DocumentsIcon, ErrorIcon, SpinnerIcon, UploadIcon, FileIcon 
 export default function UploadPanel({ sessionId, documents, onUploaded, onClose, show, minimalMode }) {
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [result,    setResult]    = useState(null);
+  const [error,     setError]     = useState("");
+  
+  // FIXED (#574): Staged draft workspace state slot allocation
+  const [draftFile, setDraftFile] = useState(null);
   
   // Preview UI local states
   const [previewContent, setPreviewContent] = useState(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [previewFilename, setPreviewFilename] = useState("");
+  const [previewError, setPreviewError] = useState(null);
 
   const [uploadResults, setUploadResults] = useState([]);
-  const [error, setError] = useState("");
   const fileRef = useRef();
 
   // FIXED (#570): Initialize persistence layer state from localStorage based on active sessionId
@@ -45,6 +50,31 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
     return () => clearInterval(interval);
   }, [documents, onUploaded, minimalMode, show]);
 
+  async function handleFileSelect(file) {
+    if (!file) return;
+    setError("");
+    setResult(null);
+    // Stage the file as a local draft state object instead of auto-uploading
+    setDraftFile(file);
+  }
+
+  async function commitDraftUpload() {
+    if (!draftFile) return;
+    setUploading(true);
+    setError("");
+    setResult(null);
+    try {
+      const data = await uploadDocument(draftFile, sessionId);
+      setResult(data);
+      onUploaded(data.filename);
+      setDraftFile(null); // Clear draft slot container on success profiles
+    } catch(e) { 
+      setError(e.message); 
+    } finally { 
+      setUploading(false); 
+    }
+  }
+
   // FIXED (#567): Global event listener to dismiss panel when Escape key is pressed
   useEffect(() => {
     if (!show) return;
@@ -74,13 +104,13 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
         setUploadResults(prev => [...prev, { filename: file.name, status: "error", message: errorMessage }]);
       }
     }
-    setUploading(false); 
+    setUploading(false);
   }
 
   function onDrop(e) {
     e.preventDefault(); 
     setDragging(false);
-    handleFiles(e.dataTransfer.files);
+    handleFileSelect(e.dataTransfer.files[0]);
   }
 
   // FIXED (#567): Intercept keyboard interactions (Space/Enter) on the interactive dropzone box layout
@@ -94,11 +124,13 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
   async function handleTriggerPreview(filename) {
     setLoadingPreview(true);
     setPreviewFilename(filename);
+    setPreviewError(null);
     try {
       const data = await previewDocument(filename, sessionId);
       setPreviewContent(data.content || "No textual content available to display.");
     } catch (e) {
-      setPreviewContent(`Error loading preview: ${e.message}`);
+      setPreviewError(e.message || "Failed to load document preview");
+      setPreviewContent(null);
     } finally {
       setLoadingPreview(false);
     }
@@ -108,10 +140,10 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
     <section 
       data-testid="upload-panel"
       aria-labelledby="upload-panel-title"
-      className={`border-b border-gray-800 bg-gray-900 px-5 py-4 shrink-0 transition-all duration-200 ${show ? 'block' : 'hidden'}`}
+      className={`border-b border-gray-800 bg-gray-900 px-4 py-3 sm:px-5 sm:py-4 shrink-0 w-full transition-all duration-200 ${show ? 'block' : 'hidden'}`}
     >
       <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           {/* FIXED (#570): Persistent view collapse button trigger control toggle layout */}
           <button
             type="button"
@@ -121,14 +153,32 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
           >
             {isCollapsed ? "▶" : "▼"}
           </button>
+          
           <h2 id="upload-panel-title" className="text-sm font-semibold text-white inline-flex items-center gap-1.5">
             <DocumentsIcon className="w-4 h-4" aria-hidden="true" />
-            Documents
+            Documents Workspace
           </h2>
+          
+          {/* FIXED (#571): Pure CSS/Tailwind interactive help tooltip utility box */}
+          <div className="group relative inline-block">
+            <button
+              type="button"
+              className="text-gray-500 hover:text-purple-400 text-xs font-mono border border-gray-700 hover:border-purple-500/40 rounded-full w-4 h-4 inline-flex items-center justify-center bg-gray-950 cursor-help transition-colors focus:outline-none focus:ring-1 focus:ring-purple-500"
+              aria-label="Upload limits information description"
+            >
+              i
+            </button>
+            <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 hidden group-hover:block group-focus-within:block w-48 bg-gray-950 border border-gray-800 text-gray-400 text-[10px] p-2 rounded shadow-xl z-50 pointer-events-none leading-relaxed">
+              <span className="font-semibold text-white block mb-0.5">Supported Upload Formats:</span>
+              PDF, TXT, CSV, DOCX, MD, HTML files up to a maximum limit of 50MB.
+              <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-950"></div>
+            </div>
+          </div>
         </div>
+        
         <button 
           onClick={onClose} 
-          className="text-gray-500 hover:text-gray-300 text-lg leading-none p-1 rounded focus:outline-none focus:ring-2 focus:ring-purple-500" 
+          className="text-gray-500 hover:text-gray-300 text-lg leading-none p-1 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
           aria-label="Close upload panel"
         >
           ×
@@ -180,19 +230,47 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
             <p className="text-[10px] sm:text-xs text-gray-600 mt-1">PDF · TXT · CSV · DOCX · MD · HTML · SRT · VTT · max 50MB</p>
           </div>
 
-          <div role="status" aria-live="polite" className="empty:hidden">
-            {uploadResults.length > 0 && (
-              <div className="mb-2">
-                {uploadResults.map((r, i) => (
-                  <p key={i} className={`text-xs mb-1 inline-flex items-center gap-1 ${r.status === "success" ? "text-green-400" : "text-red-400"}`}>
-                    {r.status === "success" ? <CheckIcon className="w-3.5 h-3.5" /> : <ErrorIcon className="w-3.5 h-3.5" />}
-                    <span className="truncate">{r.filename}{r.status === "error" ? `: ${r.message}` : ""}</span>
-                  </p>
-                ))}
+          {/* FIXED (#574): Staged draft workspace block rendering */}
+          {draftFile && (
+            <div className="bg-purple-950/20 border border-purple-900/40 rounded-xl p-3 mb-3 flex flex-col gap-2">
+              <div className="flex items-center justify-between text-xs text-gray-300">
+                <span className="inline-flex items-center gap-1.5 font-medium truncate max-w-[80%]">
+                  <FileIcon className="w-3.5 h-3.5 text-purple-400" aria-hidden="true" />
+                  {draftFile.name} <span className="text-[10px] text-purple-400/80 bg-purple-950 px-1.5 py-0.5 rounded border border-purple-800/30">Draft</span>
+                </span>
+                <button 
+                  type="button"
+                  onClick={() => setDraftFile(null)} 
+                  className="text-gray-500 hover:text-gray-300 text-sm leading-none p-1"
+                  title="Cancel draft"
+                >
+                  ×
+                </button>
               </div>
-            )}
-          </div>
-          
+              <button
+                type="button"
+                disabled={uploading}
+                onClick={commitDraftUpload}
+                className="w-full bg-purple-600 hover:bg-purple-500 disabled:bg-gray-800 text-white font-medium text-xs py-1.5 rounded-lg transition"
+              >
+                {uploading ? "Uploading Draft..." : "Upload Draft"}
+              </button>
+            </div>
+          )}
+
+          {uploadResults.length > 0 && (
+            <div className="mb-2">
+              {uploadResults.map((r, i) => (
+                <p key={i} className={`text-xs mb-1 inline-flex items-center gap-1 ${r.status === "success" ? "text-green-400" : "text-red-400"}`}>
+                  {r.status === "success" ? <CheckIcon className="w-3.5 h-3.5" /> : <ErrorIcon className="w-3.5 h-3.5" />}
+                  <span className="truncate">{r.filename}{r.status === "error" ? `: ${r.message}` : ""}</span>
+                </p>
+              ))}
+            </div>
+          )}
+
+          {result && <p className="text-xs text-green-400 mb-2 inline-flex items-center gap-1"><CheckIcon className="w-3.5 h-3.5" />{result.message}</p>}
+
           {/* Uploaded docs list */}
           {documents.length > 0 && (
             <div aria-label="Indexed documents collection">
@@ -201,17 +279,17 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
                 {documents.map((d, i) => {
                   const currentFilename = d.filename || d;
                   return (
-                    <li key={i} className="flex items-center justify-between text-xs bg-gray-800 rounded-lg px-3 py-1.5 mb-1 hover:bg-gray-750 transition">
+                    <li key={i} className="flex items-center justify-between text-xs bg-gray-800 rounded-lg px-3 py-2 sm:py-1.5 mb-1 hover:bg-gray-750 transition min-h-[36px]">
                       <span className="text-gray-300 truncate inline-flex items-center gap-1 max-w-[65%]">
-                        <FileIcon className="w-3.5 h-3.5" aria-hidden="true" />
-                        {currentFilename}
+                        <FileIcon className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                        <span className="truncate">{currentFilename}</span>
                       </span>
                       <div className="flex items-center gap-2 shrink-0">
-                        {d.chunks_indexed && <span className="text-gray-500">{d.chunks_indexed} chunks</span>}
+                        {d.chunks_indexed && <span className="text-gray-500 text-[11px] sm:text-xs">{d.chunks_indexed} chunks</span>}
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); handleTriggerPreview(currentFilename); }}
-                          className="p-1 text-gray-400 hover:text-purple-400 rounded transition"
+                          className="p-2 sm:p-1 text-gray-400 hover:text-purple-400 rounded transition min-w-[32px] min-h-[32px] sm:min-w-0 sm:min-h-0 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-purple-500"
                           title="Preview Document Content"
                           disabled={loadingPreview}
                         >
@@ -232,7 +310,7 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
       )}
 
       {/* Read-Only Modal Viewport Overlay */}
-      {previewContent !== null && (
+      {(previewContent !== null || previewError !== null) && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-gray-900 border border-gray-800 w-full max-w-2xl rounded-2xl max-h-[80vh] flex flex-col shadow-2xl">
             <div className="p-4 border-b border-gray-800 flex items-center justify-between">
@@ -242,15 +320,47 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
               </div>
               <button 
                 type="button"
-                onClick={() => setPreviewContent(null)}
+                onClick={() => {
+                  setPreviewContent(null);
+                  setPreviewError(null);
+                  setPreviewFilename("");
+                }}
                 className="text-gray-400 hover:text-white px-3 py-1.5 sm:px-2 sm:py-1 text-sm bg-gray-800 border border-gray-700 rounded-lg transition focus:outline-none focus:ring-2 focus:ring-purple-500"
               >
                 Close
               </button>
             </div>
-            <div className="p-5 overflow-y-auto flex-1 text-xs text-gray-300 font-mono whitespace-pre-wrap leading-relaxed bg-gray-950/40 selection:bg-purple-900">
-              {previewContent}
-            </div>
+            {previewError ? (
+              <div className="p-8 flex flex-col items-center justify-center text-center">
+                <div className="w-12 h-12 bg-red-900/30 border border-red-500/30 rounded-full flex items-center justify-center text-red-500 mb-4">
+                  ⚠️
+                </div>
+                <h4 className="text-white font-medium mb-2">Failed to Load Preview</h4>
+                <p className="text-gray-400 text-xs max-w-md mb-6">{previewError}</p>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => {
+                      setPreviewContent(null);
+                      setPreviewError(null);
+                      setPreviewFilename("");
+                    }}
+                    className="px-4 py-2 text-xs font-medium text-gray-300 hover:text-white bg-gray-800 hover:bg-gray-750 border border-gray-700 rounded-lg transition"
+                  >
+                    Clear Selection
+                  </button>
+                  <button
+                    onClick={() => handleTriggerPreview(previewFilename)}
+                    className="px-4 py-2 text-xs font-medium text-white bg-purple-600 hover:bg-purple-750 rounded-lg transition shadow-md shadow-purple-900/20"
+                  >
+                    Retry
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="p-5 overflow-y-auto flex-1 text-xs text-gray-300 font-mono whitespace-pre-wrap leading-relaxed bg-gray-950/40 selection:bg-purple-900">
+                {previewContent}
+              </div>
+            )}
           </div>
         </div>
       )}
