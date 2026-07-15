@@ -116,11 +116,11 @@ export default function App() {
       } else {
         setOllamaOk(false);
       }
-      } catch (error) {
-          console.error(error);
-      } finally {
-          setSettingsLoading(false);
-      }
+    } catch (error) {
+        console.error(error);
+    } finally {
+        setSettingsLoading(false);
+    }
   }
 
   const refreshSessions = useCallback(async () => {
@@ -373,18 +373,6 @@ export default function App() {
     await api.clearMessages(sessionId);
     setMessages([]);
   }
-  if (settingsLoading) {
-  return (
-    <div className="flex items-center justify-center h-screen bg-gray-950">
-      <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-600 border-t-white"></div>
-    </div>
-  );
-}
-
-  // ─── Routing Interceptor ───
-  if (isSharedPath) {
-    return <SharedView />;
-  }
 
   const handleLanguageChange = useCallback(async (newLang) => {
     setLanguage(newLang);
@@ -416,6 +404,23 @@ export default function App() {
     setSessions(prev => prev.map(s => s.id === sid ? { ...s, color } : s));
   }, []);
 
+
+  // ─── ALL CONDITIONAL EARLY RETURNS PLACED SAFELY DOWN HERE ───
+
+  if (settingsLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-gray-950">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-600 border-t-white"></div>
+      </div>
+    );
+  }
+
+  // ─── Routing Interceptor ───
+  if (isSharedPath) {
+    return <SharedView />;
+  }
+
+  // ─── MAIN APP RENDER ───
   return (
     <div className={`flex h-screen overflow-hidden ${settings.theme === "light" ? "bg-gray-100" : "bg-gray-950"} text-gray-100 relative`}>
       {!focusMode && (
@@ -490,7 +495,7 @@ export default function App() {
 
             {/* --- Issue #261: Dynamic Absolute Positioned Undo Toast Element --- */}
             {showUndoToast && deletedSessionCache && (
-              <div className="fixed bottom-5 right-5 z-50 flex items-center justify-between gap-4 bg-gray-900 border border-purple-500/40 text-gray-200 text-xs rounded-xl shadow-2xl px-4 py-3 animate-fade-in min-w-[240px]">
+              <div className="fixed bottom-5 right-5 z-50 flex items-center justify-between gap-4 bg-gray-950 border border-purple-500/40 text-gray-200 text-xs rounded-xl shadow-2xl px-4 py-3 animate-fade-in min-w-[240px]">
                 <p className="truncate max-w-[160px]">
                   Deleted <span className="text-purple-400 font-medium">"{deletedSessionCache.title}"</span>
                 </p>
