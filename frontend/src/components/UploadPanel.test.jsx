@@ -313,4 +313,63 @@ describe("UploadPanel multi-select upload", () => {
     expect(screen.getByText(/bad\.exe/)).toBeDefined();
     expect(onUploaded).toHaveBeenCalledTimes(1);
   });
+
+  it("shows document preview on success", async () => {
+    api.previewDocument.mockResolvedValue({ content: "This is the document content preview." });
+    
+    render(
+      <UploadPanel sessionId="s1" documents={[{ filename: "test.pdf", chunks_indexed: 5 }]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />
+    );
+
+    const previewButton = screen.getByTitle("Preview Document Content");
+    fireEvent.click(previewButton);
+
+    await waitFor(() => expect(api.previewDocument).toHaveBeenCalledWith("test.pdf", "s1"));
+    expect(screen.getByText("This is the document content preview.")).toBeInTheDocument();
+  });
+
+  it("renders fallback UI on preview failure and allows retry and clear selection", async () => {
+    api.previewDocument
+      .mockRejectedValueOnce(new Error("Corrupt PDF structure"))
+      .mockResolvedValueOnce({ content: "Recovered content after retry" });
+
+    render(
+      <UploadPanel sessionId="s1" documents={[{ filename: "corrupt.pdf", chunks_indexed: 1 }]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />
+    );
+
+    const previewButton = screen.getByTitle("Preview Document Content");
+    fireEvent.click(previewButton);
+
+    // Verify fallback UI is rendered
+    await waitFor(() => expect(api.previewDocument).toHaveBeenCalledTimes(1));
+    expect(screen.getByText("Failed to Load Preview")).toBeInTheDocument();
+    expect(screen.getByText("Corrupt PDF structure")).toBeInTheDocument();
+
+    const retryButton = screen.getByText("Retry");
+    const clearButton = screen.getByText("Clear Selection");
+    expect(retryButton).toBeInTheDocument();
+    expect(clearButton).toBeInTheDocument();
+
+    // Click retry
+    fireEvent.click(retryButton);
+    await waitFor(() => expect(api.previewDocument).toHaveBeenCalledTimes(2));
+    expect(screen.getByText("Recovered content after retry")).toBeInTheDocument();
+    expect(screen.queryByText("Failed to Load Preview")).not.toBeInTheDocument();
+
+    // Close preview to check clear behavior
+    const closeButton = screen.getByText("Close");
+    fireEvent.click(closeButton);
+    expect(screen.queryByText("Recovered content after retry")).not.toBeInTheDocument();
+
+    // Now fail again to test clear selection button
+    api.previewDocument.mockRejectedValueOnce(new Error("Another failure"));
+    fireEvent.click(previewButton);
+
+    await waitFor(() => expect(api.previewDocument).toHaveBeenCalledTimes(3));
+    expect(screen.getByText("Failed to Load Preview")).toBeInTheDocument();
+
+    const clearButton2 = screen.getByText("Clear Selection");
+    fireEvent.click(clearButton2);
+    expect(screen.queryByText("Failed to Load Preview")).not.toBeInTheDocument();
+  });
 });
