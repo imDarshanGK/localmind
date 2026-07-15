@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "screenshot": "node scripts/capture-screenshots.js",
+    "screenshot:japanese": "node scripts/capture-japanese-demo.js",
     "test": "vitest run --environment jsdom"
 
   },
