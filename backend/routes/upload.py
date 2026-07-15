@@ -1,5 +1,6 @@
 """Upload routes — /api/upload"""
 import os
+import asyncio
 from pathlib import Path
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Query, BackgroundTasks
 from models.schemas import UploadResponse
@@ -110,24 +111,39 @@ async def delete_document(doc_id: int):
 @router.get("/preview")
 async def preview_document(filename: str = Query(...), session_id: str = Query(...)):
     file_path = os.path.join(".", "data", "uploads", session_id, filename)
-    
-    if not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail="Document storage path not found.")
-        
     ext = Path(filename).suffix.lower()
     
-    try:
-        # If it's a standard clear-text format file layout, parse it cleanly
-        if ext in [".txt", ".md", ".csv", ".html", ".srt", ".vtt"]:
-            with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-                content = f.read(50000) # Capped at 50k characters for UI fast loading optimization
-            return {"content": content}
+    max_attempts = 3
+    backoff = 0.5
+    
+    for attempt in range(1, max_attempts + 1):
+        try:
+            if not os.path.exists(file_path):
+                raise FileNotFoundError("Document storage path not found.")
+                
+            # If it's a standard clear-text format file layout, parse it cleanly
+            if ext in [".txt", ".md", ".csv", ".html", ".srt", ".vtt"]:
+                with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+                    content = f.read(50000) # Capped at 50k characters for UI fast loading optimization
+                return {"content": content}
+                
+            # For non-trivial binary sets (PDFs/DOCX), offer a safe notice for version 1
+            else:
+                return {
+                    "content": f"[Binary Formatter Notice]\nPreviews for '{ext}' files are natively processed. Content indexed safely for Chat retrieval contexts."
+                }
+                
+        except (FileNotFoundError, PermissionError, OSError) as e:
+            if attempt == max_attempts:
+                if isinstance(e, FileNotFoundError):
+                    raise HTTPException(status_code=404, detail="Document storage path not found.")
+                raise HTTPException(status_code=500, detail=f"Failed to read file contents: {str(e)}")
             
-        # For non-trivial binary sets (PDFs/DOCX), offer a safe notice for version 1
-        else:
-            return {
-                "content": f"[Binary Formatter Notice]\nPreviews for '{ext}' files are natively processed. Content indexed safely for Chat retrieval contexts."
-            }
-            
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to read file contents: {str(e)}")
+            logger.warning(
+                "preview_retry route=/preview session=%s filename=%s error=%s attempt=%d/%d",
+                session_id, filename, str(e), attempt, max_attempts
+            )
+            await asyncio.sleep(backoff)
+            backoff *= 2
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to read file contents: {str(e)}")
