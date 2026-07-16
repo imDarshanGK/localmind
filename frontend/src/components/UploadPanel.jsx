@@ -9,17 +9,36 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose 
   const [error,     setError]     = useState("");
   const fileRef = useRef();
 
+  function isDuplicateFile(file) {
+  return documents.some((doc) => {
+    const filename = doc.filename || doc;
+    return filename === file.name;
+  });
+}
+
   async function handleFile(file) {
     if (!file) return;
+
+    if (isDuplicateFile(file)) {
+    setError(`"${file.name}" has already been added.`);
+    setResult(null);
+    return;
+  }
+
     setUploading(true); setError(""); setResult(null);
     try {
       const data = await uploadDocument(file, sessionId);
       setResult(data);
       onUploaded(data.filename);
     } catch(e) { setError(e.message); }
-    finally { setUploading(false); }
-  }
+    finally {
+      setUploading(false); 
+      if (fileRef.current) {
+        fileRef.current.value = "";
 
+    }
+  }
+  }
   function onDrop(e) {
     e.preventDefault(); setDragging(false);
     handleFile(e.dataTransfer.files[0]);
