@@ -519,6 +519,17 @@ export default function ChatWindow({ messages, loading, onSend, onDeleteMessage,
               />
             </div>
 
+
+            {/* Inline Audio/Processing Waveform */}
+            {loading && (
+              <div className="flex items-end gap-1 h-6 pb-1.5 px-2" title="Processing...">
+                <div className="w-0.5 bg-purple-500 rounded-full animate-bounce h-full" style={{ animationDelay: '0.1s' }} />
+                <div className="w-0.5 bg-purple-400 rounded-full animate-bounce h-3" style={{ animationDelay: '0.3s' }} />
+                <div className="w-0.5 bg-purple-500 rounded-full animate-bounce h-full" style={{ animationDelay: '0.5s' }} />
+              </div>
+            )}
+
+           
             {/* Input Action Controls */}
             {loading ? (
               <button type="button" onClick={onStop} className="shrink-0 text-sm bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-xl transition font-medium flex items-center gap-1.5">
