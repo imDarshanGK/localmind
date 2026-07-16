@@ -18,3 +18,4 @@ jsonschema>=4.17.0
 psutil
 grapheme==0.6.0
 pre-commit==4.6.0
+fpdf2==2.8.7

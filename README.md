@@ -136,6 +136,16 @@ VITE_API_BASE_URL=https://<your-backend>.onrender.com/api
 
 The included `render.yaml` defines a backend web service and a frontend static site for the same repo.
 
+### RAG Retrieval & Source Ranking Configuration
+
+During document Q&A queries, LocalMind ranks retrieved text segments to provide accurate citations and relevant context:
+
+1. **Selection & Ranking**: Matching reference segments are selected using **Cosine Similarity** (`"hnsw:space": "cosine"` configured in ChromaDB). Chunks are ranked by similarity score, placing the most relevant fragments at the top of the LLM context.
+2. **Citations**: The ranked segments are processed into a structured list of unique document sources and text previews, which are rendered as inline citation links in the UI.
+3. **Production Configuration**: The retrieval process is influenced by the following settings in the `app_settings` SQLite database table (adjustable via the Settings Panel in the UI):
+   - **`rag_top_k`** (Default: `4`, Range: `1-10`): Controls the number of top-ranked retrieved source chunks injected into the context window.
+   - **`rag_chunk_overlap`** (Default: `50`, Range: `0-200` characters): Sets the character overlap bounds between adjacent document chunks to maintain continuous context links during document ingestion.
+
 ## macOS Install Troubleshooting
 
 ### `node` or `npm` not found
