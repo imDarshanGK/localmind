@@ -1,6 +1,7 @@
 import { CloseIcon } from "./Icons";
 
-export default function DeleteConfirmDialog({sessionName, onConfirm, onClose}) {
+export default function DeleteConfirmDialog({title, confirmLabel, sessionName, onConfirm, onClose}) {
+    const finalConfirmLabel = confirmLabel || (sessionName ? "Delete" : "Delete all");
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
             <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-sm mx-4 shadow-2xl">
@@ -13,16 +14,22 @@ export default function DeleteConfirmDialog({sessionName, onConfirm, onClose}) {
                     >
                         <CloseIcon className="w-4 h-4" />
                     </button>
-                    <h2 className="text-sm font-semibold text-white">Delete Session</h2>
+                    <h2 className="text-sm font-semibold text-white">{title}</h2>
                     <div className="w-4" />
                 </div>
 
                 {/* Body */}
                 <div className="px-5 py-5">
                     <p className="text-sm text-gray-300">
-                        Are you sure you want to delete session{" "}
-                        <span className="text-white font-medium">'{sessionName}'</span>?
-                        This action cannot be undone.
+                        {sessionName ? (
+                            <>
+                            Are you sure you want to delete session{" "}
+                            <span className="text-white font-medium">'{sessionName}'</span>?
+                            </>
+                        ) : (
+                            "Are you sure you want to delete all sessions?"
+                        )}
+                        {" "}This action cannot be undone.
                     </p>
                 </div>
 
@@ -38,7 +45,7 @@ export default function DeleteConfirmDialog({sessionName, onConfirm, onClose}) {
                     onClick={onConfirm}
                     className="flex-1 text-sm bg-red-600 hover:bg-red-500 active:bg-red-700 text-white py-2 rounded-xl font-medium transition"
                     >
-                        Delete                    
+                        {finalConfirmLabel}                    
                     </button>
                 </div>
             </div>
