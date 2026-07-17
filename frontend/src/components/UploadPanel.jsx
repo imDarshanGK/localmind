@@ -20,6 +20,13 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
   const [uploadResults, setUploadResults] = useState([]);
   const fileRef = useRef();
 
+  function isDuplicateFile(file) {
+  return documents.some((doc) => {
+    const filename = doc.filename || doc;
+    return filename === file.name;
+  });
+}
+
   // FIXED (#570): Initialize persistence layer state from localStorage based on active sessionId
   const [isCollapsed, setIsCollapsed] = useState(() => {
     try {
@@ -52,28 +59,38 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
 
   async function handleFileSelect(file) {
     if (!file) return;
+
+    if (isDuplicateFile(file)) {
+      setError(`"${file.name}" has already been added.`);
+      setResult(null);
+      return;
+    }
+
     setError("");
     setResult(null);
-    // Stage the file as a local draft state object instead of auto-uploading
     setDraftFile(file);
   }
-
   async function commitDraftUpload() {
     if (!draftFile) return;
     setUploading(true);
     setError("");
     setResult(null);
-    try {
-      const data = await uploadDocument(draftFile, sessionId);
-      setResult(data);
-      onUploaded(data.filename);
-      setDraftFile(null); // Clear draft slot container on success profiles
-    } catch(e) { 
-      setError(e.message); 
-    } finally { 
-      setUploading(false); 
+  try {
+    const data = await uploadDocument(draftFile, sessionId);
+    setResult(data);
+    onUploaded(data.filename);
+  } catch (e) {
+    setError(e.message);
+  } finally {
+    setUploading(false);
+
+    setDraftFile(null);
+
+    if (fileRef.current) {
+      fileRef.current.value = "";
     }
   }
+ }
 
   // FIXED (#567): Global event listener to dismiss panel when Escape key is pressed
   useEffect(() => {
@@ -86,24 +103,58 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
     window.addEventListener("keydown", handleGlobalKeyDown);
     return () => window.removeEventListener("keydown", handleGlobalKeyDown);
   }, [show, onClose]);
-
+  
   async function handleFiles(filelist) {
     const files = Array.from(filelist || []);
     if (files.length === 0) return;
-    setUploading(true); 
+
+    setUploading(true);
     setError("");
     setUploadResults([]);
+
     for (const file of files) {
+      if (isDuplicateFile(file)) {
+        setUploadResults((prev) => [
+          ...prev,
+          {
+            filename: file.name,
+            status: "error",
+            message: `"${file.name}" has already been added.`,
+          },
+        ]);
+        continue;
+      }
+
       try {
         const data = await uploadDocument(file, sessionId);
-        setUploadResults(prev => [...prev, { filename: data.filename || file.name, status: "success", message: data.message }]);
+
+        setUploadResults((prev) => [
+          ...prev,
+          {
+            filename: data.filename || file.name,
+            status: "success",
+            message: data.message,
+          },
+        ]);
+
         onUploaded(data.filename);
-      } catch(e) { 
-        const errorMessage = e.message || "An unexpected error occurred during document processing.";
+      } catch (e) {
+        const errorMessage =
+          e.message || "An unexpected error occurred during document processing.";
+
         setError(errorMessage);
-        setUploadResults(prev => [...prev, { filename: file.name, status: "error", message: errorMessage }]);
+
+        setUploadResults((prev) => [
+          ...prev,
+          {
+            filename: file.name,
+            status: "error",
+            message: errorMessage,
+          },
+        ]);
       }
     }
+
     setUploading(false);
   }
 
