@@ -4,6 +4,7 @@ import { AppLogoIcon, FileIcon, LockIcon } from "./Icons";
 
 export default function ChatWindow({ messages, loading, onSend, sessionId }) {
   const [input, setInput] = useState("");
+  const [copiedId, setCopiedId] = useState(null); // Tracks which message was recently copied
   const bottomRef = useRef(null);
   const textareaRef = useRef(null);
 
@@ -23,6 +24,16 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
   function autoResize(e) {
     e.target.style.height = "auto";
     e.target.style.height = Math.min(e.target.scrollHeight, 160) + "px";
+  }
+
+  async function handleCopy(msgId, text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedId(msgId);
+      setTimeout(() => setCopiedId(null), 2000); // Reset visual feedback after 2 seconds
+    } catch (err) {
+      console.error("Failed to copy text: ", err);
+    }
   }
 
   const SUGGESTIONS = [
@@ -66,43 +77,62 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
           </div>
         )}
 
-        {messages.map((msg, i) => (
-          <div key={msg.id || i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-            <div className={`max-w-2xl ${msg.role === "user" ? "max-w-xl" : "max-w-2xl"}`}>
-              {msg.role === "assistant" && (
-                <div className="flex items-center gap-1.5 mb-1.5 ml-1">
-                  <AppLogoIcon className="w-4 h-4 text-purple-400" />
-                  <span className="text-xs font-semibold text-purple-400">LocalMind</span>
-                  {msg.streaming && <span className="text-xs text-gray-500 animate-pulse">typing...</span>}
+        {messages.map((msg, i) => {
+          const messageId = msg.id || i;
+          return (
+            <div key={messageId} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+              <div className={`max-w-2xl ${msg.role === "user" ? "max-w-xl" : "max-w-2xl"}`}>
+                {msg.role === "assistant" && (
+                  <div className="flex items-center justify-between mb-1.5 ml-1">
+                    <div className="flex items-center gap-1.5">
+                      <AppLogoIcon className="w-4 h-4 text-purple-400" />
+                      <span className="text-xs font-semibold text-purple-400">LocalMind</span>
+                      {msg.streaming && <span className="text-xs text-gray-500 animate-pulse">typing...</span>}
+                    </div>
+                    
+                    {/* Copy Feedback Button */}
+                    {!msg.streaming && (
+                      <button
+                        onClick={() => handleCopy(messageId, msg.content)}
+                        className={`text-xs px-2 py-0.5 rounded transition ${
+                          copiedId === messageId 
+                            ? "text-green-400 font-medium" 
+                            : "text-gray-500 hover:text-gray-300 hover:bg-gray-800"
+                        }`}
+                      >
+                        {copiedId === messageId ? "✓ Copied!" : "Copy"}
+                      </button>
+                    )}
+                  </div>
+                )}
+                <div className={`px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words
+                  ${msg.role === "user"
+                    ? "bg-purple-700 text-white rounded-br-sm"
+                    : "bg-gray-800 text-gray-100 rounded-bl-sm border border-gray-700"}`}>
+                  {msg.content}
+                  {msg.streaming && <span className="inline-block w-1.5 h-4 bg-purple-400 ml-1 animate-pulse rounded" />}
                 </div>
-              )}
-              <div className={`px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words
-                ${msg.role === "user"
-                  ? "bg-purple-700 text-white rounded-br-sm"
-                  : "bg-gray-800 text-gray-100 rounded-bl-sm border border-gray-700"}`}>
-                {msg.content}
-                {msg.streaming && <span className="inline-block w-1.5 h-4 bg-purple-400 ml-1 animate-pulse rounded" />}
-              </div>
-              {msg.sources?.length > 0 && (
-                <div className="mt-1.5 ml-1 flex flex-wrap gap-1">
-                  {msg.sources.map((s,i) => (
-                    <span key={i} className="text-xs bg-gray-800 text-blue-400 px-2 py-0.5 rounded-full border border-gray-700">
-                      <span className="inline-flex items-center gap-1">
-                        <FileIcon className="w-3 h-3" />
-                        <span>{s}</span>
+                {msg.sources?.length > 0 && (
+                  <div className="mt-1.5 ml-1 flex flex-wrap gap-1">
+                    {msg.sources.map((s,i) => (
+                      <span key={i} className="text-xs bg-gray-800 text-blue-400 px-2 py-0.5 rounded-full border border-gray-700">
+                        <span className="inline-flex items-center gap-1">
+                          <FileIcon className="w-3 h-3" />
+                          <span>{s}</span>
+                        </span>
                       </span>
-                    </span>
-                  ))}
-                </div>
-              )}
-              {msg.role === "user" && (
-                <div className="text-right mt-1 mr-1">
-                  <span className="text-xs text-gray-600">You</span>
-                </div>
-              )}
+                    ))}
+                  </div>
+                )}
+                {msg.role === "user" && (
+                  <div className="text-right mt-1 mr-1">
+                    <span className="text-xs text-gray-600">You</span>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
 
         {loading && !messages.find(m => m.streaming) && (
           <div className="flex justify-start">
