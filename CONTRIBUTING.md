@@ -25,6 +25,7 @@ Please read [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md). Be kind. Be respectful.
 ## How to Contribute
 
 ### Beginners — start here!
+
 Look for issues labeled [`good-first-issue`](https://github.com/yourusername/localmind/issues?q=label%3Agood-first-issue).
 These are small, well-defined tasks perfect for your first PR.
 
@@ -79,6 +80,7 @@ cd frontend && npm run dev
 ## Making a Pull Request
 
 1. **Create a branch** from `main`:
+
    ```bash
    git checkout -b feature/your-feature-name
    # or
@@ -90,17 +92,21 @@ cd frontend && npm run dev
 3. **Write tests** for your changes (if applicable).
 
 4. **Commit** with a clear message:
+
    ```bash
    git commit -m "feat: add Gemma model support"
    git commit -m "fix: handle empty PDF upload"
    git commit -m "docs: improve quick start guide"
    ```
+
    We follow [Conventional Commits](https://www.conventionalcommits.org/).
 
 5. **Push and open a PR**:
+
    ```bash
    git push origin feature/your-feature-name
    ```
+
    Open a PR on GitHub. Fill in the PR template.
 
 6. **Wait for review** — we aim to review within 48 hours!
@@ -110,11 +116,13 @@ cd frontend && npm run dev
 ## Issue Guidelines
 
 When opening a bug report:
+
 - Describe what you expected vs what happened
 - Include steps to reproduce
 - Include your OS, Python version, and Ollama version
 
 When requesting a feature:
+
 - Explain the use case
 - Why does it belong in LocalMind?
 
@@ -123,17 +131,20 @@ When requesting a feature:
 ## Coding Standards
 
 **Python (backend)**
+
 - Follow PEP 8
 - Use type hints
 - Write docstrings for functions
 - Run `black .` before committing
 
 **JavaScript/React (frontend)**
+
 - Use functional components + hooks
 - Keep components small and focused
 - Follow the existing file structure
 
 **Tests**
+
 ```bash
 # Run backend tests
 cd backend && pytest
@@ -143,11 +154,13 @@ pytest --cov=. --cov-report=term
 ```
 
 ---
+
 ## Documentation Validation
 
 All documentation changes and Markdown files are automatically checked for syntax regression and broken links via GitHub Actions (`docs-regression.yml`) upon creating a pull request.
 
 ---
+
 ## Need Help?
 
 Open a [Discussion](https://github.com/yourusername/localmind/discussions) or comment on the issue.
@@ -156,3 +169,4 @@ We're here to help! 🙌
 ---
 
 Made with ❤️ for Social Summer of Code 2026
+.
