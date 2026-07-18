@@ -26,7 +26,7 @@ Please read [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md). Be kind. Be respectful.
 
 ### Beginners — start here!
 
-Look for issues labeled [`good-first-issue`](https://github.com/yourusername/localmind/issues?q=label%3Agood-first-issue).
+Look for issues labeled [`good-first-issue`](https://github.com/imDarshanGK/localmind/issues?q=label%3Agood-first-issue).
 These are small, well-defined tasks perfect for your first PR.
 
 Types of contributions:
@@ -163,7 +163,7 @@ All documentation changes and Markdown files are automatically checked for synta
 
 ## Need Help?
 
-Open a [Discussion](https://github.com/yourusername/localmind/discussions) or comment on the issue.
+Open a [Discussion](https://github.com/imDarshanGK/localmind/discussions) or comment on the issue.
 We're here to help! 🙌
 
 ---
