@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 import { describe, test, expect, vi, afterEach, beforeEach } from "vitest";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, act } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import ChatWindow from "./ChatWindow";
 import { exportSession } from "../utils/api";
 
+// --- GLOBAL MOCKS & SETUP ---
 vi.mock("../utils/api", () => ({
   exportSession: vi.fn(),
 }));
@@ -15,8 +16,13 @@ vi.mock("./Icons", () => ({
   LockIcon: () => <span data-testid="lock-icon" />,
 }));
 
+// Mock clipboard API functionality using Vitest utilities
+Object.assign(navigator, {
+  clipboard: { writeText: vi.fn().mockImplementation(() => Promise.resolve()) },
+});
+
+// Mock window scroll layouts absent inside default jsdom configurations
 beforeEach(() => {
-  // Mock window scroll layouts absent inside default jsdom configurations
   window.HTMLElement.prototype.scrollIntoView = vi.fn();
 });
 
@@ -25,6 +31,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+// --- SUITE 1: REGRESSION SUITE (#751) ---
 describe("ChatWindow Regression Suite (#751)", () => {
   describe("Empty Welcome State Framework", () => {
     test("renders baseline readiness text and suggestions when message logs are empty", () => {
@@ -56,19 +63,13 @@ describe("ChatWindow Regression Suite (#751)", () => {
       
       expect(screen.getByText("Hello world")).toBeInTheDocument();
       expect(screen.getByText("Hello User!")).toBeInTheDocument();
-      
-      // Verify typing loader element is present
       expect(screen.getByText("typing...")).toBeInTheDocument();
-      
-      // Verify source attachments are rendered
       expect(screen.getByText("doc1.pdf")).toBeInTheDocument();
       expect(screen.getByText("doc2.txt")).toBeInTheDocument();
     });
 
     test("displays fallback mechanical loading dots if thread is active but text buffer is dry", () => {
       render(<ChatWindow messages={[]} loading={true} onSend={vi.fn()} sessionId="s1" />);
-      
-      // The local mind loader container renders when loading is true and no message is streaming
       expect(screen.getByText("LocalMind")).toBeInTheDocument();
     });
   });
@@ -92,11 +93,10 @@ describe("ChatWindow Regression Suite (#751)", () => {
       
       const textarea = screen.getByPlaceholderText(/Ask anything.../i);
       fireEvent.change(textarea, { target: { value: "Valid prompt message" } });
-      
       fireEvent.keyDown(textarea, { key: "Enter", shiftKey: false });
       
       expect(onSendSpy).toHaveBeenCalledWith("Valid prompt message");
-      expect(textarea.value).toBe(""); // Input gets reset cleanly
+      expect(textarea.value).toBe("");
     });
 
     test("bypasses submission pipelines when Shift+Enter key combinations are executed", () => {
@@ -105,10 +105,49 @@ describe("ChatWindow Regression Suite (#751)", () => {
       
       const textarea = screen.getByPlaceholderText(/Ask anything.../i);
       fireEvent.change(textarea, { target: { value: "Multi line\n" } });
-      
       fireEvent.keyDown(textarea, { key: "Enter", shiftKey: true });
       
       expect(onSendSpy).not.toHaveBeenCalled();
     });
+  });
+});
+
+// --- SUITE 2: COPY FEEDBACK SUITE (#750) ---
+describe('ChatWindow Copy Feedback', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  test('should show checkmark icon / "Copy" state change on click and revert after 1.5 seconds', async () => {
+    const mockMessages = [
+      { id: 'msg-1', role: 'assistant', content: 'Hello from LocalMind!', streaming: false }
+    ];
+
+    render(
+      <ChatWindow 
+        messages={mockMessages} 
+        loading={false} 
+        onSend={vi.fn()} 
+        onDeleteMessage={vi.fn()} 
+        onStop={vi.fn()} 
+        sessionId="session-1" 
+        minimalMode={false} 
+      />
+    );
+
+    const copyButton = screen.getByTitle('Copy response');
+    fireEvent.click(copyButton);
+
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith('Hello from LocalMind!');
+
+    act(() => {
+      vi.advanceTimersByTime(1500);
+    });
+
+    expect(screen.getByTitle('Copy response')).toBeDefined();
   });
 });
