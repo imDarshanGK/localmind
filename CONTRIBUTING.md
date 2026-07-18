@@ -143,7 +143,11 @@ pytest --cov=. --cov-report=term
 ```
 
 ---
+## Documentation Validation
 
+All documentation changes and Markdown files are automatically checked for syntax regression and broken links via GitHub Actions (`docs-regression.yml`) upon creating a pull request.
+
+---
 ## Need Help?
 
 Open a [Discussion](https://github.com/yourusername/localmind/discussions) or comment on the issue.
