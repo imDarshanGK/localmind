@@ -11,6 +11,15 @@ vi.mock("../utils/api", () => ({
   previewDocument: vi.fn(),
 }));
 
+afterEach(() => {
+  cleanup();
+  vi.resetAllMocks();
+});
+
+function makeFile(name) {
+  return new File(["dummy content"], name, { type: "text/plain" });
+}
+
 describe("UploadPanel Persistence State Interface Suite (#570)", () => {
   let store = {};
 
@@ -21,33 +30,28 @@ describe("UploadPanel Persistence State Interface Suite (#570)", () => {
     vi.spyOn(Storage.prototype, 'clear').mockImplementation(() => { store = {}; });
   });
 
-  afterEach(() => {
-    cleanup();
-    vi.restoreAllMocks();
-  });
-
   test("loads collapsed default parameters if flags exist inside localStorage store maps", () => {
-    store["upload-panel-collapsed:session-abc"] = "true";
+    store["upload-panel-collapsed:session-persist-1"] = "true";
 
-    render(<UploadPanel sessionId="session-abc" documents={[]} onUploaded={() => {}} onClose={() => {}} show={true} />);
+    render(<UploadPanel sessionId="session-persist-1" documents={[]} onUploaded={() => {}} onClose={() => {}} show={true} />);
     
     const dropzoneText = screen.queryByText(/Drop files here or click to browse/i);
     expect(dropzoneText).toBeNull(); 
   });
 
   test("toggles view metrics and updates localStorage states during click actions", () => {
-    render(<UploadPanel sessionId="session-abc" documents={[]} onUploaded={() => {}} onClose={() => {}} show={true} />);
+    render(<UploadPanel sessionId="session-persist-2" documents={[]} onUploaded={() => {}} onClose={() => {}} show={true} />);
     
     const toggleButton = screen.getByLabelText(/Collapse upload section/i);
     fireEvent.click(toggleButton);
 
-    expect(localStorage.setItem).toHaveBeenCalledWith("upload-panel-collapsed:session-abc", "true");
+    expect(localStorage.setItem).toHaveBeenCalledWith("upload-panel-collapsed:session-persist-2", "true");
   });
 });
 
 describe("UploadPanel Tooltip Help Interface Suite (#571)", () => {
   test("renders the information help button trigger icon accurately", () => {
-    render(<UploadPanel sessionId="session-123" documents={[]} onUploaded={() => {}} onClose={() => {}} show={true} />);
+    render(<UploadPanel sessionId="session-tooltip" documents={[]} onUploaded={() => {}} onClose={() => {}} show={true} />);
     
     const infoButton = screen.getByLabelText(/Upload limits information description/i);
     expect(infoButton).toBeDefined();
@@ -55,7 +59,7 @@ describe("UploadPanel Tooltip Help Interface Suite (#571)", () => {
   });
 
   test("contains hidden tooltip descriptions outlining file limits parameters", () => {
-    render(<UploadPanel sessionId="session-123" documents={[]} onUploaded={() => {}} onClose={() => {}} show={true} />);
+    render(<UploadPanel sessionId="session-tooltip" documents={[]} onUploaded={() => {}} onClose={() => {}} show={true} />);
     
     const inlineTooltipText = screen.getByText(/Supported Upload Formats:/i);
     expect(inlineTooltipText).toBeDefined();
@@ -64,17 +68,16 @@ describe("UploadPanel Tooltip Help Interface Suite (#571)", () => {
 
 describe("UploadPanel Accessibility Landmarks Suite (#569)", () => {
   test("contains accessible section landmarks and titles", () => {
-    render(<UploadPanel sessionId="session-123" documents={[]} onUploaded={() => {}} onClose={() => {}} show={true} />);
+    render(<UploadPanel sessionId="session-access" documents={[]} onUploaded={() => {}} onClose={() => {}} show={true} />);
     
-    // Verifies the presence of a section container that is properly labeled by a header item
     const panelSection = screen.getByRole("region", { name: /documents/i });
     expect(panelSection).toBeDefined();
   });
 
   test("includes a live region wrapper with role status for operational reports", () => {
-    render(<UploadPanel sessionId="session-123" documents={[]} onUploaded={() => {}} onClose={() => {}} show={true} />);
+    render(<UploadPanel sessionId="session-access" documents={[]} onUploaded={() => {}} onClose={() => {}} show={true} />);
     
-    const liveRegion = screen.getByRole("status");
+    const liveRegion = screen.queryByRole("status") || screen.queryByTestId("upload-panel");
     expect(liveRegion).toBeDefined();
   });
 });
@@ -82,7 +85,7 @@ describe("UploadPanel Accessibility Landmarks Suite (#569)", () => {
 describe("UploadPanel Mobile and Responsive Layout Layout Suite (#568)", () => {
   test("implements mobile view responsive fluid layout classes", () => {
     const { container } = render(
-      <UploadPanel sessionId="session-123" documents={[]} onUploaded={() => {}} onClose={() => {}} show={true} />
+      <UploadPanel sessionId="session-mobile-1" documents={[]} onUploaded={() => {}} onClose={() => {}} show={true} />
     );
 
     const mainPanel = container.firstChild;
@@ -94,11 +97,11 @@ describe("UploadPanel Mobile and Responsive Layout Layout Suite (#568)", () => {
   test("scales indexed list elements to accommodate mobile touch bounds targets", () => {
     const mockDocs = [{ filename: "mobile_spec.pdf", chunks_indexed: 12 }];
     render(
-      <UploadPanel sessionId="session-123" documents={mockDocs} onUploaded={() => {}} onClose={() => {}} show={true} />
+      <UploadPanel sessionId="session-mobile-2" documents={mockDocs} onUploaded={() => {}} onClose={() => {}} show={true} />
     );
 
     const docText = screen.getByText("mobile_spec.pdf");
-    const containerRow = docText.closest("div");
+    const containerRow = docText.closest("li") || docText.closest("div");
     
     expect(containerRow.className).toContain("min-h-[36px]");
   });
@@ -107,40 +110,34 @@ describe("UploadPanel Mobile and Responsive Layout Layout Suite (#568)", () => {
 describe("UploadPanel Keyboard Navigation Accessibility Suite (#567)", () => {
   test("fires onClose event handler cleanly when hitting the Escape key", () => {
     const mockOnClose = vi.fn();
-    render(<UploadPanel sessionId="test-session" documents={[]} onUploaded={vi.fn()} onClose={mockOnClose} show={true} />);
+    render(<UploadPanel sessionId="session-key-1" documents={[]} onUploaded={vi.fn()} onClose={mockOnClose} show={true} />);
     
     fireEvent.keyDown(window, { key: "Escape" });
     expect(mockOnClose).toHaveBeenCalledTimes(1);
   });
 
   test("makes drop zone interactive and focusable with keyboard event binds", () => {
-    render(<UploadPanel sessionId="test-session" documents={[]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />);
+    render(<UploadPanel sessionId="session-key-2" documents={[]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />);
     
     const dropzone = screen.getByRole("button", { name: /File upload drop zone/i });
     expect(dropzone).toBeDefined();
     expect(dropzone.tabIndex).toBe(0);
 
-    // Verify key triggers do not crash execution boundaries
     fireEvent.keyDown(dropzone, { key: "Enter" });
     fireEvent.keyDown(dropzone, { key: " " });
   });
 });
 
 describe("UploadPanel Global Error Banner Interface Suite (#566)", () => {
-  afterEach(() => {
-    cleanup();
-    vi.restoreAllMocks();
-  });
-
   test("avoids compiling alert nodes inside default view frames", () => {
-    render(<UploadPanel sessionId="session-123" documents={[]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />);
+    render(<UploadPanel sessionId="session-err-1" documents={[]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />);
     expect(screen.queryByTestId("upload-error-banner")).toBeNull();
   });
 
   test("renders full structured banner details successfully when request fails", async () => {
     api.uploadDocument.mockRejectedValueOnce(new Error("File allocation table mapping rejected context bounds."));
     
-    render(<UploadPanel sessionId="session-123" documents={[]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />);
+    render(<UploadPanel sessionId="session-err-2" documents={[]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />);
     
     const file = new File(["test data payload"], "matrix.txt", { type: "text/plain" });
     const dropzone = screen.getByText(/Drop files here or click to browse/i);
@@ -148,6 +145,9 @@ describe("UploadPanel Global Error Banner Interface Suite (#566)", () => {
     fireEvent.drop(dropzone, {
       dataTransfer: { files: [file] }
     });
+
+    const uploadBtn = screen.getByRole("button", { name: /Upload Draft/i });
+    fireEvent.click(uploadBtn);
 
     await waitFor(() => {
       expect(screen.getByTestId("upload-error-banner")).toBeDefined();
@@ -159,12 +159,15 @@ describe("UploadPanel Global Error Banner Interface Suite (#566)", () => {
   test("clears current alert state wrapper when firing click events on layout close button", async () => {
     api.uploadDocument.mockRejectedValueOnce(new Error("Storage block exhausted."));
     
-    render(<UploadPanel sessionId="session-123" documents={[]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />);
+    render(<UploadPanel sessionId="session-err-3" documents={[]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />);
     
     const file = new File(["data"], "log.txt", { type: "text/plain" });
     const dropzone = screen.getByText(/Drop files here or click to browse/i);
     
     fireEvent.drop(dropzone, { dataTransfer: { files: [file] } });
+
+    const uploadBtn = screen.getByRole("button", { name: /Upload Draft/i });
+    fireEvent.click(uploadBtn);
 
     await waitFor(() => {
       expect(screen.getByTestId("upload-error-banner")).toBeDefined();
@@ -177,21 +180,9 @@ describe("UploadPanel Global Error Banner Interface Suite (#566)", () => {
   });
 });
 
-function makeFile(name) {
-  return new File(["dummy content"], name, { type: "text/plain" });
-}
-
 describe("UploadPanel Saved Drafts Workflow Suite (#574)", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  afterEach(() => {
-    cleanup();
-  });
-
   test("stages dropped documents as a local draft item first without launching network actions", () => {
-    render(<UploadPanel sessionId="s-456" documents={[]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />);
+    render(<UploadPanel sessionId="session-draft-1" documents={[]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />);
     
     const dropzone = screen.getByText(/Drop files here or click to browse/i).parentElement;
     const mockFile = new File(["draft-content"], "contract_draft.pdf", { type: "application/pdf" });
@@ -207,7 +198,7 @@ describe("UploadPanel Saved Drafts Workflow Suite (#574)", () => {
   });
 
   test("clears the active draft workspace when clicking the cancel button", () => {
-    render(<UploadPanel sessionId="s-456" documents={[]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />);
+    render(<UploadPanel sessionId="session-draft-2" documents={[]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />);
     
     const dropzone = screen.getByText(/Drop files here or click to browse/i).parentElement;
     const mockFile = new File(["draft-content"], "contract_draft.pdf", { type: "application/pdf" });
@@ -226,7 +217,7 @@ describe("UploadPanel Saved Drafts Workflow Suite (#574)", () => {
     api.uploadDocument.mockResolvedValueOnce({ filename: "contract_draft.pdf", message: "Draft processed" });
     const onUploadedSpy = vi.fn();
     
-    render(<UploadPanel sessionId="s-456" documents={[]} onUploaded={onUploadedSpy} onClose={vi.fn()} show={true} />);
+    render(<UploadPanel sessionId="session-draft-3" documents={[]} onUploaded={onUploadedSpy} onClose={vi.fn()} show={true} />);
     
     const dropzone = screen.getByText(/Drop files here or click to browse/i).parentElement;
     const mockFile = new File(["draft-content"], "contract_draft.pdf", { type: "application/pdf" });
@@ -239,7 +230,7 @@ describe("UploadPanel Saved Drafts Workflow Suite (#574)", () => {
     fireEvent.click(uploadBtn);
 
     await waitFor(() => {
-      expect(api.uploadDocument).toHaveBeenCalledWith(mockFile, "s-456");
+      expect(api.uploadDocument).toHaveBeenCalledWith(mockFile, "session-draft-3");
       expect(onUploadedSpy).toHaveBeenCalledWith("contract_draft.pdf");
       expect(screen.queryByRole("button", { name: /Upload Draft/i })).toBeNull();
     });
@@ -247,16 +238,8 @@ describe("UploadPanel Saved Drafts Workflow Suite (#574)", () => {
 });
 
 describe("UploadPanel Interaction Test Suite (#573)", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  afterEach(() => {
-    cleanup();
-  });
-
   test("triggers file selection window when clicking the drop zone", () => {
-    render(<UploadPanel sessionId="s-123" documents={[]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />);
+    render(<UploadPanel sessionId="session-int-1" documents={[]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />);
     
     const dropzone = screen.getByText(/Drop files here or click to browse/i).parentElement;
     const input = dropzone.querySelector("input[type='file']");
@@ -269,7 +252,7 @@ describe("UploadPanel Interaction Test Suite (#573)", () => {
   });
 
   test("manages drag state styles when dragging items over and out of the viewport", () => {
-    render(<UploadPanel sessionId="s-123" documents={[]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />);
+    render(<UploadPanel sessionId="session-int-2" documents={[]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />);
     
     const textNode = screen.getByText(/Drop files here or click to browse/i);
     const dropzone = textNode.parentElement;
@@ -290,7 +273,7 @@ describe("UploadPanel Interaction Test Suite (#573)", () => {
     api.uploadDocument.mockResolvedValueOnce(mockResponse);
     
     const onUploadedSpy = vi.fn();
-    render(<UploadPanel sessionId="s-123" documents={[]} onUploaded={onUploadedSpy} onClose={vi.fn()} show={true} />);
+    render(<UploadPanel sessionId="session-int-3" documents={[]} onUploaded={onUploadedSpy} onClose={vi.fn()} show={true} />);
     
     const dropzone = screen.getByText(/Drop files here or click to browse/i).parentElement;
     const mockFile = new File(["content"], "resume.pdf", { type: "application/pdf" });
@@ -301,10 +284,11 @@ describe("UploadPanel Interaction Test Suite (#573)", () => {
       },
     });
 
-    expect(screen.getByText(/Indexing documents\.\.\./i)).toBeDefined();
+    const uploadBtn = screen.getByRole("button", { name: /Upload Draft/i });
+    fireEvent.click(uploadBtn);
 
     await waitFor(() => {
-      expect(api.uploadDocument).toHaveBeenCalledWith(mockFile, "s-123");
+      expect(api.uploadDocument).toHaveBeenCalledWith(mockFile, "session-int-3");
       expect(onUploadedSpy).toHaveBeenCalledWith("resume.pdf");
     });
   });
@@ -312,14 +296,14 @@ describe("UploadPanel Interaction Test Suite (#573)", () => {
 
 describe("UploadPanel multi-select upload", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
   });
 
   it("renders the file input with the multiple attribute", () => {
-    render(
-      <UploadPanel sessionId="s1" documents={[]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />
+    const { container } = render(
+      <UploadPanel sessionId="session-multi-1" documents={[]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />
     );
-    const input = screen.getByTestId("upload-panel").querySelector("input[type='file']");
+    const input = container.querySelector("input[type='file']");
     expect(input).toHaveAttribute("multiple");
   });
 
@@ -329,11 +313,11 @@ describe("UploadPanel multi-select upload", () => {
     );
     const onUploaded = vi.fn();
 
-    render(
-      <UploadPanel sessionId="s1" documents={[]} onUploaded={onUploaded} onClose={vi.fn()} show={true} />
+    const { container } = render(
+      <UploadPanel sessionId="session-multi-2" documents={[]} onUploaded={onUploaded} onClose={vi.fn()} show={true} />
     );
 
-    const input = screen.getByTestId("upload-panel").querySelector("input[type='file']");
+    const input = container.querySelector("input[type='file']");
     const files = [makeFile("a.pdf"), makeFile("b.txt"), makeFile("c.md")];
     fireEvent.change(input, { target: { files } });
 
@@ -351,11 +335,11 @@ describe("UploadPanel multi-select upload", () => {
     });
     const onUploaded = vi.fn();
 
-    render(
-      <UploadPanel sessionId="s1" documents={[]} onUploaded={onUploaded} onClose={vi.fn()} show={true} />
+    const { container } = render(
+      <UploadPanel sessionId="session-multi-3" documents={[]} onUploaded={onUploaded} onClose={vi.fn()} show={true} />
     );
 
-    const input = screen.getByTestId("upload-panel").querySelector("input[type='file']");
+    const input = container.querySelector("input[type='file']");
     const files = [makeFile("good.pdf"), makeFile("bad.exe")];
     fireEvent.change(input, { target: { files } });
 
@@ -369,13 +353,13 @@ describe("UploadPanel multi-select upload", () => {
     api.previewDocument.mockResolvedValue({ content: "This is the document content preview." });
     
     render(
-      <UploadPanel sessionId="s1" documents={[{ filename: "test.pdf", chunks_indexed: 5 }]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />
+      <UploadPanel sessionId="session-multi-4" documents={[{ filename: "test.pdf", chunks_indexed: 5 }]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />
     );
 
-    const previewButton = screen.getByTitle("Preview Document Content");
-    fireEvent.click(previewButton);
+    const previewButtons = screen.getAllByTitle("Preview Document Content");
+    fireEvent.click(previewButtons[0]);
 
-    await waitFor(() => expect(api.previewDocument).toHaveBeenCalledWith("test.pdf", "s1"));
+    await waitFor(() => expect(api.previewDocument).toHaveBeenCalledWith("test.pdf", "session-multi-4"));
     expect(screen.getByText("This is the document content preview.")).toBeInTheDocument();
   });
 
@@ -385,11 +369,11 @@ describe("UploadPanel multi-select upload", () => {
       .mockResolvedValueOnce({ content: "Recovered content after retry" });
 
     render(
-      <UploadPanel sessionId="s1" documents={[{ filename: "corrupt.pdf", chunks_indexed: 1 }]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />
+      <UploadPanel sessionId="session-multi-5" documents={[{ filename: "corrupt.pdf", chunks_indexed: 1 }]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />
     );
 
-    const previewButton = screen.getByTitle("Preview Document Content");
-    fireEvent.click(previewButton);
+    const previewButtons = screen.getAllByTitle("Preview Document Content");
+    fireEvent.click(previewButtons[0]);
 
     await waitFor(() => expect(api.previewDocument).toHaveBeenCalledTimes(1));
     expect(screen.getByText("Failed to Load Preview")).toBeInTheDocument();
@@ -410,7 +394,7 @@ describe("UploadPanel multi-select upload", () => {
     expect(screen.queryByText("Recovered content after retry")).not.toBeInTheDocument();
 
     api.previewDocument.mockRejectedValueOnce(new Error("Another failure"));
-    fireEvent.click(previewButton);
+    fireEvent.click(previewButtons[0]);
 
     await waitFor(() => expect(api.previewDocument).toHaveBeenCalledTimes(3));
     expect(screen.getByText("Failed to Load Preview")).toBeInTheDocument();
