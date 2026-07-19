@@ -200,12 +200,14 @@ export default function Sidebar({
               onClick={(e) => e.stopPropagation()}
             />
           ) : (
-            <span 
+            <button 
+              type="button"
               onClick={() => {
                 onLoadSession(s.id);
                 setIsOpen(false);
               }} 
-              className={`inline-flex items-center gap-1.5 w-full ${isActive || isFocusedViaKeyboard ? "text-white" : ""}`}
+              aria-current={isActive ? "true" : undefined}
+              className={`inline-flex items-center gap-1.5 w-full text-left outline-none ${isActive || isFocusedViaKeyboard ? "text-white" : ""}`}
             >
               <ChatIcon className="w-3.5 h-3.5 text-gray-500 shrink-0" />
               <span
@@ -217,11 +219,11 @@ export default function Sidebar({
                 {highlightText(s.title || "New Chat", search)}
               </span>
               {s.message_count > 0 && (
-                <span className="ml-1 text-gray-500 text-[10px] bg-gray-800/60 px-1.5 py-0.5 rounded-full shrink-0">
+                <span className="ml-1 text-gray-500 text-[10px] bg-gray-800/60 px-1.5 py-0.5 rounded-full shrink-0" aria-label={`${s.message_count} messages`}>
                   {s.message_count}
                 </span>
               )}
-            </span>
+            </button>
           )}
         </div>
 
@@ -242,7 +244,7 @@ export default function Sidebar({
 
           <button
             onClick={() => setDeleteConfirm({ sessionId: s.id, sessionName: s.title })}
-            aria-label="Delete chat"
+            aria-label={`Delete chat session ${s.title || "New Chat"}`}
             tabIndex={-1}
             className="relative group/del opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 px-1.5 py-2 transition text-sm font-medium shrink-0"
           >
@@ -282,8 +284,9 @@ export default function Sidebar({
         />
       )}
 
-      {/* --- Responsive Sidebar Shell Container --- */}
-      <div
+      {/* --- Responsive Sidebar Shell Container updated to <aside> landmark --- */}
+      <aside
+        aria-label="Chat Management Sidebar"
         className={`
           fixed inset-y-0 left-0 z-40 transform transition-transform duration-300 ease-in-out
           md:relative md:transform-none md:translate-x-0 md:z-auto
@@ -383,21 +386,23 @@ export default function Sidebar({
           </select>
         </div>
 
-        {/* Search Bar */}
-        <div className="px-3 py-2 border-b border-gray-800">
+        {/* Search Bar container updated to role="search" landmark */}
+        <div role="search" className="px-3 py-2 border-b border-gray-800">
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search chats..."
+            aria-label="Search chat sessions history"
             className="w-full text-xs bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-gray-300 placeholder-gray-600 outline-none focus:border-purple-500"
           />
         </div>
 
-        {/* Chat Sessions Lists Context Wrapper with key listeners */}
-        <div 
+        {/* Chat Sessions Wrapper updated to semantic <nav> landmark */}
+        <nav 
           data-testid="sidebar-sessions-list"
           tabIndex={0}
           onKeyDown={handleKeyDown}
+          aria-label="Chat Sessions History"
           className="flex-1 overflow-y-auto px-2 py-2 outline-none"
         >
           {filtered.length === 0 && (
@@ -421,10 +426,10 @@ export default function Sidebar({
             )}
             {unpinnedSessions.map((s) => renderSessionRow(s))}
           </div>
-        </div>
+        </nav>
 
-        {/* Local Security and Source Attributions Footer */}
-        <div className="px-4 py-3 border-t border-gray-800 flex flex-col gap-1">
+        {/* Source Attributions container updated to semantic <footer> landmark */}
+        <footer className="px-4 py-3 border-t border-gray-800 flex flex-col gap-1">
           <p className="text-xs text-gray-600 inline-flex items-center gap-1">
             <LockIcon className="w-3.5 h-3.5" />
             <span>100% local · no cloud · MIT</span>
@@ -438,8 +443,8 @@ export default function Sidebar({
             <StarIcon className="w-3.5 h-3.5" />
             <span>Star on GitHub</span>
           </a>
-        </div>
-      </div>
+        </footer>
+      </aside>
 
       {/* Delete Confirmation Portal Overlay */}
       {deleteConfirm && (
