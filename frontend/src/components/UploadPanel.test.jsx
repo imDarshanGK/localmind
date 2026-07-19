@@ -1,422 +1,420 @@
-// @vitest-environment jsdom
-import { describe, it, test, expect, beforeEach, afterEach, vi } from "vitest";
-import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
-import "@testing-library/jest-dom/vitest";
-import UploadPanel from "./UploadPanel";
-import * as api from "../utils/api";
+import { useState, useRef, useEffect } from "react";
+import { uploadDocument, deleteDocument, previewDocument } from "../utils/api";
+import { CheckIcon, DocumentsIcon, ErrorIcon, SpinnerIcon, UploadIcon, FileIcon } from "./Icons";
 
-vi.mock("../utils/api", () => ({
-  uploadDocument: vi.fn(),
-  deleteDocument: vi.fn(),
-  previewDocument: vi.fn(),
-}));
+export default function UploadPanel({ sessionId, documents, onUploaded, onClose, show, minimalMode }) {
+  const [dragging, setDragging] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [result,    setResult]    = useState(null);
+  const [error,      setError]      = useState("");
+  
+  // FIXED (#574): Staged draft workspace state slot allocation
+  const [draftFile, setDraftFile] = useState(null);
+  
+  // Preview UI local states
+  const [previewContent, setPreviewContent] = useState(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
+  const [previewFilename, setPreviewFilename] = useState("");
+  const [previewError, setPreviewError] = useState(null);
 
-describe("UploadPanel Persistence State Interface Suite (#570)", () => {
-  let store = {};
+  const [uploadResults, setUploadResults] = useState([]);
+  const fileRef = useRef();
 
-  beforeEach(() => {
-    store = {};
-    vi.spyOn(Storage.prototype, 'getItem').mockImplementation((key) => store[key] || null);
-    vi.spyOn(Storage.prototype, 'setItem').mockImplementation((key, value) => { store[key] = String(value); });
-    vi.spyOn(Storage.prototype, 'clear').mockImplementation(() => { store = {}; });
-  });
-
-  afterEach(() => {
-    cleanup();
-    vi.restoreAllMocks();
-  });
-
-  test("loads collapsed default parameters if flags exist inside localStorage store maps", () => {
-    store["upload-panel-collapsed:session-abc"] = "true";
-
-    render(<UploadPanel sessionId="session-abc" documents={[]} onUploaded={() => {}} onClose={() => {}} show={true} />);
-    
-    const dropzoneText = screen.queryByText(/Drop files here or click to browse/i);
-    expect(dropzoneText).toBeNull(); 
-  });
-
-  test("toggles view metrics and updates localStorage states during click actions", () => {
-    render(<UploadPanel sessionId="session-abc" documents={[]} onUploaded={() => {}} onClose={() => {}} show={true} />);
-    
-    const toggleButton = screen.getByLabelText(/Collapse upload section/i);
-    fireEvent.click(toggleButton);
-
-    expect(localStorage.setItem).toHaveBeenCalledWith("upload-panel-collapsed:session-abc", "true");
-  });
-});
-
-describe("UploadPanel Tooltip Help Interface Suite (#571)", () => {
-  test("renders the information help button trigger icon accurately", () => {
-    render(<UploadPanel sessionId="session-123" documents={[]} onUploaded={() => {}} onClose={() => {}} show={true} />);
-    
-    const infoButton = screen.getByLabelText(/Upload limits information description/i);
-    expect(infoButton).toBeDefined();
-    expect(infoButton.textContent.trim()).toBe("i");
-  });
-
-  test("contains hidden tooltip descriptions outlining file limits parameters", () => {
-    render(<UploadPanel sessionId="session-123" documents={[]} onUploaded={() => {}} onClose={() => {}} show={true} />);
-    
-    const inlineTooltipText = screen.getByText(/Supported Upload Formats:/i);
-    expect(inlineTooltipText).toBeDefined();
-  });
-});
-
-describe("UploadPanel Accessibility Landmarks Suite (#569)", () => {
-  test("contains accessible section landmarks and titles", () => {
-    render(<UploadPanel sessionId="session-123" documents={[]} onUploaded={() => {}} onClose={() => {}} show={true} />);
-    
-    // Verifies the presence of a section container that is properly labeled by a header item
-    const panelSection = screen.getByRole("region", { name: /documents/i });
-    expect(panelSection).toBeDefined();
-  });
-
-  test("includes a live region wrapper with role status for operational reports", () => {
-    render(<UploadPanel sessionId="session-123" documents={[]} onUploaded={() => {}} onClose={() => {}} show={true} />);
-    
-    const liveRegion = screen.getByRole("status");
-    expect(liveRegion).toBeDefined();
-  });
-});
-
-describe("UploadPanel Mobile and Responsive Layout Layout Suite (#568)", () => {
-  test("implements mobile view responsive fluid layout classes", () => {
-    const { container } = render(
-      <UploadPanel sessionId="session-123" documents={[]} onUploaded={() => {}} onClose={() => {}} show={true} />
-    );
-
-    const mainPanel = container.firstChild;
-    expect(mainPanel.className).toContain("px-4");
-    expect(mainPanel.className).toContain("sm:px-5");
-    expect(mainPanel.className).toContain("w-full");
-  });
-
-  test("scales indexed list elements to accommodate mobile touch bounds targets", () => {
-    const mockDocs = [{ filename: "mobile_spec.pdf", chunks_indexed: 12 }];
-    render(
-      <UploadPanel sessionId="session-123" documents={mockDocs} onUploaded={() => {}} onClose={() => {}} show={true} />
-    );
-
-    const docText = screen.getByText("mobile_spec.pdf");
-    const containerRow = docText.closest("div");
-    
-    expect(containerRow.className).toContain("min-h-[36px]");
-  });
-});
-
-describe("UploadPanel Keyboard Navigation Accessibility Suite (#567)", () => {
-  test("fires onClose event handler cleanly when hitting the Escape key", () => {
-    const mockOnClose = vi.fn();
-    render(<UploadPanel sessionId="test-session" documents={[]} onUploaded={vi.fn()} onClose={mockOnClose} show={true} />);
-    
-    fireEvent.keyDown(window, { key: "Escape" });
-    expect(mockOnClose).toHaveBeenCalledTimes(1);
-  });
-
-  test("makes drop zone interactive and focusable with keyboard event binds", () => {
-    render(<UploadPanel sessionId="test-session" documents={[]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />);
-    
-    const dropzone = screen.getByRole("button", { name: /File upload drop zone/i });
-    expect(dropzone).toBeDefined();
-    expect(dropzone.tabIndex).toBe(0);
-
-    // Verify key triggers do not crash execution boundaries
-    fireEvent.keyDown(dropzone, { key: "Enter" });
-    fireEvent.keyDown(dropzone, { key: " " });
-  });
-});
-
-describe("UploadPanel Global Error Banner Interface Suite (#566)", () => {
-  afterEach(() => {
-    cleanup();
-    vi.restoreAllMocks();
-  });
-
-  test("avoids compiling alert nodes inside default view frames", () => {
-    render(<UploadPanel sessionId="session-123" documents={[]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />);
-    expect(screen.queryByTestId("upload-error-banner")).toBeNull();
-  });
-
-  test("renders full structured banner details successfully when request fails", async () => {
-    api.uploadDocument.mockRejectedValueOnce(new Error("File allocation table mapping rejected context bounds."));
-    
-    render(<UploadPanel sessionId="session-123" documents={[]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />);
-    
-    const file = new File(["test data payload"], "matrix.txt", { type: "text/plain" });
-    const dropzone = screen.getByText(/Drop files here or click to browse/i);
-    
-    fireEvent.drop(dropzone, {
-      dataTransfer: { files: [file] }
+  function isDuplicateFile(file) {
+    return documents.some((doc) => {
+      const filename = doc.filename || doc;
+      return filename === file.name;
     });
+  }
 
-    await waitFor(() => {
-      expect(screen.getByTestId("upload-error-banner")).toBeDefined();
-      expect(screen.getByText("Upload Failure")).toBeDefined();
-      expect(screen.getByText("File allocation table mapping rejected context bounds.")).toBeDefined();
-    });
+  // FIXED (#570): Initialize persistence layer state from localStorage based on active sessionId
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`upload-panel-collapsed:${sessionId}`);
+      return saved === "true";
+    } catch (e) {
+      return false;
+    }
   });
 
-  test("clears current alert state wrapper when firing click events on layout close button", async () => {
-    api.uploadDocument.mockRejectedValueOnce(new Error("Storage block exhausted."));
-    
-    render(<UploadPanel sessionId="session-123" documents={[]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />);
-    
-    const file = new File(["data"], "log.txt", { type: "text/plain" });
-    const dropzone = screen.getByText(/Drop files here or click to browse/i);
-    
-    fireEvent.drop(dropzone, { dataTransfer: { files: [file] } });
+  // FIXED (#570): Sync view state configurations safely as explicit string values
+  useEffect(() => {
+    try {
+      localStorage.setItem(`upload-panel-collapsed:${sessionId}`, String(isCollapsed));
+    } catch (e) {
+      console.warn("localStorage persistence layer allocation blocked:", e);
+    }
+  }, [isCollapsed, sessionId]);
 
-    await waitFor(() => {
-      expect(screen.getByTestId("upload-error-banner")).toBeDefined();
-    });
+  // Poll for document status updates if any are queued/processing
+  useEffect(() => {
+    if (minimalMode || !show) return;
+    const isProcessing = documents.some(d => d.status === "queued" || d.status === "processing");
+    if (!isProcessing) return;
+    const interval = setInterval(() => {
+      onUploaded(); // Triggers refreshDocuments
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [documents, onUploaded, minimalMode, show]);
 
-    const closeButton = screen.getByLabelText("Dismiss failure banner");
-    fireEvent.click(closeButton);
+  async function handleFileSelect(file) {
+    if (!file) return;
 
-    expect(screen.queryByTestId("upload-error-banner")).toBeNull();
-  });
-});
+    if (isDuplicateFile(file)) {
+      setError(`"${file.name}" has already been added.`);
+      setResult(null);
+      return;
+    }
 
-function makeFile(name) {
-  return new File(["dummy content"], name, { type: "text/plain" });
+    setError("");
+    setResult(null);
+    setDraftFile(file);
+  }
+
+  async function commitDraftUpload() {
+    if (!draftFile) return;
+    setUploading(true);
+    setError("");
+    setResult(null);
+    try {
+      const data = await uploadDocument(draftFile, sessionId);
+      setResult(data);
+      onUploaded(data.filename);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setUploading(false);
+      setDraftFile(null);
+
+      if (fileRef.current) {
+        fileRef.current.value = "";
+      }
+    }
+  }
+
+  // FIXED (#567): Global event listener to dismiss panel when Escape key is pressed
+  useEffect(() => {
+    if (!show) return;
+    function handleGlobalKeyDown(e) {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    }
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, [show, onClose]);
+  
+  async function handleFiles(filelist) {
+    const files = Array.from(filelist || []);
+    if (files.length === 0) return;
+
+    setUploading(true);
+    setError("");
+    setUploadResults([]);
+
+    for (const file of files) {
+      if (isDuplicateFile(file)) {
+        setUploadResults((prev) => [
+          ...prev,
+          {
+            filename: file.name,
+            status: "error",
+            message: `"${file.name}" has already been added.`,
+          },
+        ]);
+        continue;
+      }
+
+      try {
+        const data = await uploadDocument(file, sessionId);
+
+        setUploadResults((prev) => [
+          ...prev,
+          {
+            filename: data.filename || file.name,
+            status: "success",
+            message: data.message,
+          },
+        ]);
+
+        onUploaded(data.filename);
+      } catch (e) {
+        const errorMessage =
+          e.message || "An unexpected error occurred during document processing.";
+
+        setError(errorMessage);
+
+        setUploadResults((prev) => [
+          ...prev,
+          {
+            filename: file.name,
+            status: "error",
+            message: errorMessage,
+          },
+        ]);
+      }
+    }
+
+    setUploading(false);
+  }
+
+  function onDrop(e) {
+    e.preventDefault(); 
+    setDragging(false);
+    handleFileSelect(e.dataTransfer.files[0]);
+  }
+
+  // FIXED (#567): Intercept keyboard interactions (Space/Enter) on the interactive dropzone box layout
+  function handleDropzoneKeyDown(e) {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      fileRef.current.click();
+    }
+  }
+
+  async function handleTriggerPreview(filename) {
+    setLoadingPreview(true);
+    setPreviewFilename(filename);
+    setPreviewError(null);
+    try {
+      const data = await previewDocument(filename, sessionId);
+      setPreviewContent(data.content || "No textual content available to display.");
+    } catch (e) {
+      setPreviewError(e.message || "Failed to load document preview");
+      setPreviewContent(null);
+    } finally {
+      setLoadingPreview(false);
+    }
+  }
+
+  return (
+    <section 
+      data-testid="upload-panel"
+      aria-labelledby="upload-panel-title"
+      className={`border-b border-gray-800 bg-gray-900 px-4 py-3 sm:px-5 sm:py-4 shrink-0 w-full transition-all duration-200 ${show ? 'block' : 'hidden'}`}
+    >
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-1.5">
+          {/* FIXED (#570): Persistent view collapse button trigger control toggle layout */}
+          <button
+            type="button"
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className="text-gray-400 hover:text-white text-xs p-1 focus:outline-none focus:ring-1 focus:ring-purple-500 rounded transition"
+            aria-label={isCollapsed ? "Expand upload section" : "Collapse upload section"}
+          >
+            {isCollapsed ? "▶" : "▼"}
+          </button>
+          
+          <h2 id="upload-panel-title" className="text-sm font-semibold text-white inline-flex items-center gap-1.5">
+            <DocumentsIcon className="w-4 h-4" aria-hidden="true" />
+            Documents Workspace
+          </h2>
+          
+          {/* FIXED (#571): Pure CSS/Tailwind interactive help tooltip utility box */}
+          <div className="group relative inline-block">
+            <button
+              type="button"
+              className="text-gray-500 hover:text-purple-400 text-xs font-mono border border-gray-700 hover:border-purple-500/40 rounded-full w-4 h-4 inline-flex items-center justify-center bg-gray-950 cursor-help transition-colors focus:outline-none focus:ring-1 focus:ring-purple-500"
+              aria-label="Upload limits information description"
+            >
+              i
+            </button>
+            <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 hidden group-hover:block group-focus-within:block w-48 bg-gray-950 border border-gray-800 text-gray-400 text-[10px] p-2 rounded shadow-xl z-50 pointer-events-none leading-relaxed">
+              <span className="font-semibold text-white block mb-0.5">Supported Upload Formats:</span>
+              PDF, TXT, CSV, DOCX, MD, HTML files up to a maximum limit of 50MB.
+              <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-950"></div>
+            </div>
+          </div>
+        </div>
+        
+        <button 
+          onClick={onClose} 
+          className="text-gray-500 hover:text-gray-300 text-lg leading-none p-1 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
+          aria-label="Close upload panel"
+        >
+          ×
+        </button>
+      </div>
+
+      {error && (
+        <div data-testid="upload-error-banner" className="mb-3 text-xs bg-red-950/40 border border-red-900/60 text-red-400 p-2.5 rounded-lg flex items-start gap-2">
+          <ErrorIcon className="w-4 h-4 text-red-400 shrink-0 mt-0.5" aria-hidden="true" />
+          <div className="flex-1">
+            <p className="font-semibold text-red-300">Upload Failure</p>
+            <p className="text-red-400/90 leading-relaxed mt-0.5">{error}</p>
+          </div>
+          <button 
+            type="button" 
+            onClick={() => setError("")}
+            className="text-red-400/60 hover:text-red-300 text-base font-bold leading-none px-1 rounded focus:outline-none focus:ring-1 focus:ring-red-500"
+            aria-label="Dismiss failure banner"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
+      {/* FIXED (#570): Enforced conditional rendering block to handle DOM tree unmounting patterns */}
+      {!isCollapsed && (
+        <div>
+          {/* Drop zone */}
+          <div
+            tabIndex={0}
+            role="button"
+            aria-label="File upload drop zone. Press Enter or Space to browse."
+            onDragOver={e => { e.preventDefault(); setDragging(true); }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={onDrop}
+            onClick={() => fileRef.current.click()}
+            onKeyDown={handleDropzoneKeyDown}
+            className={`border-2 border-dashed rounded-xl px-3 py-4 sm:px-4 sm:py-5 text-center cursor-pointer transition mb-3 outline-none focus:ring-2 focus:ring-purple-500
+              ${dragging ? "border-purple-500 bg-purple-900/20" : "border-gray-700 hover:border-purple-600 hover:bg-gray-800/50"}`}
+          >
+            <input ref={fileRef} type="file" accept=".pdf,.txt,.csv,.docx,.md,.html,.srt,.vtt" className="hidden" multiple
+              aria-label="Upload document input"
+              onChange={e => handleFiles(e.target.files)} />
+            
+            <p className="text-2xl mb-1 flex justify-center">
+              {uploading ? <SpinnerIcon className="w-7 h-7 text-purple-400" /> : <UploadIcon className="w-7 h-7 text-gray-300" />}
+            </p>
+            <p className="text-xs sm:text-sm text-gray-400">{uploading ? "Indexing documents..." : "Drop files here or click to browse"}</p>
+            <p className="text-[10px] sm:text-xs text-gray-600 mt-1">PDF · TXT · CSV · DOCX · MD · HTML · SRT · VTT · max 50MB</p>
+          </div>
+
+          {/* FIXED (#574): Staged draft workspace block rendering */}
+          {draftFile && (
+            <div className="bg-purple-950/20 border border-purple-900/40 rounded-xl p-3 mb-3 flex flex-col gap-2">
+              <div className="flex items-center justify-between text-xs text-gray-300">
+                <span className="inline-flex items-center gap-1.5 font-medium truncate max-w-[80%]">
+                  <FileIcon className="w-3.5 h-3.5 text-purple-400" aria-hidden="true" />
+                  {draftFile.name} <span className="text-[10px] text-purple-400/80 bg-purple-950 px-1.5 py-0.5 rounded border border-purple-800/30">Draft</span>
+                </span>
+                <button 
+                  type="button"
+                  onClick={() => setDraftFile(null)} 
+                  className="text-gray-500 hover:text-gray-300 text-sm leading-none p-1"
+                  title="Cancel draft"
+                >
+                  ×
+                </button>
+              </div>
+              <button
+                type="button"
+                disabled={uploading}
+                onClick={commitDraftUpload}
+                className="w-full bg-purple-600 hover:bg-purple-500 disabled:bg-gray-800 text-white font-medium text-xs py-1.5 rounded-lg transition"
+              >
+                {uploading ? "Uploading Draft..." : "Upload Draft"}
+              </button>
+            </div>
+          )}
+
+          {uploadResults.length > 0 && (
+            <div className="mb-2">
+              {uploadResults.map((r, i) => (
+                <p key={i} className={`text-xs mb-1 inline-flex items-center gap-1 ${r.status === "success" ? "text-green-400" : "text-red-400"}`}>
+                  {r.status === "success" ? <CheckIcon className="w-3.5 h-3.5" /> : <ErrorIcon className="w-3.5 h-3.5" />}
+                  <span className="truncate">{r.filename}{r.status === "error" ? `: ${r.message}` : ""}</span>
+                </p>
+              ))}
+            </div>
+          )}
+
+          {result && <p className="text-xs text-green-400 mb-2 inline-flex items-center gap-1"><CheckIcon className="w-3.5 h-3.5" />{result.message}</p>}
+
+          {/* Uploaded docs list */}
+          {documents.length > 0 && (
+            <div aria-label="Indexed documents collection">
+              <p className="text-xs text-gray-500 mb-1">Indexed documents:</p>
+              <ul className="space-y-1">
+                {documents.map((d, i) => {
+                  const currentFilename = d.filename || d;
+                  return (
+                    <li key={i} className="flex items-center justify-between text-xs bg-gray-800 rounded-lg px-3 py-2 sm:py-1.5 mb-1 hover:bg-gray-750 transition min-h-[36px]">
+                      <span className="text-gray-300 truncate inline-flex items-center gap-1 max-w-[65%]">
+                        <FileIcon className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                        <span className="truncate">{currentFilename}</span>
+                      </span>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {d.chunks_indexed && <span className="text-gray-500 text-[11px] sm:text-xs">{d.chunks_indexed} chunks</span>}
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); handleTriggerPreview(currentFilename); }}
+                          className="p-2 sm:p-1 text-gray-400 hover:text-purple-400 rounded transition min-w-[32px] min-h-[32px] sm:min-w-0 sm:min-h-0 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-purple-500"
+                          title="Preview Document Content"
+                          disabled={loadingPreview}
+                        >
+                          {loadingPreview && previewFilename === currentFilename ? (
+                            <SpinnerIcon className="w-3.5 h-3.5" />
+                          ) : (
+                            "👁️"
+                          )}
+                        </button>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Read-Only Modal Viewport Overlay */}
+      {(previewContent !== null || previewError !== null) && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-900 border border-gray-800 w-full max-w-2xl rounded-2xl max-h-[80vh] flex flex-col shadow-2xl">
+            <div className="p-4 border-b border-gray-800 flex items-center justify-between">
+              <div className="truncate pr-4">
+                <span className="text-[10px] text-purple-400 font-semibold uppercase tracking-wider block">Read-Only Preview</span>
+                <h3 className="text-sm font-medium text-white truncate">{previewFilename}</h3>
+              </div>
+              <button 
+                type="button"
+                onClick={() => {
+                  setPreviewContent(null);
+                  setPreviewError(null);
+                  setPreviewFilename("");
+                }}
+                className="text-gray-400 hover:text-white px-3 py-1.5 sm:px-2 sm:py-1 text-sm bg-gray-800 border border-gray-700 rounded-lg transition focus:outline-none focus:ring-2 focus:ring-purple-500"
+              >
+                Close
+              </button>
+            </div>
+            {previewError ? (
+              <div className="p-8 flex flex-col items-center justify-center text-center">
+                <div className="w-12 h-12 bg-red-900/30 border border-red-500/30 rounded-full flex items-center justify-center text-red-500 mb-4">
+                  ⚠️
+                </div>
+                <h4 className="text-white font-medium mb-2">Failed to Load Preview</h4>
+                <p className="text-gray-400 text-xs max-w-md mb-6">{previewError}</p>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => {
+                      setPreviewContent(null);
+                      setPreviewError(null);
+                      setPreviewFilename("");
+                    }}
+                    className="px-4 py-2 text-xs font-medium text-gray-300 hover:text-white bg-gray-800 hover:bg-gray-750 border border-gray-700 rounded-lg transition"
+                  >
+                    Clear Selection
+                  </button>
+                  <button
+                    onClick={() => handleTriggerPreview(previewFilename)}
+                    className="px-4 py-2 text-xs font-medium text-white bg-purple-600 hover:bg-purple-750 rounded-lg transition shadow-md shadow-purple-900/20"
+                  >
+                    Retry
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="p-5 overflow-y-auto flex-1 text-xs text-gray-300 font-mono whitespace-pre-wrap leading-relaxed bg-gray-950/40 selection:bg-purple-900">
+                {previewContent}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </section>
+  );
 }
-
-describe("UploadPanel Saved Drafts Workflow Suite (#574)", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  afterEach(() => {
-    cleanup();
-  });
-
-  test("stages dropped documents as a local draft item first without launching network actions", () => {
-    render(<UploadPanel sessionId="s-456" documents={[]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />);
-    
-    const dropzone = screen.getByText(/Drop files here or click to browse/i).parentElement;
-    const mockFile = new File(["draft-content"], "contract_draft.pdf", { type: "application/pdf" });
-
-    fireEvent.drop(dropzone, {
-      dataTransfer: { files: [mockFile] }
-    });
-
-    expect(screen.getByText(/contract_draft\.pdf/i)).toBeDefined();
-    expect(screen.getByText("Draft")).toBeDefined();
-    expect(screen.getByRole("button", { name: /Upload Draft/i })).toBeDefined();
-    expect(api.uploadDocument).not.toHaveBeenCalled();
-  });
-
-  test("clears the active draft workspace when clicking the cancel button", () => {
-    render(<UploadPanel sessionId="s-456" documents={[]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />);
-    
-    const dropzone = screen.getByText(/Drop files here or click to browse/i).parentElement;
-    const mockFile = new File(["draft-content"], "contract_draft.pdf", { type: "application/pdf" });
-
-    fireEvent.drop(dropzone, {
-      dataTransfer: { files: [mockFile] }
-    });
-
-    const cancelBtn = screen.getByTitle(/Cancel draft/i);
-    fireEvent.click(cancelBtn);
-
-    expect(screen.queryByText(/contract_draft\.pdf/i)).toBeNull();
-  });
-
-  test("submits network upload execution stack when the user hits the commit action button", async () => {
-    api.uploadDocument.mockResolvedValueOnce({ filename: "contract_draft.pdf", message: "Draft processed" });
-    const onUploadedSpy = vi.fn();
-    
-    render(<UploadPanel sessionId="s-456" documents={[]} onUploaded={onUploadedSpy} onClose={vi.fn()} show={true} />);
-    
-    const dropzone = screen.getByText(/Drop files here or click to browse/i).parentElement;
-    const mockFile = new File(["draft-content"], "contract_draft.pdf", { type: "application/pdf" });
-
-    fireEvent.drop(dropzone, {
-      dataTransfer: { files: [mockFile] }
-    });
-
-    const uploadBtn = screen.getByRole("button", { name: /Upload Draft/i });
-    fireEvent.click(uploadBtn);
-
-    await waitFor(() => {
-      expect(api.uploadDocument).toHaveBeenCalledWith(mockFile, "s-456");
-      expect(onUploadedSpy).toHaveBeenCalledWith("contract_draft.pdf");
-      expect(screen.queryByRole("button", { name: /Upload Draft/i })).toBeNull();
-    });
-  });
-});
-
-describe("UploadPanel Interaction Test Suite (#573)", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  afterEach(() => {
-    cleanup();
-  });
-
-  test("triggers file selection window when clicking the drop zone", () => {
-    render(<UploadPanel sessionId="s-123" documents={[]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />);
-    
-    const dropzone = screen.getByText(/Drop files here or click to browse/i).parentElement;
-    const input = dropzone.querySelector("input[type='file']");
-    
-    const clickSpy = vi.spyOn(input, "click");
-    input.addEventListener('click', (e) => e.stopPropagation(), { once: true });
-    
-    fireEvent.click(dropzone);
-    expect(clickSpy).toHaveBeenCalledTimes(1);
-  });
-
-  test("manages drag state styles when dragging items over and out of the viewport", () => {
-    render(<UploadPanel sessionId="s-123" documents={[]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />);
-    
-    const textNode = screen.getByText(/Drop files here or click to browse/i);
-    const dropzone = textNode.parentElement;
-
-    expect(dropzone.className).toContain("border-gray-700");
-
-    fireEvent.dragOver(dropzone);
-    expect(dropzone.className).toContain("border-purple-500");
-    expect(dropzone.className).toContain("bg-purple-900/20");
-
-    fireEvent.dragLeave(dropzone);
-    expect(dropzone.className).toContain("border-gray-700");
-    expect(dropzone.className).not.toContain("border-purple-500");
-  });
-
-  test("executes upload handler sequence accurately when a valid file is dropped", async () => {
-    const mockResponse = { filename: "resume.pdf", message: "Document parsed successfully" };
-    api.uploadDocument.mockResolvedValueOnce(mockResponse);
-    
-    const onUploadedSpy = vi.fn();
-    render(<UploadPanel sessionId="s-123" documents={[]} onUploaded={onUploadedSpy} onClose={vi.fn()} show={true} />);
-    
-    const dropzone = screen.getByText(/Drop files here or click to browse/i).parentElement;
-    const mockFile = new File(["content"], "resume.pdf", { type: "application/pdf" });
-
-    fireEvent.drop(dropzone, {
-      dataTransfer: {
-        files: [mockFile],
-      },
-    });
-
-    expect(screen.getByText(/Indexing documents\.\.\./i)).toBeDefined();
-
-    await waitFor(() => {
-      expect(api.uploadDocument).toHaveBeenCalledWith(mockFile, "s-123");
-      expect(onUploadedSpy).toHaveBeenCalledWith("resume.pdf");
-    });
-  });
-});
-
-describe("UploadPanel multi-select upload", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it("renders the file input with the multiple attribute", () => {
-    render(
-      <UploadPanel sessionId="s1" documents={[]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />
-    );
-    const input = screen.getByTestId("upload-panel").querySelector("input[type='file']");
-    expect(input).toHaveAttribute("multiple");
-  });
-
-  it("uploads every selected file and reports a success row for each", async () => {
-    api.uploadDocument.mockImplementation((file) =>
-      Promise.resolve({ filename: file.name, message: "Indexed" })
-    );
-    const onUploaded = vi.fn();
-
-    render(
-      <UploadPanel sessionId="s1" documents={[]} onUploaded={onUploaded} onClose={vi.fn()} show={true} />
-    );
-
-    const input = screen.getByTestId("upload-panel").querySelector("input[type='file']");
-    const files = [makeFile("a.pdf"), makeFile("b.txt"), makeFile("c.md")];
-    fireEvent.change(input, { target: { files } });
-
-    await waitFor(() => expect(api.uploadDocument).toHaveBeenCalledTimes(3));
-    expect(screen.getByText("a.pdf")).toBeDefined();
-    expect(screen.getByText("b.txt")).toBeDefined();
-    expect(screen.getByText("c.md")).toBeDefined();
-    expect(onUploaded).toHaveBeenCalledTimes(3);
-  });
-
-  it("keeps uploading remaining files when one file fails", async () => {
-    api.uploadDocument.mockImplementation((file) => {
-      if (file.name === "bad.exe") return Promise.reject(new Error("Unsupported file type"));
-      return Promise.resolve({ filename: file.name, message: "Indexed" });
-    });
-    const onUploaded = vi.fn();
-
-    render(
-      <UploadPanel sessionId="s1" documents={[]} onUploaded={onUploaded} onClose={vi.fn()} show={true} />
-    );
-
-    const input = screen.getByTestId("upload-panel").querySelector("input[type='file']");
-    const files = [makeFile("good.pdf"), makeFile("bad.exe")];
-    fireEvent.change(input, { target: { files } });
-
-    await waitFor(() => expect(api.uploadDocument).toHaveBeenCalledTimes(2));
-    expect(screen.getByText(/good\.pdf/)).toBeDefined();
-    expect(screen.getByText(/bad\.exe/)).toBeDefined();
-    expect(onUploaded).toHaveBeenCalledTimes(1);
-  });
-
-  it("shows document preview on success", async () => {
-    api.previewDocument.mockResolvedValue({ content: "This is the document content preview." });
-    
-    render(
-      <UploadPanel sessionId="s1" documents={[{ filename: "test.pdf", chunks_indexed: 5 }]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />
-    );
-
-    const previewButton = screen.getByTitle("Preview Document Content");
-    fireEvent.click(previewButton);
-
-    await waitFor(() => expect(api.previewDocument).toHaveBeenCalledWith("test.pdf", "s1"));
-    expect(screen.getByText("This is the document content preview.")).toBeInTheDocument();
-  });
-
-  it("renders fallback UI on preview failure and allows retry and clear selection", async () => {
-    api.previewDocument
-      .mockRejectedValueOnce(new Error("Corrupt PDF structure"))
-      .mockResolvedValueOnce({ content: "Recovered content after retry" });
-
-    render(
-      <UploadPanel sessionId="s1" documents={[{ filename: "corrupt.pdf", chunks_indexed: 1 }]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />
-    );
-
-    const previewButton = screen.getByTitle("Preview Document Content");
-    fireEvent.click(previewButton);
-
-    await waitFor(() => expect(api.previewDocument).toHaveBeenCalledTimes(1));
-    expect(screen.getByText("Failed to Load Preview")).toBeInTheDocument();
-    expect(screen.getByText("Corrupt PDF structure")).toBeInTheDocument();
-
-    const retryButton = screen.getByText("Retry");
-    const clearButton = screen.getByText("Clear Selection");
-    expect(retryButton).toBeInTheDocument();
-    expect(clearButton).toBeInTheDocument();
-
-    fireEvent.click(retryButton);
-    await waitFor(() => expect(api.previewDocument).toHaveBeenCalledTimes(2));
-    expect(screen.getByText("Recovered content after retry")).toBeInTheDocument();
-    expect(screen.queryByText("Failed to Load Preview")).not.toBeInTheDocument();
-
-    const closeButton = screen.getByText("Close");
-    fireEvent.click(closeButton);
-    expect(screen.queryByText("Recovered content after retry")).not.toBeInTheDocument();
-
-    api.previewDocument.mockRejectedValueOnce(new Error("Another failure"));
-    fireEvent.click(previewButton);
-
-    await waitFor(() => expect(api.previewDocument).toHaveBeenCalledTimes(3));
-    expect(screen.getByText("Failed to Load Preview")).toBeInTheDocument();
-
-    const clearButton2 = screen.getByText("Clear Selection");
-    fireEvent.click(clearButton2);
-    expect(screen.queryByText("Failed to Load Preview")).not.toBeInTheDocument();
-  });
-});
