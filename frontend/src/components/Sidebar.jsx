@@ -31,6 +31,8 @@ export default function Sidebar({
   onLanguageChange,
   onUpdateSessionColor,
   onRenameSession, 
+  error,
+  onErrorDismiss,
 }) {
   const [search, setSearch] = useState("");
   const [activeIndex, setActiveIndex] = useState(-1);
@@ -302,6 +304,29 @@ export default function Sidebar({
             <span className="block text-xs text-purple-300 font-normal opacity-75">Ctrl+Shift+N</span>
           </button>
         </div>
+
+        {/* --- INLINE ERROR BANNER (#555) --- */}
+        {error && (
+          <div 
+            data-testid="sidebar-error-banner" 
+            className="mx-4 mt-3 text-xs bg-red-950/45 border border-red-900/60 text-red-400 p-2.5 rounded-xl flex items-start gap-2"
+          >
+            <div className="flex-1">
+              <p className="font-semibold text-red-300">Sync Failure</p>
+              <p className="text-red-400/90 leading-relaxed mt-0.5">{error}</p>
+            </div>
+            {onErrorDismiss && (
+              <button 
+                type="button" 
+                onClick={onErrorDismiss}
+                className="text-red-400/60 hover:text-red-300 font-bold px-1 rounded transition focus:outline-none"
+                aria-label="Dismiss sidebar banner"
+              >
+                ×
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Model Selector Parameters */}
         <div className="px-4 py-3 border-b border-gray-800">

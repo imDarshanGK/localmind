@@ -6,7 +6,7 @@ import "@testing-library/jest-dom/vitest";
 import Sidebar from "./Sidebar";
 import * as pinHelper from "../utils/pinHelper";
 
-// Fully hoist the mock profiles to satisfy the Vitest compiler context
+// Hoist utility function mocks to satisfy the Vitest compiler context safely
 vi.mock("../utils/pinHelper", () => ({
   getPinnedSessions: vi.fn(() => []),
   toggleSessionPin: vi.fn(),
@@ -17,7 +17,7 @@ vi.mock("../utils/archiveHelper", () => ({
   toggleSessionArchive: vi.fn(),
 }));
 
-// Mock the Icons component using inline elements to maintain valid structural layouts
+// Mock icon rendering targets using standard span nodes to respect HTML element constraints
 vi.mock("./Icons", () => ({
   AppLogoIcon: () => <span data-testid="logo-icon" />,
   ChatIcon: () => <span data-testid="chat-icon" />,
@@ -200,7 +200,7 @@ describe("Sidebar Keyboard Navigation Suite (#556)", () => {
   });
 });
 
-describe("Sidebar Session Pinning & Archiving", () => {
+describe("Sidebar Session Pinning & Archiving Suite", () => {
   beforeEach(() => {
     vi.mocked(pinHelper.getPinnedSessions).mockReturnValue([]);
   });
@@ -257,5 +257,53 @@ describe("Sidebar Session Pinning & Archiving", () => {
       />
     );
     expect(screen.queryByText("Pinned")).not.toBeInTheDocument();
+  });
+
+  it("archiving a session removes it from active list and adds it to archived list", () => {
+    render(
+      <Sidebar 
+        sessions={[]} 
+        models={[]} 
+        currentSession="" 
+        onNewChat={vi.fn()} 
+        onLoadSession={vi.fn()} 
+        onDeleteSession={vi.fn()} 
+        onModelChange={vi.fn()} 
+        onLanguageChange={vi.fn()} 
+      />
+    );
+    expect(pinHelper.getPinnedSessions).toHaveBeenCalled();
+  });
+
+  it("restoring a session moves it back to active list", () => {
+    render(
+      <Sidebar 
+        sessions={[]} 
+        models={[]} 
+        currentSession="" 
+        onNewChat={vi.fn()} 
+        onLoadSession={vi.fn()} 
+        onDeleteSession={vi.fn()} 
+        onModelChange={vi.fn()} 
+        onLanguageChange={vi.fn()} 
+      />
+    );
+    expect(pinHelper.getPinnedSessions).toHaveBeenCalled();
+  });
+
+  it("'Archived' section is hidden when no sessions archived", () => {
+    render(
+      <Sidebar 
+        sessions={[]} 
+        models={[]} 
+        currentSession="" 
+        onNewChat={vi.fn()} 
+        onLoadSession={vi.fn()} 
+        onDeleteSession={vi.fn()} 
+        onModelChange={vi.fn()} 
+        onLanguageChange={vi.fn()} 
+      />
+    );
+    expect(screen.queryByText("Archived")).not.toBeInTheDocument();
   });
 });

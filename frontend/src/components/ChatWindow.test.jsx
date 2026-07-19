@@ -6,6 +6,8 @@ import ChatWindow from './ChatWindow';
 import { exportSession } from '../utils/api';
 expect.extend(jestDomMatchers);
 
+expect.extend(jestDomMatchers);
+
 // Mock clipboard API functionality using Vitest utilities
 Object.assign(navigator, {
   clipboard: { writeText: vi.fn().mockImplementation(() => Promise.resolve()) },
