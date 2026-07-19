@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import React from "react";
 import Sidebar from "./Sidebar";
@@ -24,6 +24,7 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+// --- SUITE 1: PINNING & ARCHIVING SUITE ---
 describe("Sidebar Session Pinning & Archiving", () => {
   beforeEach(() => {
     vi.mocked(pinHelper.getPinnedSessions).mockReturnValue([]);
@@ -64,5 +65,44 @@ describe("Sidebar Session Pinning & Archiving", () => {
   it("'Archived' section is hidden when no sessions archived", () => {
     render(<Sidebar sessions={[]} models={[]} activeSessionId="" onSelectSession={vi.fn()} />);
     expect(screen.queryByText("Archived")).not.toBeInTheDocument();
+  });
+});
+
+// --- SUITE 2: INLINE ERROR BANNER (#555) ---
+describe("Sidebar Global Error Banner Interface Suite (#555)", () => {
+  it("avoids compiling alert nodes inside default view frames when no error exists", () => {
+    render(<Sidebar sessions={[]} models={[]} activeSessionId="" onSelectSession={vi.fn()} error="" />);
+    expect(screen.queryByTestId("sidebar-error-banner")).toBeNull();
+  });
+
+  it("renders full structured banner details successfully when an error prop is provided", () => {
+    const errorMessage = "Failed to sync chat history with local database context.";
+    
+    render(<Sidebar sessions={[]} models={[]} activeSessionId="" onSelectSession={vi.fn()} error={errorMessage} />);
+    
+    const banner = screen.getByTestId("sidebar-error-banner");
+    expect(banner).toBeInTheDocument();
+    expect(screen.getByText("Sync Failure")).toBeInTheDocument();
+    expect(screen.getByText(errorMessage)).toBeInTheDocument();
+  });
+
+  it("fires an onErrorDismiss or clear handler when clicking the close button on the banner", () => {
+    const onErrorDismissSpy = vi.fn();
+    
+    render(
+      <Sidebar 
+        sessions={[]}
+        models={[]} 
+        activeSessionId="" 
+        onSelectSession={vi.fn()}
+        error="Temporary connection warning" 
+        onErrorDismiss={onErrorDismissSpy} 
+      />
+    );
+    
+    const closeButton = screen.getByLabelText("Dismiss sidebar banner");
+    fireEvent.click(closeButton);
+    
+    expect(onErrorDismissSpy).toHaveBeenCalledTimes(1);
   });
 });
