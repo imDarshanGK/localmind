@@ -35,6 +35,8 @@ export default function Sidebar({
   onErrorDismiss,
 }) {
   const [search, setSearch] = useState("");
+  const [activeIndex, setActiveIndex] = useState(-1);
+
   // --- Issue #95: Loading guard state to debounce multiple sequential clicks ---
   const [creating, setCreating] = useState(false);
   
@@ -73,6 +75,44 @@ export default function Sidebar({
   const filtered = sessions.filter((s) => s.title?.toLowerCase().includes(search.toLowerCase()));
   const pinnedSessions = filtered.filter((s) => pinnedIds.includes(s.id));
   const unpinnedSessions = filtered.filter((s) => !pinnedIds.includes(s.id));
+
+  // Reset keyboard navigation focus index whenever searches change
+  useEffect(() => {
+    setActiveIndex(-1);
+  }, [search]);
+
+  // Handle keyboard navigation across the split session items list
+  const handleKeyDown = (e) => {
+    const totalItems = pinnedSessions.length + unpinnedSessions.length;
+    if (totalItems === 0) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActiveIndex((prev) => (prev < totalItems - 1 ? prev + 1 : 0));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActiveIndex((prev) => (prev > 0 ? prev - 1 : totalItems - 1));
+    } else if (e.key === "Enter" && activeIndex >= 0) {
+      e.preventDefault();
+      const targetSession = activeIndex < pinnedSessions.length 
+        ? pinnedSessions[activeIndex] 
+        : unpinnedSessions[activeIndex - pinnedSessions.length];
+      if (targetSession) {
+        onLoadSession(targetSession.id);
+        setIsOpen(false);
+      }
+    } else if (e.key === "Delete" && activeIndex >= 0) {
+      e.preventDefault();
+      const targetSession = activeIndex < pinnedSessions.length 
+        ? pinnedSessions[activeIndex] 
+        : unpinnedSessions[activeIndex - pinnedSessions.length];
+      if (targetSession) {
+        setDeleteConfirm({ sessionId: targetSession.id, sessionName: targetSession.title });
+      }
+    } else if (e.key === "Escape") {
+      setActiveIndex(-1);
+    }
+  };
 
   // Wraps the click execution with the async guard layout
   async function handleCreateChat() {
@@ -115,12 +155,21 @@ export default function Sidebar({
   const renderSessionRow = (s) => {
     const isActive = currentSession === s.id;
     const isPinned = pinnedIds.includes(s.id);
+
+    // Compute virtual list indices cleanly to handle focus tracking across dynamic partitions
+    const globalIdx = isPinned 
+      ? pinnedSessions.findIndex(x => x.id === s.id) 
+      : pinnedSessions.length + unpinnedSessions.findIndex(x => x.id === s.id);
+
+    const isFocusedViaKeyboard = activeIndex === globalIdx;
+
     return (
       <div
         key={s.id}
+        data-testid={`sidebar-item-${globalIdx}`}
         onContextMenu={(e) => handleContextMenu(e, s.id)}
         className={`relative group flex items-center justify-between rounded-lg mb-0.5 transition pl-1 pr-1
-          ${isActive ? "bg-gray-700" : "hover:bg-gray-800"}`}
+          ${isActive || isFocusedViaKeyboard ? "bg-gray-700 ring-1 ring-purple-500" : "hover:bg-gray-800"}`}
       >
         <span
           aria-hidden="true"
@@ -155,7 +204,7 @@ export default function Sidebar({
                 onLoadSession(s.id);
                 setIsOpen(false);
               }} 
-              className={`inline-flex items-center gap-1.5 w-full ${isActive ? "text-white" : ""}`}
+              className={`inline-flex items-center gap-1.5 w-full ${isActive || isFocusedViaKeyboard ? "text-white" : ""}`}
             >
               <ChatIcon className="w-3.5 h-3.5 text-gray-500 shrink-0" />
               <span
@@ -179,6 +228,7 @@ export default function Sidebar({
           <button
             onClick={(e) => handleTogglePin(e, s.id)}
             aria-label={isPinned ? "Unpin chat" : "Pin chat"}
+            tabIndex={-1}
             className={`relative group/pin px-1 py-2 transition text-xs ${
               isPinned ? "text-purple-400 opacity-100" : "text-gray-500 opacity-0 group-hover:opacity-100 hover:text-gray-300"
             }`}
@@ -192,6 +242,7 @@ export default function Sidebar({
           <button
             onClick={() => setDeleteConfirm({ sessionId: s.id, sessionName: s.title })}
             aria-label="Delete chat"
+            tabIndex={-1}
             className="relative group/del opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 px-1.5 py-2 transition text-sm font-medium shrink-0"
           >
             ×
@@ -229,7 +280,7 @@ export default function Sidebar({
         className={`
           fixed inset-y-0 left-0 z-40 transform transition-transform duration-300 ease-in-out
           md:relative md:transform-none md:translate-x-0 md:z-auto
-          flex flex-col bg-gray-900 border-r border-gray-800 shrink-0
+          flex flex-col bg-gray-900 border-r border-gray-800 shrink-0 outline-none
           ${isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
         `}
         style={{ width: "260px" }}
@@ -335,8 +386,13 @@ export default function Sidebar({
           />
         </div>
 
-        {/* Chat Sessions Lists */}
-        <div className="flex-1 overflow-y-auto px-2 py-2">
+        {/* Chat Sessions Lists Context Wrapper with key listeners */}
+        <div 
+          data-testid="sidebar-sessions-list"
+          tabIndex={0}
+          onKeyDown={handleKeyDown}
+          className="flex-1 overflow-y-auto px-2 py-2 outline-none"
+        >
           {filtered.length === 0 && (
             <p className="text-xs text-gray-600 px-2 py-1">
               {sessions.length === 0 ? "No chats yet. Start one!" : "No results."}
@@ -385,6 +441,7 @@ export default function Sidebar({
           onConfirm={() => {
             onDeleteSession(deleteConfirm.sessionId);
             setDeleteConfirm(null);
+            setActiveIndex(-1);
           }}
           onClose={() => setDeleteConfirm(null)}
         />
