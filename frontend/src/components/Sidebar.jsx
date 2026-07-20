@@ -120,6 +120,7 @@ export default function Sidebar({
     setCreating(true);
     try {
       await onNewChat();
+      setIsOpen(false);
     } catch (err) {
       console.error("Failed to initialize session context:", err);
     } finally {
@@ -177,7 +178,7 @@ export default function Sidebar({
             ${isActive ? "opacity-100 animate-pulse" : "opacity-0"}`}
         />
         
-        {/* Issue #96 & #226: Interactive element boundary area wrapper */}
+        {/* Interactive element boundary area wrapper */}
         <div 
           onDoubleClick={() => {
             setEditingId(s.id);
@@ -262,7 +263,7 @@ export default function Sidebar({
       {/* --- Mobile Hamburger Toggle Trigger --- */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="md:hidden fixed top-3 left-3 z-50 p-2 rounded-xl bg-gray-800 border border-gray-700 text-gray-300 hover:text-white transition shadow-md"
+        className="md:hidden fixed top-3 left-3 z-50 p-2 rounded-xl bg-gray-800 border border-gray-700 text-gray-300 hover:text-white transition shadow-md outline-none"
         aria-label="Toggle Navigation Sidebar"
       >
         {isOpen ? (
@@ -275,7 +276,13 @@ export default function Sidebar({
       </button>
 
       {/* --- Mobile Dim Backdrop Overlay --- */}
-      {isOpen && <div onClick={() => setIsOpen(false)} className="md:hidden fixed inset-0 bg-black/60 z-40 backdrop-blur-xs transition" />}
+      {isOpen && (
+        <div 
+          onClick={() => setIsOpen(false)} 
+          className="md:hidden fixed inset-0 bg-black/60 z-40 backdrop-blur-xs transition"
+          data-testid="sidebar-backdrop"
+        />
+      )}
 
       {/* --- Responsive Sidebar Shell Container updated to <aside> landmark --- */}
       <aside

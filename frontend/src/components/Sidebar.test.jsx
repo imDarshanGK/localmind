@@ -31,6 +31,86 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+// --- Mobile Responsive Layout Tests (#557) ---
+describe("Sidebar Component - Mobile Responsive Layout (#557)", () => {
+  const mockSessions = [
+    { id: "1", title: "Mobile Session A", message_count: 1 },
+    { id: "2", title: "Mobile Session B", message_count: 0 },
+  ];
+  const mockModels = [{ name: "llama3" }];
+
+  let defaultProps;
+
+  beforeEach(() => {
+    defaultProps = {
+      sessions: mockSessions,
+      currentSession: "1",
+      models: mockModels,
+      model: "llama3",
+      language: "en",
+      onNewChat: vi.fn(),
+      onLoadSession: vi.fn(),
+      onDeleteSession: vi.fn(),
+      onModelChange: vi.fn(),
+      onLanguageChange: vi.fn(),
+    };
+  });
+
+  it("toggles the visibility of the mobile sidebar when clicking the hamburger trigger button", () => {
+    render(<Sidebar {...defaultProps} />);
+
+    const toggleBtn = screen.getByRole("button", { name: /toggle navigation sidebar/i });
+    expect(toggleBtn).toBeInTheDocument();
+    expect(screen.queryByTestId("sidebar-backdrop")).not.toBeInTheDocument();
+
+    fireEvent.click(toggleBtn);
+    expect(screen.getByTestId("sidebar-backdrop")).toBeInTheDocument();
+
+    fireEvent.click(toggleBtn);
+    expect(screen.queryByTestId("sidebar-backdrop")).not.toBeInTheDocument();
+  });
+
+  it("dismisses the open side drawer menu when clicking the backdrop overlay dim screen", () => {
+    render(<Sidebar {...defaultProps} />);
+
+    const toggleBtn = screen.getByRole("button", { name: /toggle navigation sidebar/i });
+    fireEvent.click(toggleBtn);
+
+    const backdrop = screen.getByTestId("sidebar-backdrop");
+    expect(backdrop).toBeInTheDocument();
+
+    fireEvent.click(backdrop);
+    expect(screen.queryByTestId("sidebar-backdrop")).not.toBeInTheDocument();
+  });
+
+  it("auto-closes the mobile sidebar panel drawer when selecting a session row item", () => {
+    render(<Sidebar {...defaultProps} />);
+
+    const toggleBtn = screen.getByRole("button", { name: /toggle navigation sidebar/i });
+    fireEvent.click(toggleBtn);
+
+    const sessionBtn = screen.getByRole("button", { name: /mobile session a/i });
+    fireEvent.click(sessionBtn);
+
+    expect(defaultProps.onLoadSession).toHaveBeenCalledWith("1");
+    expect(screen.queryByTestId("sidebar-backdrop")).not.toBeInTheDocument();
+  });
+
+  it("auto-closes the mobile sidebar panel drawer when clicking the + New Chat button option", () => {
+    render(<Sidebar {...defaultProps} />);
+
+    const toggleBtn = screen.getByRole("button", { name: /toggle navigation sidebar/i });
+    fireEvent.click(toggleBtn);
+
+    const newChatBtn = screen.getByRole("button", { name: /\+ new chat/i });
+    fireEvent.click(newChatBtn);
+
+    expect(defaultProps.onNewChat).toHaveBeenCalled();
+    expect(screen.queryByTestId("sidebar-backdrop")).not.toBeInTheDocument();
+  });
+});
+
+// --- Accessibility Overhaul Tests (#558) ---
 describe("Sidebar Component - Accessibility Landmarks (#558)", () => {
   const mockSessions = [
     { id: "1", title: "Accessible Session A", message_count: 2 },
@@ -69,7 +149,7 @@ describe("Sidebar Component - Accessibility Landmarks (#558)", () => {
     const searchLandmark = screen.getByRole("search");
     expect(searchLandmark).toBeInTheDocument();
     
-    const searchInput = screen.getByLabelText(/search chat sessions history/i);
+    const searchInput = screen.getByPlaceholderText("Search chats...");
     expect(searchLandmark).toContainElement(searchInput);
   });
 
@@ -84,7 +164,6 @@ describe("Sidebar Component - Accessibility Landmarks (#558)", () => {
   it("should expose aria-current targets reflecting the active dynamic session focus context", () => {
     render(<Sidebar {...defaultProps} />);
     
-    // Target the specific chat navigation button using a custom matcher function or precise substring
     const activeBtn = screen.getByRole("button", { name: (content) => content.includes("Accessible Session A") && !content.includes("Delete") });
     const inactiveBtn = screen.getByRole("button", { name: "Accessible Session B" });
     
@@ -101,6 +180,7 @@ describe("Sidebar Component - Accessibility Landmarks (#558)", () => {
   });
 });
 
+// --- Core Functionality Tests ---
 describe("Sidebar Component - Core Functionality", () => {
   const mockSessions = [
     { id: "1", title: "First Session", message_count: 2 },
@@ -153,6 +233,7 @@ describe("Sidebar Component - Core Functionality", () => {
   });
 });
 
+// --- Keyboard Navigation Tests (#556) ---
 describe("Sidebar Keyboard Navigation Suite (#556)", () => {
   const mockSessions = [
     { id: "1", title: "First Session", message_count: 2 },
@@ -178,19 +259,15 @@ describe("Sidebar Keyboard Navigation Suite (#556)", () => {
 
     const listContainer = screen.getByTestId("sidebar-sessions-list");
 
-    // Press ArrowDown to jump to the first item (Index 0)
     fireEvent.keyDown(listContainer, { key: "ArrowDown" });
     expect(screen.getByTestId("sidebar-item-0").className).toContain("bg-gray-700");
 
-    // Press ArrowDown again to move to the second item (Index 1)
     fireEvent.keyDown(listContainer, { key: "ArrowDown" });
     expect(screen.getByTestId("sidebar-item-1").className).toContain("bg-gray-700");
 
-    // Press ArrowDown again to verify list wrap-around (Index 0)
     fireEvent.keyDown(listContainer, { key: "ArrowDown" });
     expect(screen.getByTestId("sidebar-item-0").className).toContain("bg-gray-700");
 
-    // Press ArrowUp to verify backward wrap-around (Index 1)
     fireEvent.keyDown(listContainer, { key: "ArrowUp" });
     expect(screen.getByTestId("sidebar-item-1").className).toContain("bg-gray-700");
   });
@@ -270,6 +347,7 @@ describe("Sidebar Keyboard Navigation Suite (#556)", () => {
   });
 });
 
+// --- Pinning & Archiving Tests ---
 describe("Sidebar Session Pinning & Archiving Suite", () => {
   beforeEach(() => {
     vi.mocked(pinHelper.getPinnedSessions).mockReturnValue([]);
