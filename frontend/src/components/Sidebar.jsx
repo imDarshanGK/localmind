@@ -2,19 +2,38 @@ import { useState } from "react";
 import { AppLogoIcon, ChatIcon, LockIcon, StarIcon } from "./Icons";
 
 const LANGUAGES = [
-  {code:"en",label:"English"},{code:"hi",label:"हिन्दी"},{code:"ta",label:"தமிழ்"},
-  {code:"te",label:"తెలుగు"},{code:"kn",label:"ಕನ್ನಡ"},{code:"fr",label:"Français"},
-  {code:"de",label:"Deutsch"},{code:"es",label:"Español"},
+  { code: "en", label: "English" },
+  { code: "hi", label: "हिन्दी" },
+  { code: "ta", label: "தமிழ்" },
+  { code: "te", label: "తెలుగు" },
+  { code: "kn", label: "ಕನ್ನಡ" },
+  { code: "fr", label: "Français" },
+  { code: "de", label: "Deutsch" },
+  { code: "es", label: "Español" },
 ];
 
-export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSession, onDeleteSession, model, models, onModelChange, language, onLanguageChange }) {
+export default function Sidebar({
+  sessions,
+  currentSession,
+  onNewChat,
+  onLoadSession,
+  onDeleteSession,
+  model,
+  models,
+  onModelChange,
+  language,
+  onLanguageChange,
+}) {
   const [search, setSearch] = useState("");
-  const modelList = models.length > 0 ? models.map(m=>m.name) : ["llama3","mistral","phi3","gemma2"];
-  const filtered  = sessions.filter(s => s.title?.toLowerCase().includes(search.toLowerCase()));
+  const modelList =
+    models.length > 0 ? models.map((m) => m.name) : ["llama3", "mistral", "phi3", "gemma2"];
+  const filtered = sessions.filter((s) =>
+    s.title?.toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
     <div className="w-64 flex flex-col bg-gray-900 border-r border-gray-800 shrink-0">
-      {/* Logo */}
+      {/* Logo & New Chat */}
       <div className="px-4 pt-5 pb-4 border-b border-gray-800">
         <div className="flex items-center gap-2 mb-4">
           <AppLogoIcon className="w-6 h-6 text-purple-400" />
@@ -23,57 +42,102 @@ export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSes
             <p className="text-xs text-gray-500">v2.0 · Offline AI</p>
           </div>
         </div>
-        <button onClick={onNewChat}
-          className="w-full text-sm bg-purple-700 hover:bg-purple-600 active:bg-purple-800 text-white py-2 rounded-xl font-medium transition">
+        <button
+          onClick={onNewChat}
+          title="Start a new chat session"
+          aria-label="Start a new chat session"
+          className="w-full text-sm bg-purple-700 hover:bg-purple-600 active:bg-purple-800 text-white py-2 rounded-xl font-medium transition"
+        >
           + New Chat
         </button>
       </div>
 
-      {/* Model */}
+      {/* Model & Language Controls */}
       <div className="px-4 py-3 border-b border-gray-800">
-        <label className="text-xs text-gray-500 block mb-1">AI Model</label>
-        <select value={model} onChange={e=>onModelChange(e.target.value)}
-          className="w-full text-xs bg-gray-800 text-gray-200 border border-gray-700 rounded-lg px-2 py-1.5 outline-none focus:border-purple-500">
-          {modelList.map(m => <option key={m} value={m}>{m}</option>)}
+        <label htmlFor="ai-model-select" className="text-xs text-gray-500 block mb-1">
+          AI Model
+        </label>
+        <select
+          id="ai-model-select"
+          value={model}
+          onChange={(e) => onModelChange(e.target.value)}
+          title="Select AI Model for active conversation"
+          aria-label="Select AI Model"
+          className="w-full text-xs bg-gray-800 text-gray-200 border border-gray-700 rounded-lg px-2 py-1.5 outline-none focus:border-purple-500"
+        >
+          {modelList.map((m) => (
+            <option key={m} value={m}>
+              {m}
+            </option>
+          ))}
         </select>
-        <label className="text-xs text-gray-500 block mb-1 mt-2">Language</label>
-        <select value={language} onChange={e=>onLanguageChange(e.target.value)}
-          className="w-full text-xs bg-gray-800 text-gray-200 border border-gray-700 rounded-lg px-2 py-1.5 outline-none focus:border-purple-500">
-          {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
+
+        <label htmlFor="language-select" className="text-xs text-gray-500 block mb-1 mt-2">
+          Language
+        </label>
+        <select
+          id="language-select"
+          value={language}
+          onChange={(e) => onLanguageChange(e.target.value)}
+          title="Change sidebar interface language"
+          aria-label="Select Interface Language"
+          className="w-full text-xs bg-gray-800 text-gray-200 border border-gray-700 rounded-lg px-2 py-1.5 outline-none focus:border-purple-500"
+        >
+          {LANGUAGES.map((l) => (
+            <option key={l.code} value={l.code}>
+              {l.label}
+            </option>
+          ))}
         </select>
       </div>
 
-      {/* Search */}
+      {/* Search Input */}
       <div className="px-3 py-2 border-b border-gray-800">
-        <input value={search} onChange={e=>setSearch(e.target.value)}
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
           placeholder="Search chats..."
-          className="w-full text-xs bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-gray-300 placeholder-gray-600 outline-none focus:border-purple-500" />
+          title="Filter chat history by title"
+          aria-label="Search chat sessions history"
+          className="w-full text-xs bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-gray-300 placeholder-gray-600 outline-none focus:border-purple-500"
+        />
       </div>
 
-      {/* Sessions */}
+      {/* Sessions List */}
       <div className="flex-1 overflow-y-auto px-2 py-2">
         {filtered.length === 0 && (
           <p className="text-xs text-gray-600 px-2 py-1">
             {sessions.length === 0 ? "No chats yet. Start one!" : "No results."}
           </p>
         )}
-        {filtered.map(s => (
-          <div key={s.id} className={`group flex items-center gap-1 rounded-lg mb-0.5 transition
-            ${currentSession === s.id ? "bg-gray-700" : "hover:bg-gray-800"}`}>
-            <button onClick={()=>onLoadSession(s.id)}
-              className="flex-1 text-left text-xs px-3 py-2 truncate text-gray-400 group-hover:text-gray-200">
+        {filtered.map((s) => (
+          <div
+            key={s.id}
+            className={`group flex items-center gap-1 rounded-lg mb-0.5 transition ${
+              currentSession === s.id ? "bg-gray-700" : "hover:bg-gray-800"
+            }`}
+          >
+            <button
+              onClick={() => onLoadSession(s.id)}
+              title={`Switch to session: ${s.title || "New Chat"}`}
+              className="flex-1 text-left text-xs px-3 py-2 truncate text-gray-400 group-hover:text-gray-200"
+            >
               <span className={currentSession === s.id ? "text-white" : ""}>
-                <span className="inline-flex items-center gap-1.5">
-                  <ChatIcon className="w-3.5 h-3.5 text-gray-500" />
-                  <span>{s.title || "New Chat"}</span>
+                <span className="inline-flex items-center gap-1.5 truncate">
+                  <ChatIcon className="w-3.5 h-3.5 text-gray-500 shrink-0" />
+                  <span className="truncate">{s.title || "New Chat"}</span>
                 </span>
               </span>
               {s.message_count > 0 && (
-                <span className="ml-1 text-gray-600">{s.message_count}</span>
+                <span className="ml-1 text-gray-600">({s.message_count})</span>
               )}
             </button>
-            <button onClick={()=>onDeleteSession(s.id)}
-              className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 px-2 py-2 transition text-xs">
+            <button
+              onClick={() => onDeleteSession(s.id)}
+              title={`Delete session "${s.title || "New Chat"}"`}
+              aria-label={`Delete session ${s.title || "New Chat"}`}
+              className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 px-2 py-2 transition text-xs"
+            >
               ×
             </button>
           </div>
@@ -81,13 +145,18 @@ export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSes
       </div>
 
       {/* Footer */}
-      <div className="px-4 py-3 border-t border-gray-800">
-        <p className="text-xs text-gray-600 inline-flex items-center gap-1">
+      <div className="px-4 py-3 border-t border-gray-800 flex flex-col gap-1">
+        <p className="text-xs text-gray-600 inline-flex items-center gap-1" title="Local privacy statement">
           <LockIcon className="w-3.5 h-3.5" />
           <span>100% local · no cloud · MIT</span>
         </p>
-        <a href="https://github.com/yourusername/localmind" target="_blank" rel="noreferrer"
-          className="text-xs text-purple-500 hover:text-purple-400 transition inline-flex items-center gap-1">
+        <a
+          href="https://github.com/yourusername/localmind"
+          target="_blank"
+          rel="noreferrer"
+          title="Open GitHub Repository in a new tab"
+          className="text-xs text-purple-500 hover:text-purple-400 transition inline-flex items-center gap-1"
+        >
           <StarIcon className="w-3.5 h-3.5" />
           <span>Star on GitHub</span>
         </a>
