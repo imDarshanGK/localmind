@@ -5,8 +5,8 @@ import { CheckIcon, DocumentsIcon, ErrorIcon, SpinnerIcon, UploadIcon, FileIcon 
 export default function UploadPanel({ sessionId, documents, onUploaded, onClose }) {
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [result,    setResult]    = useState(null);
-  const [error,     setError]     = useState("");
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState("");
   const fileRef = useRef();
 
   async function handleFile(file) {
@@ -50,8 +50,8 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose 
       {result && <p className="text-xs text-green-400 mb-2 inline-flex items-center gap-1"><CheckIcon className="w-3.5 h-3.5" />{result.message}</p>}
       {error  && <p className="text-xs text-red-400 mb-2 inline-flex items-center gap-1"><ErrorIcon className="w-3.5 h-3.5" />{error}</p>}
 
-      {/* Uploaded docs list */}
-      {documents.length > 0 && (
+      {/* Uploaded docs list / Empty-state guidance (#565) */}
+      {documents && documents.length > 0 ? (
         <div>
           <p className="text-xs text-gray-500 mb-1">Indexed documents:</p>
           {documents.map((d, i) => (
@@ -60,6 +60,17 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose 
               {d.chunks_indexed && <span className="text-gray-500 ml-2 shrink-0">{d.chunks_indexed} chunks</span>}
             </div>
           ))}
+        </div>
+      ) : (
+        /* Empty-state guidance (#565) */
+        <div 
+          data-testid="upload-empty-state" 
+          className="bg-gray-950/40 border border-gray-800/80 rounded-xl p-4 text-center my-2"
+        >
+          <p className="text-xs font-medium text-gray-400 mb-1">No documents added yet</p>
+          <p className="text-[11px] text-gray-500 leading-relaxed">
+            Upload files above to index context for your session workspace. Supported formats include PDF, TXT, CSV, DOCX, MD, and HTML.
+          </p>
         </div>
       )}
     </div>
