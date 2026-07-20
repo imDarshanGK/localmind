@@ -116,11 +116,11 @@ export default function App() {
       } else {
         setOllamaOk(false);
       }
-      } catch (error) {
-          console.error(error);
-      } finally {
-          setSettingsLoading(false);
-      }
+    } catch (error) {
+        console.error(error);
+    } finally {
+        setSettingsLoading(false);
+    }
   }
 
   const refreshSessions = useCallback(async () => {
@@ -327,7 +327,7 @@ export default function App() {
     }, 5000);
   }
 
-  // --- Issue #261: Undo Handler Mechanism ---
+  // --- Issue #261: Undo Mechanism ---
   const handleUndoDelete = () => {
     if (!deletedSessionCache) return;
 
@@ -373,18 +373,6 @@ export default function App() {
     await api.clearMessages(sessionId);
     setMessages([]);
   }
-  if (settingsLoading) {
-  return (
-    <div className="flex items-center justify-center h-screen bg-gray-950">
-      <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-600 border-t-white"></div>
-    </div>
-  );
-}
-
-  // ─── Routing Interceptor ───
-  if (isSharedPath) {
-    return <SharedView />;
-  }
 
   const handleLanguageChange = useCallback(async (newLang) => {
     setLanguage(newLang);
@@ -415,6 +403,24 @@ export default function App() {
     setSessionColor(sid, color);
     setSessions(prev => prev.map(s => s.id === sid ? { ...s, color } : s));
   }, []);
+
+  // ─── Early Layout Rendering Interceptors (Placed safely after all Hook declarations) ───
+  if (settingsLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-gray-950">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-600 border-t-white"></div>
+      </div>
+    );
+  }
+
+  if (isSharedPath) {
+    return <SharedView />;
+  }
+
+  // Issue #275: Filter messages by search term context
+  const filteredMessages = messages.filter((msg) =>
+    msg.content?.toLowerCase().includes(searchTerm?.toLowerCase() || "")
+  );
 
   return (
     <div className={`flex h-screen overflow-hidden ${settings.theme === "light" ? "bg-gray-100" : "bg-gray-950"} text-gray-100 relative`}>

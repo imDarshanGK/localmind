@@ -82,6 +82,7 @@ export default function ChatWindow({ messages, loading, onSend, onDeleteMessage,
                 onClick={() => handleReactionToggle(msg.id, emoji)}
                 className={`p-0.5 text-xs hover:scale-125 transition-transform rounded-full ${isSelected ? 'bg-purple-500/20' : 'hover:bg-gray-800'}`}
                 title={`React with ${emoji}`}
+                aria-label={`React with ${emoji}`}
               >
                 {emoji}
               </button>
@@ -289,9 +290,9 @@ export default function ChatWindow({ messages, loading, onSend, onDeleteMessage,
                       <span className="text-xs font-semibold text-purple-400">LocalMind</span>
                     </div>
                     
-                    {/* --- Issue #263: Real-time token display with non-stream fallback --- */}
+                    {/* --- Issue #263: Real-time token display with polished alignment layout --- */}
                     {(msg.token_count > 0 || (!msg.streaming && msg.content)) && (
-                      <span className="text-[10px] bg-purple-950/60 text-purple-300 border border-purple-800/40 font-mono px-1.5 py-0.5 rounded-md shadow-sm">
+                      <span className="text-[10px] bg-purple-950/60 text-purple-300 border border-purple-800/40 font-mono px-1.5 py-0.5 rounded-md shadow-sm ml-1 mb-0.5">
                         {(msg.token_count > 0 ? msg.token_count : (msg.content ? Math.round(msg.content.trim().split(/\s+/).length * 1.3) : 0))} tokens
                       </span>
                     )}
@@ -339,7 +340,7 @@ export default function ChatWindow({ messages, loading, onSend, onDeleteMessage,
                       }
                     }}
                   >
-                    {msg.content}
+                    {msg.content ? msg.content.trim() : ""}
                   </ReactMarkdown>
                   {msg.streaming && <span className="inline-block w-1.5 h-4 bg-purple-400 ml-1 animate-pulse rounded" />}
                 </div>
@@ -433,7 +434,7 @@ export default function ChatWindow({ messages, loading, onSend, onDeleteMessage,
                     </button>
                     {renderDeleteControl(msg.id)}
                     <div className="relative" onMouseEnter={() => setHoveredStatsId(msg.id)} onMouseLeave={() => setHoveredStatsId(null)}>
-                      <button className="p-1 rounded hover:bg-gray-800 text-gray-500 hover:text-gray-300 transition" title="Performance stats">
+                      <button className="p-1 rounded hover:bg-gray-800 text-gray-500 hover:text-gray-300 transition" title="Performance stats" aria-label="Performance stats">
                         <ChartIcon className="w-4 h-4" />
                       </button>
                       {hoveredStatsId === msg.id && msg.benchmarks && Object.keys(msg.benchmarks).length > 0 && (
@@ -501,7 +502,7 @@ export default function ChatWindow({ messages, loading, onSend, onDeleteMessage,
                 <div className="flex items-center gap-1.5 bg-gray-800 rounded-lg px-2.5 py-1 w-fit">
                   <TemplateIcon className="w-3.5 h-3.5 text-purple-400" />
                   <span className="text-xs text-gray-300">{selectedTemplate.prompt_title}</span>
-                  <button onClick={() => setSelectedTemplate(null)} className="text-gray-500 hover:text-gray-300 transition">
+                  <button onClick={() => setSelectedTemplate(null)} className="text-gray-500 hover:text-gray-300 transition" aria-label="Clear template">
                     <CloseIcon className="w-3 h-3" />
                   </button>
                 </div>
