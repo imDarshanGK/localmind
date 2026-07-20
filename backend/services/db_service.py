@@ -228,6 +228,15 @@ def init_db():
                 success INTEGER DEFAULT 1,
                 created_at TEXT DEFAULT (datetime('now'))
             );
+
+            CREATE TABLE IF NOT EXISTS export_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id TEXT,
+                format TEXT NOT NULL,
+                export_type TEXT NOT NULL,
+                details TEXT,
+                created_at TEXT DEFAULT (datetime('now'))
+            );
                             
             CREATE TABLE IF NOT EXISTS shared_sessions (
                 id TEXT PRIMARY KEY,
@@ -445,6 +454,28 @@ def get_messages_full(session_id: str) -> list[dict]:
         ]
 
 
+def get_messages_by_ids(message_ids: list[str]) -> list[dict]:
+    if not message_ids:
+        return []
+    placeholders = ",".join("?" for _ in message_ids)
+    with get_db() as conn:
+        rows = conn.execute(
+            f"SELECT id, role, content, sources, created_at, benchmarks FROM messages WHERE id IN ({placeholders}) ORDER BY created_at ASC",
+            message_ids,
+        ).fetchall()
+        return [
+            {
+                "id": r["id"],
+                "role": r["role"],
+                "content": r["content"],
+                "sources": json.loads(r["sources"] or "[]"),
+                "created_at": r["created_at"],
+                "benchmarks": json.loads(r["benchmarks"] or "{}")
+            }
+            for r in rows
+        ]
+
+
 def clear_messages(session_id: str):
     with get_db() as conn:
         cur = conn.execute("DELETE FROM messages WHERE session_id=?", (session_id,))
@@ -554,6 +585,25 @@ def log_plugin(session_id: str, plugin: str, inp: str, out: str, success: bool =
             "INSERT INTO plugin_logs (session_id, plugin, input, output, success) VALUES (?,?,?,?,?)",
             (session_id, plugin, inp, out, int(success)),
         )
+
+
+# ─── Export logs ─────────────────────────────────────────────
+
+def get_export_logs(limit: int = 50) -> list[dict]:
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT * FROM export_logs ORDER BY id DESC LIMIT ?",
+            (limit,)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+def log_export(session_id: str | None, format: str, export_type: str, details: str = None):
+    with get_db() as conn:
+        conn.execute(
+            "INSERT INTO export_logs (session_id, format, export_type, details) VALUES (?,?,?,?)",
+            (session_id, format, export_type, details),
+        )
+
 
 
 # ─── Shareable Sessions (Issue #270) ─────────────────────────

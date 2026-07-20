@@ -1,5 +1,6 @@
 """Upload routes — /api/upload"""
 import os
+import asyncio
 from pathlib import Path
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Query, BackgroundTasks
 from models.schemas import UploadResponse
@@ -107,27 +108,66 @@ async def delete_document(doc_id: int):
 
 
 # --- Issue #265: Fetch Read-Only Document Preview Endpoint ---
-@router.get("/preview")
-async def preview_document(filename: str = Query(...), session_id: str = Query(...)):
-    file_path = os.path.join(".", "data", "uploads", session_id, filename)
-    
+def read_file_sync(file_path: str, ext: str) -> dict:
     if not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail="Document storage path not found.")
+        raise FileNotFoundError("Document storage path not found.")
         
+    # If it's a standard clear-text format file layout, parse it cleanly
+    if ext in [".txt", ".md", ".csv", ".html", ".srt", ".vtt"]:
+        with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+            content = f.read(50000) # Capped at 50k characters for UI fast loading optimization
+        return {"content": content}
+        
+    # For non-trivial binary sets (PDFs/DOCX), offer a safe notice for version 1
+    else:
+        return {
+            "content": f"[Binary Formatter Notice]\nPreviews for '{ext}' files are natively processed. Content indexed safely for Chat retrieval contexts."
+        }
+
+
+@router.get("/preview")
+async def preview_document(
+    filename: str = Query(...),
+    session_id: str = Query(...),
+    timeout: float = Query(5.0, description="Timeout in seconds for preview reading operations")
+):
+    file_path = os.path.join(".", "data", "uploads", session_id, filename)
     ext = Path(filename).suffix.lower()
     
-    try:
-        # If it's a standard clear-text format file layout, parse it cleanly
-        if ext in [".txt", ".md", ".csv", ".html", ".srt", ".vtt"]:
-            with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-                content = f.read(50000) # Capped at 50k characters for UI fast loading optimization
-            return {"content": content}
+    max_attempts = 3
+    backoff = 0.5
+    
+    for attempt in range(1, max_attempts + 1):
+        try:
+            # Enforce timeout using asyncio.wait_for and asyncio.to_thread
+            res = await asyncio.wait_for(
+                asyncio.to_thread(read_file_sync, file_path, ext),
+                timeout=timeout
+            )
+            return res
             
-        # For non-trivial binary sets (PDFs/DOCX), offer a safe notice for version 1
-        else:
-            return {
-                "content": f"[Binary Formatter Notice]\nPreviews for '{ext}' files are natively processed. Content indexed safely for Chat retrieval contexts."
-            }
+        except (TimeoutError, asyncio.TimeoutError) as e:
+            if attempt == max_attempts:
+                raise HTTPException(status_code=408, detail="Preview request timed out.")
             
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to read file contents: {str(e)}")
+            logger.warning(
+                "preview_retry_timeout route=/preview session=%s filename=%s attempt=%d/%d",
+                session_id, filename, attempt, max_attempts
+            )
+            await asyncio.sleep(backoff)
+            backoff *= 2
+            
+        except (FileNotFoundError, PermissionError, OSError) as e:
+            if attempt == max_attempts:
+                if isinstance(e, FileNotFoundError):
+                    raise HTTPException(status_code=404, detail="Document storage path not found.")
+                raise HTTPException(status_code=500, detail=f"Failed to read file contents: {str(e)}")
+            
+            logger.warning(
+                "preview_retry route=/preview session=%s filename=%s error=%s attempt=%d/%d",
+                session_id, filename, str(e), attempt, max_attempts
+            )
+            await asyncio.sleep(backoff)
+            backoff *= 2
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to read file contents: {str(e)}")
