@@ -2,15 +2,15 @@ import { useState } from "react";
 import { AppLogoIcon, ChatIcon, LockIcon, StarIcon } from "./Icons";
 
 const LANGUAGES = [
-  {code:"en",label:"English"},{code:"hi",label:"हिन्दी"},{code:"ta",label:"தமிழ்"},
-  {code:"te",label:"తెలుగు"},{code:"kn",label:"ಕನ್ನಡ"},{code:"fr",label:"Français"},
-  {code:"de",label:"Deutsch"},{code:"es",label:"Español"},
+  { code: "en", label: "English" }, { code: "hi", label: "हिन्दी" }, { code: "ta", label: "தமிழ்" },
+  { code: "te", label: "తెలుగు" }, { code: "kn", label: "ಕನ್ನಡ" }, { code: "fr", label: "Français" },
+  { code: "de", label: "Deutsch" }, { code: "es", label: "Español" },
 ];
 
 export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSession, onDeleteSession, model, models, onModelChange, language, onLanguageChange }) {
   const [search, setSearch] = useState("");
-  const modelList = models.length > 0 ? models.map(m=>m.name) : ["llama3","mistral","phi3","gemma2"];
-  const filtered  = sessions.filter(s => s.title?.toLowerCase().includes(search.toLowerCase()));
+  const modelList = models.length > 0 ? models.map(m => m.name) : ["llama3", "mistral", "phi3", "gemma2"];
+  const filtered = sessions.filter(s => s.title?.toLowerCase().includes(search.toLowerCase()));
 
   return (
     <div className="w-64 flex flex-col bg-gray-900 border-r border-gray-800 shrink-0">
@@ -23,45 +23,70 @@ export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSes
             <p className="text-xs text-gray-500">v2.0 · Offline AI</p>
           </div>
         </div>
-        <button onClick={onNewChat}
-          className="w-full text-sm bg-purple-700 hover:bg-purple-600 active:bg-purple-800 text-white py-2 rounded-xl font-medium transition">
+        <button 
+          data-testid="new-chat-btn"
+          onClick={onNewChat}
+          className="w-full text-sm bg-purple-700 hover:bg-purple-600 active:bg-purple-800 text-white py-2 rounded-xl font-medium transition"
+        >
           + New Chat
         </button>
       </div>
 
-      {/* Model */}
+      {/* Model & Language */}
       <div className="px-4 py-3 border-b border-gray-800">
-        <label className="text-xs text-gray-500 block mb-1">AI Model</label>
-        <select value={model} onChange={e=>onModelChange(e.target.value)}
-          className="w-full text-xs bg-gray-800 text-gray-200 border border-gray-700 rounded-lg px-2 py-1.5 outline-none focus:border-purple-500">
+        <label htmlFor="model-select" className="text-xs text-gray-500 block mb-1">AI Model</label>
+        <select 
+          id="model-select"
+          data-testid="model-select"
+          value={model} 
+          onChange={e => onModelChange(e.target.value)}
+          className="w-full text-xs bg-gray-800 text-gray-200 border border-gray-700 rounded-lg px-2 py-1.5 outline-none focus:border-purple-500"
+        >
           {modelList.map(m => <option key={m} value={m}>{m}</option>)}
         </select>
-        <label className="text-xs text-gray-500 block mb-1 mt-2">Language</label>
-        <select value={language} onChange={e=>onLanguageChange(e.target.value)}
-          className="w-full text-xs bg-gray-800 text-gray-200 border border-gray-700 rounded-lg px-2 py-1.5 outline-none focus:border-purple-500">
+
+        <label htmlFor="language-select" className="text-xs text-gray-500 block mb-1 mt-2">Language</label>
+        <select 
+          id="language-select"
+          data-testid="language-select"
+          value={language} 
+          onChange={e => onLanguageChange(e.target.value)}
+          className="w-full text-xs bg-gray-800 text-gray-200 border border-gray-700 rounded-lg px-2 py-1.5 outline-none focus:border-purple-500"
+        >
           {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
         </select>
       </div>
 
       {/* Search */}
       <div className="px-3 py-2 border-b border-gray-800">
-        <input value={search} onChange={e=>setSearch(e.target.value)}
+        <input 
+          data-testid="search-input"
+          value={search} 
+          onChange={e => setSearch(e.target.value)}
           placeholder="Search chats..."
-          className="w-full text-xs bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-gray-300 placeholder-gray-600 outline-none focus:border-purple-500" />
+          className="w-full text-xs bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-gray-300 placeholder-gray-600 outline-none focus:border-purple-500" 
+        />
       </div>
 
       {/* Sessions */}
-      <div className="flex-1 overflow-y-auto px-2 py-2">
+      <div className="flex-1 overflow-y-auto px-2 py-2" data-testid="sessions-list">
         {filtered.length === 0 && (
-          <p className="text-xs text-gray-600 px-2 py-1">
+          <p className="text-xs text-gray-600 px-2 py-1" data-testid="empty-message">
             {sessions.length === 0 ? "No chats yet. Start one!" : "No results."}
           </p>
         )}
         {filtered.map(s => (
-          <div key={s.id} className={`group flex items-center gap-1 rounded-lg mb-0.5 transition
-            ${currentSession === s.id ? "bg-gray-700" : "hover:bg-gray-800"}`}>
-            <button onClick={()=>onLoadSession(s.id)}
-              className="flex-1 text-left text-xs px-3 py-2 truncate text-gray-400 group-hover:text-gray-200">
+          <div 
+            key={s.id} 
+            data-testid={`session-item-${s.id}`}
+            className={`group flex items-center gap-1 rounded-lg mb-0.5 transition
+              ${currentSession === s.id ? "bg-gray-700" : "hover:bg-gray-800"}`}
+          >
+            <button 
+              data-testid={`load-session-${s.id}`}
+              onClick={() => onLoadSession(s.id)}
+              className="flex-1 text-left text-xs px-3 py-2 truncate text-gray-400 group-hover:text-gray-200"
+            >
               <span className={currentSession === s.id ? "text-white" : ""}>
                 <span className="inline-flex items-center gap-1.5">
                   <ChatIcon className="w-3.5 h-3.5 text-gray-500" />
@@ -69,11 +94,14 @@ export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSes
                 </span>
               </span>
               {s.message_count > 0 && (
-                <span className="ml-1 text-gray-600">{s.message_count}</span>
+                <span className="ml-1 text-gray-600" data-testid={`msg-count-${s.id}`}>{s.message_count}</span>
               )}
             </button>
-            <button onClick={()=>onDeleteSession(s.id)}
-              className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 px-2 py-2 transition text-xs">
+            <button 
+              data-testid={`delete-session-${s.id}`}
+              onClick={() => onDeleteSession(s.id)}
+              className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 px-2 py-2 transition text-xs"
+            >
               ×
             </button>
           </div>
