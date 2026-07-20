@@ -2,15 +2,29 @@ import { useState } from "react";
 import { AppLogoIcon, ChatIcon, LockIcon, StarIcon } from "./Icons";
 
 const LANGUAGES = [
-  {code:"en",label:"English"},{code:"hi",label:"हिन्दी"},{code:"ta",label:"தமிழ்"},
-  {code:"te",label:"తెలుగు"},{code:"kn",label:"ಕನ್ನಡ"},{code:"fr",label:"Français"},
-  {code:"de",label:"Deutsch"},{code:"es",label:"Español"},
+  { code: "en", label: "English" }, { code: "hi", label: "हिन्दी" }, { code: "ta", label: "தமிழ்" },
+  { code: "te", label: "తెలుగు" }, { code: "kn", label: "ಕನ್ನಡ" }, { code: "fr", label: "Français" },
+  { code: "de", label: "Deutsch" }, { code: "es", label: "Español" },
 ];
 
 export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSession, onDeleteSession, model, models, onModelChange, language, onLanguageChange }) {
   const [search, setSearch] = useState("");
-  const modelList = models.length > 0 ? models.map(m=>m.name) : ["llama3","mistral","phi3","gemma2"];
+  const [copiedId, setCopiedId] = useState(null);
+
+  const modelList = models.length > 0 ? models.map(m => m.name) : ["llama3", "mistral", "phi3", "gemma2"];
   const filtered  = sessions.filter(s => s.title?.toLowerCase().includes(search.toLowerCase()));
+
+  // Handle Copy Action with Feedback
+  const handleCopySession = (e, session) => {
+    e.stopPropagation();
+    const textToCopy = session.title || "New Chat";
+    
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(textToCopy);
+      setCopiedId(session.id);
+      setTimeout(() => setCopiedId(null), 2000);
+    }
+  };
 
   return (
     <div className="w-64 flex flex-col bg-gray-900 border-r border-gray-800 shrink-0">
@@ -72,7 +86,24 @@ export default function Sidebar({ sessions, currentSession, onNewChat, onLoadSes
                 <span className="ml-1 text-gray-600">{s.message_count}</span>
               )}
             </button>
+
+            {/* Copy Feedback Action Button */}
+            <button
+              onClick={(e) => handleCopySession(e, s)}
+              title={copiedId === s.id ? "Copied!" : "Copy session title"}
+              aria-label={`Copy session title for ${s.title || "New Chat"}`}
+              className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-purple-400 px-1 py-2 transition text-xs flex items-center"
+            >
+              {copiedId === s.id ? (
+                <span className="text-green-400 text-[10px] font-semibold">Copied!</span>
+              ) : (
+                <span className="text-xs">📋</span>
+              )}
+            </button>
+
+            {/* Delete Action Button */}
             <button onClick={()=>onDeleteSession(s.id)}
+              aria-label={`Delete session ${s.title || "New Chat"}`}
               className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 px-2 py-2 transition text-xs">
               ×
             </button>
