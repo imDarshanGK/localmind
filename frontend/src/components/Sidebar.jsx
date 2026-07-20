@@ -36,28 +36,37 @@ export default function Sidebar({
 }) {
   const [search, setSearch] = useState("");
   const [activeIndex, setActiveIndex] = useState(-1);
-
-  // --- Issue #95: Loading guard state to debounce multiple sequential clicks ---
   const [creating, setCreating] = useState(false);
   
-  // Responsive sidebar toggle states
+  // Responsive sidebar mobile drawer toggle state
   const [isOpen, setIsOpen] = useState(false);
   
+  // Persistent collapse view state for desktop viewports
+  const [isExpanded, setIsExpanded] = useState(() => {
+    const savedState = localStorage.getItem("sidebar_expanded_state");
+    return savedState !== null ? JSON.parse(savedState) : true;
+  });
+
+  // Keep localStorage synced
+  useEffect(() => {
+    localStorage.setItem("sidebar_expanded_state", JSON.stringify(isExpanded));
+  }, [isExpanded]);
+
   // Pins, context menus, and deletion states
   const [pinnedIds, setPinnedIds] = useState(() => getPinnedSessions() || []);
   const [contextMenu, setContextMenu] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
 
-  // Issue #226 states for inline editing
+  // Inline editing states
   const [editingId, setEditingId] = useState(null);
   const [editTitle, setEditTitle] = useState("");
   const inputRef = useRef(null);
 
-  // Auto-focus mechanic: triggers the exact millisecond the input mounts
+  // Auto-focus mechanic for renaming
   useEffect(() => {
     if (editingId && inputRef.current) {
       inputRef.current.focus();
-      inputRef.current.select(); // Highlight existing text for quick typing
+      inputRef.current.select();
     }
   }, [editingId]);
 
@@ -81,7 +90,7 @@ export default function Sidebar({
     setActiveIndex(-1);
   }, [search]);
 
-  // Handle keyboard navigation across the split session items list
+  // Handle keyboard navigation
   const handleKeyDown = (e) => {
     const totalItems = pinnedSessions.length + unpinnedSessions.length;
     if (totalItems === 0) return;
@@ -114,7 +123,6 @@ export default function Sidebar({
     }
   };
 
-  // Wraps the click execution with the async guard layout
   async function handleCreateChat() {
     if (creating) return;
     setCreating(true);
@@ -156,13 +164,11 @@ export default function Sidebar({
   const renderSessionRow = (s) => {
     const isActive = currentSession === s.id;
     const isPinned = pinnedIds.includes(s.id);
-
-    // Compute virtual list indices cleanly to handle focus tracking across dynamic partitions
     const globalIdx = isPinned 
       ? pinnedSessions.findIndex(x => x.id === s.id) 
       : pinnedSessions.length + unpinnedSessions.findIndex(x => x.id === s.id);
-
     const isFocusedViaKeyboard = activeIndex === globalIdx;
+    const sessionTitle = s.title || "New Chat";
 
     return (
       <div
@@ -172,21 +178,24 @@ export default function Sidebar({
         className={`relative group flex items-center justify-between rounded-lg mb-0.5 transition pl-1 pr-1
           ${isActive || isFocusedViaKeyboard ? "bg-gray-700 ring-1 ring-purple-500" : "hover:bg-gray-800"}`}
       >
-        <span
-          aria-hidden="true"
-          className={`absolute left-1 top-1/2 -translate-y-1/2 w-1 h-1 rounded-full bg-purple-400 transition-opacity duration-300
-            ${isActive ? "opacity-100 animate-pulse" : "opacity-0"}`}
-        />
+        {isExpanded && (
+          <span
+            aria-hidden="true"
+            className={`absolute left-1 top-1/2 -translate-y-1/2 w-1 h-1 rounded-full bg-purple-400 transition-opacity duration-300
+              ${isActive ? "opacity-100 animate-pulse" : "opacity-0"}`}
+          />
+        )}
         
         {/* Interactive element boundary area wrapper */}
         <div 
           onDoubleClick={() => {
+            if (!isExpanded) return;
             setEditingId(s.id);
-            setEditTitle(s.title || "New Chat");
+            setEditTitle(sessionTitle);
           }}
-          className="flex-1 min-w-0 text-left text-xs pl-5 pr-1 py-2 text-gray-400 group-hover:text-gray-200 cursor-pointer"
+          className={`flex-1 min-w-0 text-left text-xs py-2 text-gray-400 group-hover:text-gray-200 cursor-pointer ${isExpanded ? "pl-5 pr-1" : "flex justify-center"}`}
         >
-          {editingId === s.id ? (
+          {editingId === s.id && isExpanded ? (
             <input
               ref={inputRef}
               value={editTitle}
@@ -206,65 +215,75 @@ export default function Sidebar({
                 onLoadSession(s.id);
                 setIsOpen(false);
               }} 
+              title={`Switch to session: ${sessionTitle}`}
               aria-current={isActive ? "true" : undefined}
-              className={`inline-flex items-center gap-1.5 w-full text-left outline-none ${isActive || isFocusedViaKeyboard ? "text-white" : ""}`}
+              className={`inline-flex items-center gap-1.5 outline-none ${isExpanded ? "w-full text-left" : "justify-center"} ${isActive || isFocusedViaKeyboard ? "text-white" : ""}`}
             >
               <ChatIcon className="w-3.5 h-3.5 text-gray-500 shrink-0" />
-              <span
-                className="w-1.5 h-1.5 rounded-full shrink-0"
-                style={{ backgroundColor: s.color || getSessionColor(s.id) }}
-                aria-label="Tag color"
-              />
-              <span className="truncate flex-1" title="Double click to rename">
-                {highlightText(s.title || "New Chat", search)}
-              </span>
-              {s.message_count > 0 && (
-                <span className="ml-1 text-gray-500 text-[10px] bg-gray-800/60 px-1.5 py-0.5 rounded-full shrink-0" aria-label={`${s.message_count} messages`}>
-                  {s.message_count}
-                </span>
+              {isExpanded ? (
+                <>
+                  <span
+                    className="w-1.5 h-1.5 rounded-full shrink-0"
+                    style={{ backgroundColor: s.color || getSessionColor(s.id) }}
+                    aria-label="Tag color"
+                  />
+                  <span className="truncate flex-1" title="Double click to rename">
+                    {highlightText(sessionTitle, search)}
+                  </span>
+                  {s.message_count > 0 && (
+                    <span className="ml-1 text-gray-500 text-[10px] bg-gray-800/60 px-1.5 py-0.5 rounded-full shrink-0" aria-label={`${s.message_count} messages`}>
+                      {s.message_count}
+                    </span>
+                  )}
+                </>
+              ) : (
+                s.message_count > 0 && (
+                  <span className="absolute -top-1 -right-1 text-gray-400 text-[8px] bg-gray-900 px-1 rounded-full scale-90">
+                    {s.message_count}
+                  </span>
+                )
               )}
             </button>
           )}
         </div>
 
-        <div className="flex items-center shrink-0">
-          <button
-            onClick={(e) => handleTogglePin(e, s.id)}
-            aria-label={isPinned ? "Unpin chat" : "Pin chat"}
-            tabIndex={-1}
-            className={`relative group/pin px-1 py-2 transition text-xs ${
-              isPinned ? "text-purple-400 opacity-100" : "text-gray-500 opacity-0 group-hover:opacity-100 hover:text-gray-300"
-            }`}
-          >
-            <PinIcon className="w-3.5 h-3.5 shrink-0" filled={isPinned} />
-            <span className="hidden md:block absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-gray-800 border border-gray-700 text-gray-300 text-[10px] rounded opacity-0 group-hover/pin:opacity-100 pointer-events-none whitespace-nowrap z-50 transition-opacity">
-              {isPinned ? "Unpin chat" : "Pin chat"}
-            </span>
-          </button>
+        {isExpanded && (
+          <div className="flex items-center shrink-0">
+            <button
+              onClick={(e) => handleTogglePin(e, s.id)}
+              aria-label={isPinned ? "Unpin chat" : "Pin chat"}
+              title={isPinned ? "Unpin chat" : "Pin chat"}
+              tabIndex={-1}
+              className={`relative group/pin px-1 py-2 transition text-xs ${
+                isPinned ? "text-purple-400 opacity-100" : "text-gray-500 opacity-0 group-hover:opacity-100 hover:text-gray-300"
+              }`}
+            >
+              <PinIcon className="w-3.5 h-3.5 shrink-0" filled={isPinned} />
+            </button>
 
-          <button
-            onClick={() => setDeleteConfirm({ sessionId: s.id, sessionName: s.title })}
-            aria-label={`Delete chat session ${s.title || "New Chat"}`}
-            tabIndex={-1}
-            className="relative group/del opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 px-1.5 py-2 transition text-sm font-medium shrink-0"
-          >
-            ×
-            <span className="hidden md:block absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-gray-800 border border-gray-700 text-gray-300 text-[10px] rounded opacity-0 group-hover/del:opacity-100 pointer-events-none whitespace-nowrap z-50 transition-opacity">
-              Delete
-            </span>
-          </button>
-        </div>
+            <button
+              onClick={() => setDeleteConfirm({ sessionId: s.id, sessionName: sessionTitle })}
+              aria-label={`Delete session ${sessionTitle}`}
+              title={`Delete session "${sessionTitle}"`}
+              tabIndex={-1}
+              className="relative group/del opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 px-1.5 py-2 transition text-sm font-medium shrink-0"
+            >
+              ×
+            </button>
+          </div>
+        )}
       </div>
     );
   };
 
   return (
     <>
-      {/* --- Mobile Hamburger Toggle Trigger --- */}
+      {/* Mobile Hamburger Toggle Trigger */}
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="md:hidden fixed top-3 left-3 z-50 p-2 rounded-xl bg-gray-800 border border-gray-700 text-gray-300 hover:text-white transition shadow-md outline-none"
         aria-label="Toggle Navigation Sidebar"
+        title="Toggle Navigation Sidebar"
       >
         {isOpen ? (
           <span className="text-xl leading-none font-bold block w-5 h-5 flex items-center justify-center">×</span>
@@ -284,39 +303,55 @@ export default function Sidebar({
         />
       )}
 
-      {/* --- Responsive Sidebar Shell Container updated to <aside> landmark --- */}
+      {/* Main Structural Container */}
       <aside
         aria-label="Chat Management Sidebar"
         className={`
-          fixed inset-y-0 left-0 z-40 transform transition-transform duration-300 ease-in-out
+          fixed inset-y-0 left-0 z-40 transform transition-all duration-300 ease-in-out
           md:relative md:transform-none md:translate-x-0 md:z-auto
           flex flex-col bg-gray-900 border-r border-gray-800 shrink-0 outline-none
-          ${isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
+          ${isOpen ? "translate-x-0 w-[260px]" : "-translate-x-full md:translate-x-0"}
+          ${!isOpen && (isExpanded ? "md:w-64" : "md:w-16")}
         `}
-        style={{ width: "260px" }}
       >
-        {/* Logo Section */}
+        {/* Logo Section & Desktop Collapse Toggle */}
         <div className="px-4 pt-16 md:pt-5 pb-4 border-b border-gray-800">
-          <div className="flex items-center gap-2 mb-4">
-            <AppLogoIcon className="w-6 h-6 text-purple-400" />
-            <div>
-              <p className="font-bold text-white text-sm">LocalMind</p>
-              <p className="text-xs text-gray-500">v2.0 · Offline AI</p>
-            </div>
+          <div className="flex items-center justify-between gap-2 mb-4">
+            {isExpanded ? (
+              <div className="flex items-center gap-2 truncate">
+                <AppLogoIcon className="w-6 h-6 text-purple-400 shrink-0" />
+                <div className="truncate">
+                  <p className="font-bold text-white text-sm truncate">LocalMind</p>
+                  <p className="text-xs text-gray-500 truncate">v2.0 · Offline AI</p>
+                </div>
+              </div>
+            ) : (
+              <AppLogoIcon className="w-6 h-6 text-purple-400 mx-auto md:block hidden" />
+            )}
+            
+            <button 
+              onClick={() => setIsExpanded(!isExpanded)}
+              aria-label={isExpanded ? "Collapse sidebar" : "Expand sidebar"}
+              title={isExpanded ? "Collapse sidebar" : "Expand sidebar"}
+              className="text-gray-500 hover:text-gray-300 transition text-xs p-1 rounded hover:bg-gray-800 hidden md:block"
+            >
+              {isExpanded ? "◀" : "▶"}
+            </button>
           </div>
           <button
             onClick={handleCreateChat}
             disabled={creating}
-            title="New Chat"
-            className="w-full text-sm bg-purple-700 hover:bg-purple-600 active:bg-purple-800 disabled:opacity-50 disabled:cursor-not-allowed text-white py-2 rounded-xl font-medium transition"
+            title="Start a new chat session"
+            aria-label="Start a new chat session"
+            className="w-full text-sm bg-purple-700 hover:bg-purple-600 active:bg-purple-800 disabled:opacity-50 disabled:cursor-not-allowed text-white py-2 rounded-xl font-medium transition flex items-center justify-center flex-col"
           >
-            {creating ? "Creating..." : "+ New Chat"}
-            <span className="block text-xs text-purple-300 font-normal opacity-75">Ctrl+Shift+N</span>
+            <span>{creating ? "..." : (isExpanded ? "+ New Chat" : "+")}</span>
+            {isExpanded && <span className="text-[10px] text-purple-300 font-normal opacity-75 mt-0.5">Ctrl+Shift+N</span>}
           </button>
         </div>
 
-        {/* --- INLINE ERROR BANNER (#555) --- */}
-        {error && (
+        {/* Error Banner */}
+        {error && isExpanded && (
           <div 
             data-testid="sidebar-error-banner" 
             className="mx-4 mt-3 text-xs bg-red-950/45 border border-red-900/60 text-red-400 p-2.5 rounded-xl flex items-start gap-2"
@@ -331,6 +366,7 @@ export default function Sidebar({
                 onClick={onErrorDismiss}
                 className="text-red-400/60 hover:text-red-300 font-bold px-1 rounded transition focus:outline-none"
                 aria-label="Dismiss sidebar banner"
+                title="Dismiss error message"
               >
                 ×
               </button>
@@ -339,65 +375,69 @@ export default function Sidebar({
         )}
 
         {/* Model Selector Parameters */}
-        <div className="px-4 py-3 border-b border-gray-800">
-          <div className="flex items-center justify-between mb-1">
-            <label className="text-xs text-gray-500">AI Model</label>
-            <button
-              id="btn-model-info"
-              onClick={async () => {
-                try {
-                  const { getModelInfo } = await import("../utils/api");
-                  const info = await getModelInfo(model);
-                  alert(
-                    `Model Info for ${model}:\n\nFamily: ${info.details?.family}\nFormat: ${info.details?.format}\nParameter Size: ${info.details?.parameter_size}\nQuantization: ${info.details?.quantization_level}`
-                  );
-                } catch (e) {
-                  alert(`Failed to fetch model info: ${e.message}`);
-                }
-              }}
-              className="text-[10px] text-purple-400 hover:text-purple-300"
-              title="View Model Metadata (Cached)"
+        {isExpanded && (
+          <div className="px-4 py-3 border-b border-gray-800">
+            <div className="flex items-center justify-between mb-1">
+              <label htmlFor="ai-model-select" className="text-xs text-gray-500">AI Model</label>
+              <button
+                id="btn-model-info"
+                onClick={async () => {
+                  try {
+                    const { getModelInfo } = await import("../utils/api");
+                    const info = await getModelInfo(model);
+                    alert(`Model Info for ${model}:\n\nFamily: ${info.details?.family}\nFormat: ${info.details?.format}\nParameter Size: ${info.details?.parameter_size}\nQuantization: ${info.details?.quantization_level}`);
+                  } catch (e) {
+                    alert(`Failed to fetch model info: ${e.message}`);
+                  }
+                }}
+                className="text-[10px] text-purple-400 hover:text-purple-300"
+                title="View Model Metadata (Cached)"
+              >
+                [Info]
+              </button>
+            </div>
+            <select
+              id="ai-model-select"
+              value={model}
+              onChange={(e) => onModelChange(e.target.value)}
+              title="Select AI Model for active conversation"
+              aria-label="Select AI Model"
+              className="w-full text-xs bg-gray-800 text-gray-200 border border-gray-700 rounded-lg px-2 py-1.5 outline-none focus:border-purple-500"
             >
-              [Info]
-            </button>
+              {modelList.map((m) => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+            <label htmlFor="language-select" className="text-xs text-gray-500 block mb-1 mt-2">Language</label>
+            <select
+              id="language-select"
+              value={language}
+              onChange={(e) => onLanguageChange(e.target.value)}
+              title="Change sidebar interface language"
+              aria-label="Select Interface Language"
+              className="w-full text-xs bg-gray-800 text-gray-200 border border-gray-700 rounded-lg px-2 py-1.5 outline-none focus:border-purple-500"
+            >
+              {LANGUAGES.map((l) => (
+                <option key={l.code} value={l.code}>{l.label}</option>
+              ))}
+            </select>
           </div>
-          <select
-            value={model}
-            onChange={(e) => onModelChange(e.target.value)}
-            className="w-full text-xs bg-gray-800 text-gray-200 border border-gray-700 rounded-lg px-2 py-1.5 outline-none focus:border-purple-500"
-          >
-            {modelList.map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
-          </select>
-          <label className="text-xs text-gray-500 block mb-1 mt-2">Language</label>
-          <select
-            value={language}
-            onChange={(e) => onLanguageChange(e.target.value)}
-            className="w-full text-xs bg-gray-800 text-gray-200 border border-gray-700 rounded-lg px-2 py-1.5 outline-none focus:border-purple-500"
-          >
-            {LANGUAGES.map((l) => (
-              <option key={l.code} value={l.code}>
-                {l.label}
-              </option>
-            ))}
-          </select>
-        </div>
+        )}
 
-        {/* Search Bar container updated to role="search" landmark */}
+        {/* Search Bar container */}
         <div role="search" className="px-3 py-2 border-b border-gray-800">
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search chats..."
+            disabled={!isExpanded}
+            placeholder={isExpanded ? "Search chats..." : "🔍"}
+            title="Filter chat history by title"
             aria-label="Search chat sessions history"
-            className="w-full text-xs bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-gray-300 placeholder-gray-600 outline-none focus:border-purple-500"
+            className="w-full text-xs bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-gray-300 placeholder-gray-600 outline-none focus:border-purple-500 disabled:opacity-50 text-center md:text-left"
           />
         </div>
 
-        {/* Chat Sessions Wrapper updated to semantic <nav> landmark */}
+        {/* Chat Sessions Wrapper */}
         <nav 
           data-testid="sidebar-sessions-list"
           tabIndex={0}
@@ -405,7 +445,7 @@ export default function Sidebar({
           aria-label="Chat Sessions History"
           className="flex-1 overflow-y-auto px-2 py-2 outline-none"
         >
-          {filtered.length === 0 && (
+          {isExpanded && filtered.length === 0 && (
             <p className="text-xs text-gray-600 px-2 py-1">
               {sessions.length === 0 ? "No chats yet. Start one!" : "No results."}
             </p>
@@ -414,34 +454,35 @@ export default function Sidebar({
           {/* Render Pinned Items Block */}
           {pinnedSessions.length > 0 && (
             <div className="mb-4">
-              <p className="text-[10px] font-bold text-gray-500 px-2 mb-1 uppercase tracking-wider">Pinned</p>
+              {isExpanded && <p className="text-[10px] font-bold text-gray-500 px-2 mb-1 uppercase tracking-wider">Pinned</p>}
               {pinnedSessions.map((s) => renderSessionRow(s))}
             </div>
           )}
 
           {/* Render Normal Items Block */}
           <div>
-            {pinnedSessions.length > 0 && unpinnedSessions.length > 0 && (
+            {isExpanded && pinnedSessions.length > 0 && unpinnedSessions.length > 0 && (
               <p className="text-[10px] font-bold text-gray-500 px-2 mb-1 uppercase tracking-wider">Recent</p>
             )}
             {unpinnedSessions.map((s) => renderSessionRow(s))}
           </div>
         </nav>
 
-        {/* Source Attributions container updated to semantic <footer> landmark */}
-        <footer className="px-4 py-3 border-t border-gray-800 flex flex-col gap-1">
-          <p className="text-xs text-gray-600 inline-flex items-center gap-1">
-            <LockIcon className="w-3.5 h-3.5" />
-            <span>100% local · no cloud · MIT</span>
+        {/* Source Attributions footer */}
+        <footer className="px-4 py-3 border-t border-gray-800 flex flex-col gap-1 items-center md:items-start">
+          <p className="text-xs text-gray-600 inline-flex items-center gap-1" title="Local privacy statement">
+            <LockIcon className="w-3.5 h-3.5 shrink-0" />
+            {isExpanded && <span className="truncate">100% local · no cloud · MIT</span>}
           </p>
           <a
             href="https://github.com/imDarshanGK/localmind"
             target="_blank"
             rel="noreferrer"
+            title="Open GitHub Repository in a new tab"
             className="text-xs text-purple-500 hover:text-purple-400 transition inline-flex items-center gap-1 w-max"
           >
-            <StarIcon className="w-3.5 h-3.5" />
-            <span>Star on GitHub</span>
+            <StarIcon className="w-3.5 h-3.5 shrink-0" />
+            {isExpanded && <span>Star on GitHub</span>}
           </a>
         </footer>
       </aside>
@@ -460,7 +501,7 @@ export default function Sidebar({
       )}
 
       {/* Context Menu Utilities portals */}
-      {contextMenu && (
+      {contextMenu && isExpanded && (
         <div
           style={{ top: contextMenu.y, left: contextMenu.x }}
           className="fixed bg-gray-800 border border-gray-700 text-gray-200 text-xs rounded-lg shadow-xl py-1 z-50 min-w-[140px]"
