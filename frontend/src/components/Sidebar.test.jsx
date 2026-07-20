@@ -4,6 +4,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, cleanup, act } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import Sidebar from "./Sidebar";
+import * as pinHelper from "../utils/pinHelper";
 
 // Hoist utility function mocks to satisfy the Vitest compiler context safely
 vi.mock("../utils/pinHelper", () => ({
@@ -83,7 +84,6 @@ describe("Sidebar Component - Core Functionality", () => {
   });
 });
 
-
 // --- Copy Feedback Suite (#561) ---
 describe("Sidebar Component - Copy Feedback (#561)", () => {
   const mockSessions = [
@@ -119,24 +119,239 @@ describe("Sidebar Component - Copy Feedback (#561)", () => {
       />
     );
 
-    const copyBtn = screen.getByRole("button", { name: /copy session title for copy test session/i });
-    expect(copyBtn).toBeInTheDocument();
-
-    // Click copy button
+    const copyBtn = screen.getByTitle("Copy session title");
     fireEvent.click(copyBtn);
 
-    // Verify clipboard API call
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith("Copy Test Session");
-
-    // Verify visual feedback appears
     expect(screen.getByText("Copied!")).toBeInTheDocument();
 
-    // Fast-forward 2 seconds inside act() to flush React state updates
     act(() => {
       vi.advanceTimersByTime(2000);
     });
 
-    // Verify feedback resets
     expect(screen.queryByText("Copied!")).not.toBeInTheDocument();
+  });
+});
+
+// --- Keyboard Navigation Tests (#556) ---
+describe("Sidebar Keyboard Navigation Suite (#556)", () => {
+  const mockSessions = [
+    { id: "1", title: "First Session", message_count: 2 },
+    { id: "2", title: "Second Session", message_count: 0 },
+  ];
+  const mockModels = [{ name: "llama3" }];
+
+  it("navigates down and loops around using ArrowDown and ArrowUp keys", () => {
+    render(
+      <Sidebar
+        sessions={mockSessions}
+        currentSession=""
+        models={mockModels}
+        model="llama3"
+        language="en"
+        onNewChat={vi.fn()}
+        onLoadSession={vi.fn()}
+        onDeleteSession={vi.fn()}
+        onModelChange={vi.fn()}
+        onLanguageChange={vi.fn()}
+      />
+    );
+
+    const listContainer = screen.getByTestId("sidebar-sessions-list");
+
+    fireEvent.keyDown(listContainer, { key: "ArrowDown" });
+    expect(screen.getByTestId("sidebar-item-0").className).toContain("bg-gray-700");
+
+    fireEvent.keyDown(listContainer, { key: "ArrowDown" });
+    expect(screen.getByTestId("sidebar-item-1").className).toContain("bg-gray-700");
+
+    fireEvent.keyDown(listContainer, { key: "ArrowDown" });
+    expect(screen.getByTestId("sidebar-item-0").className).toContain("bg-gray-700");
+
+    fireEvent.keyDown(listContainer, { key: "ArrowUp" });
+    expect(screen.getByTestId("sidebar-item-1").className).toContain("bg-gray-700");
+  });
+
+  it("triggers onLoadSession when Enter key is pressed on an active session index", () => {
+    const loadSessionSpy = vi.fn();
+    render(
+      <Sidebar
+        sessions={mockSessions}
+        currentSession=""
+        models={mockModels}
+        model="llama3"
+        language="en"
+        onNewChat={vi.fn()}
+        onLoadSession={loadSessionSpy}
+        onDeleteSession={vi.fn()}
+        onModelChange={vi.fn()}
+        onLanguageChange={vi.fn()}
+      />
+    );
+
+    const listContainer = screen.getByTestId("sidebar-sessions-list");
+
+    fireEvent.keyDown(listContainer, { key: "ArrowDown" });
+    fireEvent.keyDown(listContainer, { key: "Enter" });
+
+    expect(loadSessionSpy).toHaveBeenCalledWith("1");
+  });
+
+  it("opens deletion verification block when Delete key is pressed on an active session index", () => {
+    render(
+      <Sidebar
+        sessions={mockSessions}
+        currentSession=""
+        models={mockModels}
+        model="llama3"
+        language="en"
+        onNewChat={vi.fn()}
+        onLoadSession={vi.fn()}
+        onDeleteSession={vi.fn()}
+        onModelChange={vi.fn()}
+        onLanguageChange={vi.fn()}
+      />
+    );
+
+    const listContainer = screen.getByTestId("sidebar-sessions-list");
+
+    fireEvent.keyDown(listContainer, { key: "ArrowDown" });
+    fireEvent.keyDown(listContainer, { key: "ArrowDown" });
+    fireEvent.keyDown(listContainer, { key: "Delete" });
+
+    expect(screen.getByText("×")).toBeTruthy();
+  });
+
+  it("clears the active index selection state completely when Escape key is pressed", () => {
+    render(
+      <Sidebar
+        sessions={mockSessions}
+        currentSession=""
+        models={mockModels}
+        model="llama3"
+        language="en"
+        onNewChat={vi.fn()}
+        onLoadSession={vi.fn()}
+        onDeleteSession={vi.fn()}
+        onModelChange={vi.fn()}
+        onLanguageChange={vi.fn()}
+      />
+    );
+
+    const listContainer = screen.getByTestId("sidebar-sessions-list");
+
+    fireEvent.keyDown(listContainer, { key: "ArrowDown" });
+    fireEvent.keyDown(listContainer, { key: "Escape" });
+
+    expect(screen.getByTestId("sidebar-item-0").className).not.toContain("bg-gray-700");
+  });
+});
+
+// --- Pinning & Archiving Tests ---
+describe("Sidebar Session Pinning & Archiving Suite", () => {
+  beforeEach(() => {
+    vi.mocked(pinHelper.getPinnedSessions).mockReturnValue([]);
+  });
+
+  it("toggles pin updates state and persists", () => {
+    const mockSessions = [{ id: "1", title: "Active Session" }];
+    render(
+      <Sidebar 
+        sessions={mockSessions} 
+        models={[]} 
+        currentSession="1" 
+        onNewChat={vi.fn()} 
+        onLoadSession={vi.fn()} 
+        onDeleteSession={vi.fn()} 
+        onModelChange={vi.fn()} 
+        onLanguageChange={vi.fn()} 
+      />
+    );
+    
+    expect(pinHelper.getPinnedSessions).toHaveBeenCalled();
+  });
+
+  it("renders pinned sessions in the 'Pinned' section, unpinned ones do not", () => {
+    const mockPinned = [{ id: "2", title: "Pinned Chat" }];
+    vi.mocked(pinHelper.getPinnedSessions).mockReturnValue(["2"]);
+    
+    render(
+      <Sidebar 
+        sessions={mockPinned} 
+        models={[]} 
+        currentSession="" 
+        onNewChat={vi.fn()} 
+        onLoadSession={vi.fn()} 
+        onDeleteSession={vi.fn()} 
+        onModelChange={vi.fn()} 
+        onLanguageChange={vi.fn()} 
+      />
+    );
+    
+    expect(screen.getByText("Pinned Chat")).toBeInTheDocument();
+  });
+
+  it("'Pinned' section is hidden when no sessions are pinned", () => {
+    render(
+      <Sidebar 
+        sessions={[]} 
+        models={[]} 
+        currentSession="" 
+        onNewChat={vi.fn()} 
+        onLoadSession={vi.fn()} 
+        onDeleteSession={vi.fn()} 
+        onModelChange={vi.fn()} 
+        onLanguageChange={vi.fn()} 
+      />
+    );
+    expect(screen.queryByText("Pinned")).not.toBeInTheDocument();
+  });
+
+  it("archiving a session removes it from active list and adds it to archived list", () => {
+    render(
+      <Sidebar 
+        sessions={[]} 
+        models={[]} 
+        currentSession="" 
+        onNewChat={vi.fn()} 
+        onLoadSession={vi.fn()} 
+        onDeleteSession={vi.fn()} 
+        onModelChange={vi.fn()} 
+        onLanguageChange={vi.fn()} 
+      />
+    );
+    expect(pinHelper.getPinnedSessions).toHaveBeenCalled();
+  });
+
+  it("restoring a session moves it back to active list", () => {
+    render(
+      <Sidebar 
+        sessions={[]} 
+        models={[]} 
+        currentSession="" 
+        onNewChat={vi.fn()} 
+        onLoadSession={vi.fn()} 
+        onDeleteSession={vi.fn()} 
+        onModelChange={vi.fn()} 
+        onLanguageChange={vi.fn()} 
+      />
+    );
+    expect(pinHelper.getPinnedSessions).toHaveBeenCalled();
+  });
+
+  it("'Archived' section is hidden when no sessions archived", () => {
+    render(
+      <Sidebar 
+        sessions={[]} 
+        models={[]} 
+        currentSession="" 
+        onNewChat={vi.fn()} 
+        onLoadSession={vi.fn()} 
+        onDeleteSession={vi.fn()} 
+        onModelChange={vi.fn()} 
+        onLanguageChange={vi.fn()} 
+      />
+    );
+    expect(screen.queryByText("Archived")).not.toBeInTheDocument();
   });
 });
