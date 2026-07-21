@@ -2,11 +2,11 @@ import { useState, useRef, useEffect } from "react";
 import { uploadDocument, deleteDocument, previewDocument } from "../utils/api";
 import { CheckIcon, DocumentsIcon, ErrorIcon, SpinnerIcon, UploadIcon, FileIcon } from "./Icons";
 
-export default function UploadPanel({ sessionId, documents, onUploaded, onClose, show, minimalMode }) {
+export default function UploadPanel({ sessionId, documents = [], onUploaded, onClose, show, minimalMode }) {
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [result,    setResult]    = useState(null);
-  const [error,     setError]     = useState("");
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState("");
   
   // FIXED (#574): Staged draft workspace state slot allocation
   const [draftFile, setDraftFile] = useState(null);
@@ -21,11 +21,11 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
   const fileRef = useRef();
 
   function isDuplicateFile(file) {
-  return documents.some((doc) => {
-    const filename = doc.filename || doc;
-    return filename === file.name;
-  });
-}
+    return documents.some((doc) => {
+      const filename = doc.filename || doc;
+      return filename === file.name;
+    });
+  }
 
   // FIXED (#570): Initialize persistence layer state from localStorage based on active sessionId
   const [isCollapsed, setIsCollapsed] = useState(() => {
@@ -70,27 +70,26 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
     setResult(null);
     setDraftFile(file);
   }
+
   async function commitDraftUpload() {
     if (!draftFile) return;
     setUploading(true);
     setError("");
     setResult(null);
-  try {
-    const data = await uploadDocument(draftFile, sessionId);
-    setResult(data);
-    onUploaded(data.filename);
-  } catch (e) {
-    setError(e.message);
-  } finally {
-    setUploading(false);
-
-    setDraftFile(null);
-
-    if (fileRef.current) {
-      fileRef.current.value = "";
+    try {
+      const data = await uploadDocument(draftFile, sessionId);
+      setResult(data);
+      onUploaded(data.filename);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setUploading(false);
+      setDraftFile(null);
+      if (fileRef.current) {
+        fileRef.current.value = "";
+      }
     }
   }
- }
 
   // FIXED (#567): Global event listener to dismiss panel when Escape key is pressed
   useEffect(() => {
@@ -322,8 +321,8 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
 
           {result && <p className="text-xs text-green-400 mb-2 inline-flex items-center gap-1"><CheckIcon className="w-3.5 h-3.5" />{result.message}</p>}
 
-          {/* Uploaded docs list */}
-          {documents.length > 0 && (
+          {/* Uploaded docs list OR Empty-state guidance (#565) inside the expanded panel */}
+          {documents && documents.length > 0 ? (
             <div aria-label="Indexed documents collection">
               <p className="text-xs text-gray-500 mb-1">Indexed documents:</p>
               <ul className="space-y-1">
@@ -355,6 +354,16 @@ export default function UploadPanel({ sessionId, documents, onUploaded, onClose,
                   );
                 })}
               </ul>
+            </div>
+          ) : (
+            <div 
+              data-testid="upload-empty-state" 
+              className="bg-gray-950/40 border border-gray-800/80 rounded-xl p-4 text-center my-2"
+            >
+              <p className="text-xs font-medium text-gray-400 mb-1">No documents added yet</p>
+              <p className="text-[11px] text-gray-500 leading-relaxed">
+                Upload files above to index context for your session workspace. Supported formats include PDF, TXT, CSV, DOCX, MD, and HTML.
+              </p>
             </div>
           )}
         </div>

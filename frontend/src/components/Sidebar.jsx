@@ -63,6 +63,17 @@ export default function Sidebar({
   const [editTitle, setEditTitle] = useState("");
   const inputRef = useRef(null);
 
+  // Helper function to check for saved drafts (#563)
+  const hasSavedDraft = (session) => {
+    if (session.hasDraft !== undefined) return Boolean(session.hasDraft);
+    try {
+      const draft = localStorage.getItem(`draft_${session.id}`);
+      return Boolean(draft && draft.trim().length > 0);
+    } catch {
+      return false;
+    }
+  };
+
   // Auto-focus mechanic for renaming
   useEffect(() => {
     if (editingId && inputRef.current) {
@@ -176,6 +187,7 @@ export default function Sidebar({
   const renderSessionRow = (s) => {
     const isActive = currentSession === s.id;
     const isPinned = pinnedIds.includes(s.id);
+    const isDraft = hasSavedDraft(s);
     const globalIdx = isPinned 
       ? pinnedSessions.findIndex(x => x.id === s.id) 
       : pinnedSessions.length + unpinnedSessions.findIndex(x => x.id === s.id);
@@ -243,6 +255,18 @@ export default function Sidebar({
                   <span className="truncate flex-1" title="Double click to rename">
                     {highlightText(sessionTitle, search)}
                   </span>
+
+                  {/* Saved Draft Badge (#563) */}
+                  {isDraft && (
+                    <span 
+                      data-testid={`draft-badge-${s.id}`}
+                      className="text-[10px] text-amber-400 bg-amber-950/60 border border-amber-800/80 px-1.5 py-0.5 rounded-full font-medium shrink-0"
+                      title="Session has unsaved draft"
+                    >
+                      Draft
+                    </span>
+                  )}
+
                   {s.message_count > 0 && (
                     <span 
                       className="ml-1 text-gray-500 text-[10px] bg-gray-800/60 px-1.5 py-0.5 rounded-full shrink-0" 
@@ -254,11 +278,20 @@ export default function Sidebar({
                   )}
                 </>
               ) : (
-                s.message_count > 0 && (
-                  <span className="absolute -top-1 -right-1 text-gray-400 text-[8px] bg-gray-900 px-1 rounded-full scale-90">
-                    {s.message_count}
-                  </span>
-                )
+                <>
+                  {isDraft && (
+                    <span 
+                      data-testid={`draft-badge-dot-${s.id}`}
+                      className="absolute -top-1 -left-1 w-2 h-2 bg-amber-400 rounded-full" 
+                      title="Session has unsaved draft" 
+                    />
+                  )}
+                  {s.message_count > 0 && (
+                    <span className="absolute -top-1 -right-1 text-gray-400 text-[8px] bg-gray-900 px-1 rounded-full scale-90">
+                      {s.message_count}
+                    </span>
+                  )}
+                </>
               )}
             </button>
           )}
