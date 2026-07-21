@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { getPlugins, runPlugin } from "../utils/api";
+import { getPlugins, runPlugin, getPluginLogs } from "../utils/api";
 import { BracesIcon, CalculatorIcon, CodeIcon, ErrorIcon, GlobeIcon, PlugIcon, SummaryIcon, HashIcon } from "./Icons";
 
 const PLUGIN_ICONS = {
@@ -18,20 +18,43 @@ export default function PluginsPanel({ sessionId, onClose }) {
   const [output, setOutput] = useState("");
   const [running, setRunning] = useState(false);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [logs, setLogs] = useState([]);
+
+  const fetchLogs = async () => {
+    try {
+      const data = await getPluginLogs(50);
+      setLogs(data.logs || []);
+    } catch (err) {
+      console.error("Failed to fetch plugin logs", err);
+    }
+  };
 
   useEffect(() => {
-    getPlugins().then(d => setPlugins(d.plugins || [])).catch(() => {});
+    setLoading(true);
+    setError("");
+    getPlugins()
+      .then((d) => setPlugins(d.plugins || []))
+      .catch((err) => {
+        setError(err.message || "Failed to fetch plugins from server.");
+      })
+      .finally(() => setLoading(false));
+    fetchLogs();
   }, []);
 
   async function run() {
-    if (!selected || !input.trim()) return;
+    if (!selected || !input.trim() || running) return;
     setRunning(true);
     setOutput("");
     setError("");
     try {
       const r = await runPlugin({ plugin: selected.id, input, session_id: sessionId });
-      if (r.success) setOutput(r.output);
-      else setError(r.error || "Plugin failed");
+      if (r.success) {
+        setOutput(r.output);
+        await fetchLogs();
+      } else {
+        setError(r.error || "Plugin failed");
+      }
     } catch (e) {
       setError(e.message);
     } finally {
@@ -96,36 +119,75 @@ export default function PluginsPanel({ sessionId, onClose }) {
         ))}
       </div>
 
-      {selected && (
-        <div className="space-y-2">
+      {/* Plugin Input/Output Area OR Empty-State Guidance */}
+      {selected ? (
+        <div className="space-y-3 md:space-y-2 flex-1 md:flex-initial flex flex-col justify-start shrink-0">
           <p className="text-xs text-gray-500">{selected.description}</p>
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder={`Enter input for ${selected.name}...`}
-            rows={3}
-            className="w-full text-xs bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-gray-200 placeholder-gray-600 outline-none focus:border-purple-500 resize-none"
+            rows={4}
+            className="w-full text-sm md:text-xs bg-gray-800 border border-gray-700 rounded-xl px-3 py-2.5 md:py-2 text-gray-200 placeholder-gray-600 outline-none focus:border-purple-500 resize-none font-sans"
           />
-          <button
-            onClick={run}
-            disabled={!input.trim() || running}
-            className="text-xs bg-purple-700 hover:bg-purple-600 disabled:opacity-40 text-white px-4 py-1.5 rounded-lg transition font-medium"
-          >
-            {running ? "Running..." : `Run ${selected.name}`}
-          </button>
+          <div className="flex items-center justify-between">
+            <button
+              onClick={run}
+              disabled={!input.trim() || running}
+              className="w-full md:w-auto text-sm md:text-xs bg-purple-700 hover:bg-purple-600 disabled:opacity-40 text-white px-5 py-2.5 md:py-1.5 rounded-lg transition font-medium shadow-md"
+            >
+              {running ? "Running..." : `Run ${selected.name}`}
+            </button>
+          </div>
           {output && (
-            <pre className="text-xs bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-green-300 whitespace-pre-wrap max-h-40 overflow-y-auto">
+            <pre className="text-xs bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-green-300 whitespace-pre-wrap max-h-60 md:max-h-40 overflow-y-auto font-mono mt-2">
               {output}
             </pre>
           )}
-          {error && (
-            <p className="text-xs text-red-400 inline-flex items-center gap-1">
-              <ErrorIcon className="w-3.5 h-3.5" />
-              {error}
-            </p>
-          )}
+        </div>
+      ) : (
+        /* FIXED (#587): Added Empty-State Guidance Layout Placeholder Card */
+        <div className="flex-1 md:flex-initial flex flex-col items-center justify-center text-center p-6 my-2 border border-dashed border-gray-800 rounded-xl bg-gray-900/40">
+          <PlugIcon className="w-8 h-8 text-gray-600 mb-2 animate-pulse" />
+          <p className="text-xs font-medium text-gray-300">No Plugin Selected</p>
+          <p className="text-[11px] text-gray-500 max-w-[260px] mt-1 leading-relaxed">
+            Select an option from the tools list above to open a plugin workspace workspace.
+          </p>
         </div>
       )}
+
+      {/* Execution Logs Block */}
+      <div className="mt-4 border-t border-gray-800 pt-4 flex-1 overflow-hidden flex flex-col min-h-[200px]">
+        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 shrink-0">
+          Recent Executions
+        </h3>
+        {logs.length === 0 ? (
+          <p className="text-xs text-gray-500">No plugins have been run yet.</p>
+        ) : (
+          <ul className="space-y-2 overflow-y-auto pr-2 text-sm flex-1 custom-scrollbar">
+            {logs.map((log) => (
+              <li key={log.id} className="p-3 bg-gray-800/50 rounded-md border border-gray-700/50">
+                <div className="flex justify-between items-center mb-1">
+                  <span className="font-bold text-purple-400 capitalize text-xs">{log.plugin}</span>
+                  <span
+                    className={`text-[10px] px-2 py-0.5 rounded-full ${
+                      log.success ? "bg-green-900/50 text-green-400" : "bg-red-900/50 text-red-400"
+                    }`}
+                  >
+                    {log.success ? "Success" : "Error"}
+                  </span>
+                </div>
+                <div className="text-gray-300 truncate text-xs">
+                  <span className="text-gray-500">Input:</span> {log.input}
+                </div>
+                <div className="text-gray-600 text-[10px] mt-1 text-right">
+                  {new Date(log.created_at + "Z").toLocaleString()}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }
