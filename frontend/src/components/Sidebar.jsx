@@ -259,6 +259,9 @@ export default function Sidebar({
               }`}
             >
               <PinIcon className="w-3.5 h-3.5 shrink-0" filled={isPinned} />
+              <span className="hidden md:block absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-gray-800 border border-gray-700 text-gray-300 text-[10px] rounded opacity-0 group-hover/pin:opacity-100 pointer-events-none whitespace-nowrap z-50 transition-opacity">
+                {isPinned ? "Unpin chat" : "Pin chat"}
+              </span>
             </button>
 
             <button
@@ -269,6 +272,9 @@ export default function Sidebar({
               className="relative group/del opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 px-1.5 py-2 transition text-sm font-medium shrink-0"
             >
               ×
+              <span className="hidden md:block absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-gray-800 border border-gray-700 text-gray-300 text-[10px] rounded opacity-0 group-hover/del:opacity-100 pointer-events-none whitespace-nowrap z-50 transition-opacity">
+                Delete
+              </span>
             </button>
           </div>
         )}
