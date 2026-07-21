@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from "react";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, act } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import Sidebar from "./Sidebar";
 import * as pinHelper from "../utils/pinHelper";
@@ -155,7 +155,7 @@ describe("Sidebar Component - Mobile Responsive Layout (#557)", () => {
     const toggleBtn = screen.getByRole("button", { name: /toggle navigation sidebar/i });
     fireEvent.click(toggleBtn);
 
-    const newChatBtn = screen.getByRole("button", { name: "Start a new chat session" });
+    const newChatBtn = screen.getByRole("button", { name: /start a new chat session/i });
     fireEvent.click(newChatBtn);
 
     expect(defaultProps.onNewChat).toHaveBeenCalled();
@@ -327,6 +327,55 @@ describe("Sidebar Component - Core Functionality", () => {
     expect(screen.getByText("LocalMind")).toBeTruthy();
     expect(screen.getByText("First Session")).toBeTruthy();
     expect(screen.getByText("Second Session")).toBeTruthy();
+  });
+});
+
+// --- Copy Feedback Suite (#561) ---
+describe("Sidebar Component - Copy Feedback (#561)", () => {
+  const mockSessions = [
+    { id: "1", title: "Copy Test Session", message_count: 2 },
+  ];
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    Object.assign(navigator, {
+      clipboard: {
+        writeText: vi.fn(),
+      },
+    });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("copies session title to clipboard and displays temporary copy feedback", () => {
+    render(
+      <Sidebar
+        sessions={mockSessions}
+        currentSession="1"
+        models={[]}
+        model="llama3"
+        language="en"
+        onNewChat={vi.fn()}
+        onLoadSession={vi.fn()}
+        onDeleteSession={vi.fn()}
+        onModelChange={vi.fn()}
+        onLanguageChange={vi.fn()}
+      />
+    );
+
+    const copyBtn = screen.getByTitle("Copy session title");
+    fireEvent.click(copyBtn);
+
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith("Copy Test Session");
+    expect(screen.getByText("Copied!")).toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
+
+    expect(screen.queryByText("Copied!")).not.toBeInTheDocument();
   });
 });
 

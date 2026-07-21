@@ -538,6 +538,17 @@ def save_setting(key: str, value):
         )
 
 
+def save_settings(settings: dict[str, object]) -> None:
+    """Persist a full settings payload in one transaction."""
+
+    with get_db() as conn:
+        for key, value in settings.items():
+            conn.execute(
+                "INSERT OR REPLACE INTO app_settings (key, value, updated_at) VALUES (?, ?, datetime('now'))",
+                (key, json.dumps(value)),
+            )
+
+
 # ─── Plugin logs ─────────────────────────────────────────────
 
 def get_plugin_logs(limit: int = 50) -> list[dict]:
