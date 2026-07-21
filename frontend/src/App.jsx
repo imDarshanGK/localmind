@@ -478,21 +478,6 @@ export default function App() {
     await api.clearMessages(sessionId);
     setMessages([]);
   }
-<<<<<<< HEAD
-=======
-  if (settingsLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-gray-950">
-        <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-600 border-t-white"></div>
-      </div>
-    );
-  }
-
-  // ─── Routing Interceptor ───
-  if (isSharedPath) {
-    return <SharedView />;
-  }
->>>>>>> upstream/main
 
   const handleLanguageChange = useCallback(
     async (newLang) => {
@@ -540,7 +525,7 @@ export default function App() {
     );
   }, []);
 
-  // ─── Early Layout Rendering Interceptors (Placed safely after all Hook declarations) ───
+  // ─── Early Layout Rendering Interceptors (Placed safely AFTER all Hook declarations) ───
   if (settingsLoading) {
     return (
       <div className="flex items-center justify-center h-screen bg-gray-950">
@@ -552,11 +537,6 @@ export default function App() {
   if (isSharedPath) {
     return <SharedView />;
   }
-
-  // Issue #275: Filter messages by search term context
-  const filteredMessages = messages.filter((msg) =>
-    msg.content?.toLowerCase().includes(searchTerm?.toLowerCase() || "")
-  );
 
   return (
     <div
@@ -646,8 +626,6 @@ export default function App() {
               sessionId={sessionId}
               minimalMode={minimalMode}
             />
-            {/* Custom Waveform Component Element Injection */}
-            
 
             {/* --- Issue #261: Dynamic Absolute Positioned Undo Toast Element --- */}
             {showUndoToast && deletedSessionCache && (
