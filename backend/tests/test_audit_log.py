@@ -1,28 +1,26 @@
 """
 Tests for Issue #797 — structured JSON audit logging on the upload queue.
 """
-import io
 import json
 import logging
 import logging.handlers
 import sys
 import tempfile
+import traceback
 import types
-import time
 from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
 
+from app import app
+import routes.upload as upload_module
 import services.db_service as db
+import utils.audit_log as audit_log
 
 _tmp = tempfile.mktemp(suffix=".db")
 db.DB_PATH = _tmp
 db.init_db()
-
-import routes.upload as upload_module
-import utils.audit_log as audit_log
-from app import app
 
 client = TestClient(app)
 
@@ -161,7 +159,6 @@ def test_log_failed_fields_include_stack_trace():
     try:
         raise ValueError("boom")
     except ValueError:
-        import traceback
         trace = traceback.format_exc()
 
     with patch.object(audit_log, "_safe_emit") as mock_emit:
