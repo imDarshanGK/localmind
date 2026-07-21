@@ -27,7 +27,8 @@ ALLOWED = {
     ".htm", ".csv", ".json", ".xml", ".rtf", ".odt",
     ".epub", ".log", ".tsv", ".ini", ".cfg", ".yaml", ".yml"
 }
-MAX_SIZE = 50 * 1024 * 1024  # 50 MB
+MAX_BYTES = 50 * 1024 * 1024  # 50 MB
+
 UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", "./data/uploads"))
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -41,8 +42,8 @@ async def upload(file: UploadFile = File(...), session_id: str = Form(...), back
         raise HTTPException(status_code=400, detail=f"File type {ext} not allowed.")
     
     content = await file.read()
-    if len(content) > MAX_SIZE:
-        logger.warning("upload_rejected reason=file_too_large size_bytes=%s limit=%s", len(content), MAX_SIZE)
+    if len(content) > MAX_BYTES:
+        logger.warning("upload_rejected reason=file_too_large size_bytes=%s limit=%s", len(content), MAX_BYTES)
         raise HTTPException(status_code=413, detail="File too large (max 50MB).")
     
     file_path = UPLOAD_DIR / f"{session_id}_{file.filename}"
@@ -67,9 +68,9 @@ async def upload(file: UploadFile = File(...), session_id: str = Form(...), back
     )
 
     if background_tasks:
-        background_tasks.add_task(process_document_task, doc_id, str(file_path), session_id)
+        background_tasks.add_task(process_document_task, str(file_path), session_id, doc_id)
     else:
-        process_document_task(doc_id, str(file_path), session_id)
+        process_document_task(str(file_path), session_id, doc_id)
         
     # Fixed Pydantic validation schema matching:
     return UploadResponse(
@@ -82,7 +83,7 @@ async def upload(file: UploadFile = File(...), session_id: str = Form(...), back
     )
 
 
-def process_document_task(doc_id: int, file_path: str, session_id: str):
+def process_document_task(file_path: str, session_id: str, doc_id: int):
     start = time.perf_counter()
 
     # --- Issue #797: structured audit log — PROCESSING ---
@@ -91,8 +92,7 @@ def process_document_task(doc_id: int, file_path: str, session_id: str):
     try:
         from services import rag_service
         db_service.update_document_status(doc_id, "processing")
-        chunks = rag_service.index_document(doc_id, file_path, session_id)
-        
+        chunks = rag_service.index_document(file_path, session_id, doc_id=doc_id)
         # Restored original status completion name ("completed"):
         db_service.update_document_status(doc_id, "completed", chunks_indexed=chunks)
         
