@@ -4,12 +4,12 @@ import json
 import tempfile
 import os
 from unittest.mock import AsyncMock, patch
+import logging
 
 from fastapi.testclient import TestClient
 
 import services.db_service as db
 from app import app
-import logging
 
 
 _tmp = tempfile.mktemp(suffix=".db")
@@ -116,18 +116,15 @@ def test_clone_session():
     assert msgs.status_code == 200
     assert msgs.json()["count"] == 2
 
-
 def test_clone_session_not_found():
     r = client.post("/api/sessions/nonexistent/clone")
     assert r.status_code == 404
-
-
+    
 def test_get_messages_empty():
     r = client.post("/api/sessions/", json={"title": "Msg Test"})
     sid = r.json()["id"]
     r2 = client.get(f"/api/sessions/{sid}/messages")
     assert r2.json()["count"] == 0
-
 
 def test_clear_messages():
     r = client.post("/api/sessions/", json={"title": "Clear Test"})
@@ -196,14 +193,22 @@ def test_upload_invalid_type():
     r = client.post("/api/upload/", files=files, data={"session_id": "s1"})
     assert r.status_code == 400
 
-
 def test_upload_document_flow():
-    r = client.post("/api/sessions/", json={"title": "Upload Flow Test"})
+    r = client.post(
+        "/api/sessions/",
+        json={"title": "Upload Flow Test"}
+    )
     sid = r.json()["id"]
 
-    files = {"file": ("sample.txt", b"hello localmind", "text/plain")}
+    files = {
+        "file": ("sample.txt", b"hello localmind", "text/plain")
+    }
 
-    upload = client.post("/api/upload/", files=files, data={"session_id": sid})
+    upload = client.post(
+        "/api/upload/",
+        files=files,
+        data={"session_id": sid}
+    )
 
     assert upload.status_code == 200
     assert upload.json()["filename"] == "sample.txt"
@@ -218,10 +223,8 @@ def test_upload_document_flow():
     assert doc["filename"] == "sample.txt"
     assert doc["session_id"] == sid
 
-
 def test_upload_too_large(monkeypatch):
     import routes.upload as up
-
     monkeypatch.setattr(up, "MAX_BYTES", 5)
     files = {"file": ("big.txt", b"x" * 10, "text/plain")}
     r = client.post("/api/upload/", files=files, data={"session_id": "s1"})
@@ -240,9 +243,7 @@ def test_upload_emits_structured_logs(caplog):
     # Structured request log is emitted, with key=value fields.
     assert any("upload_request" in m and "session=log-test" in m for m in messages)
     # The unsupported-type rejection is logged as a structured warning.
-    assert any(
-        "upload_rejected" in m and "reason=unsupported_type" in m for m in messages
-    )
+    assert any("upload_rejected" in m and "reason=unsupported_type" in m for m in messages)
 
 
 # ─── Plugins ─────────────────────────────────────────────
@@ -252,75 +253,52 @@ def test_list_plugins():
     ids = [p["id"] for p in r.json()["plugins"]]
     assert "calculator" in ids
 
-
 def test_calculator_basic():
-    r = client.post("/api/plugins/run", json={"plugin": "calculator", "input": "2+2"})
+    r = client.post("/api/plugins/run", json={"plugin":"calculator","input":"2+2"})
     assert "4" in r.json()["output"]
 
-
 def test_calculator_advanced():
-    r = client.post(
-        "/api/plugins/run", json={"plugin": "calculator", "input": "sqrt(144)"}
-    )
+    r = client.post("/api/plugins/run", json={"plugin":"calculator","input":"sqrt(144)"})
     assert "12" in r.json()["output"]
 
-
 def test_calculator_blocked():
-    r = client.post(
-        "/api/plugins/run", json={"plugin": "calculator", "input": "__import__('os')"}
-    )
+    r = client.post("/api/plugins/run", json={"plugin":"calculator","input":"__import__('os')"})
     assert "Unsafe" in r.json()["output"] or not r.json()["success"]
 
-
 def test_wordcount():
-    r = client.post(
-        "/api/plugins/run", json={"plugin": "wordcount", "input": "hello world foo bar"}
-    )
+    r = client.post("/api/plugins/run", json={"plugin":"wordcount","input":"hello world foo bar"})
     assert "Words: 4" in r.json()["output"]
 
-
 def test_jsonformat_valid():
-    r = client.post(
-        "/api/plugins/run", json={"plugin": "jsonformat", "input": '{"a":1}'}
-    )
+    r = client.post("/api/plugins/run", json={"plugin":"jsonformat","input":'{"a":1}'})
     assert '"a"' in r.json()["output"]
 
-
 def test_jsonformat_invalid():
-    r = client.post(
-        "/api/plugins/run", json={"plugin": "jsonformat", "input": "not json"}
-    )
+    r = client.post("/api/plugins/run", json={"plugin":"jsonformat","input":"not json"})
     assert "Invalid" in r.json()["output"]
-
 
 def test_summarizer():
     long_text = "The quick brown fox jumps over the lazy dog. " * 20
-    r = client.post(
-        "/api/plugins/run", json={"plugin": "summarizer", "input": long_text}
-    )
+    r = client.post("/api/plugins/run", json={"plugin":"summarizer","input":long_text})
     assert r.json()["success"]
 
-
 def test_unknown_plugin():
-    r = client.post("/api/plugins/run", json={"plugin": "unknown", "input": "test"})
+    r = client.post("/api/plugins/run", json={"plugin":"unknown","input":"test"})
     assert r.status_code == 400
 
 
 def test_coderunner_success():
-    r = client.post(
-        "/api/plugins/run",
-        json={"plugin": "coderunner", "input": "print('hello world')"},
-    )
+    r = client.post("/api/plugins/run", json={"plugin": "coderunner", "input": "print('hello world')"})
     assert r.status_code == 200
     assert r.json()["success"]
     assert "hello world" in r.json()["output"]
 
 
 def test_coderunner_timeout():
-    r = client.post(
-        "/api/plugins/run",
-        json={"plugin": "coderunner", "input": "import time\ntime.sleep(6)"},
-    )
+    r = client.post("/api/plugins/run", json={
+        "plugin": "coderunner",
+        "input": "import time\ntime.sleep(6)"
+    })
     assert r.status_code == 200
     assert r.json()["success"]
     assert "Timeout" in r.json()["output"]
@@ -348,8 +326,6 @@ def test_get_settings():
     r = client.get("/api/settings/")
     assert r.status_code == 200
     assert "default_model" in r.json()
-
-
 def test_save_settings(caplog):
     with caplog.at_level(logging.INFO, logger="routes.settings"):
         r = client.put(
@@ -366,31 +342,19 @@ def test_save_settings(caplog):
 
     assert r.json()["default_model"] == "mistral"
     assert any(
-        "Model switched from" in record.getMessage() for record in caplog.records
+        "Model switched from" in record.getMessage()
+        for record in caplog.records
     )
 
 
 # ─── Models (mocked) ─────────────────────────────────────
-@patch(
-    "routes.models.ollama_service.is_ollama_running",
-    new_callable=AsyncMock,
-    return_value=False,
-)
+@patch("routes.models.ollama_service.is_ollama_running", new_callable=AsyncMock, return_value=False)
 def test_models_ollama_down(mock):
     r = client.get("/api/models/")
     assert r.status_code == 503
 
-
-@patch(
-    "routes.models.ollama_service.is_ollama_running",
-    new_callable=AsyncMock,
-    return_value=True,
-)
-@patch(
-    "routes.models.ollama_service.list_models",
-    new_callable=AsyncMock,
-    return_value=[{"name": "llama3", "size": "4.7 GB", "status": "available"}],
-)
+@patch("routes.models.ollama_service.is_ollama_running", new_callable=AsyncMock, return_value=True)
+@patch("routes.models.ollama_service.list_models", new_callable=AsyncMock, return_value=[{"name":"llama3","size":"4.7 GB","status":"available"}])
 def test_models_list(m1, m2):
     r = client.get("/api/models/")
     assert r.status_code == 200
@@ -404,24 +368,13 @@ def test_chat_ollama_down(mock):
     assert r.status_code == 200
     assert "⚠️ I'm currently unable to process your request" in r.json()["reply"]
 
-
-@patch(
-    "routes.chat.ollama_service.is_ollama_running",
-    new_callable=AsyncMock,
-    return_value=True,
-)
-@patch(
-    "routes.chat.ollama_service.chat",
-    new_callable=AsyncMock,
-    return_value="Hello! I'm LocalMind.",
-)
-@patch("routes.chat.rag_service.retrieve_context", return_value=("", []))
+@patch("routes.chat.ollama_service.is_ollama_running", new_callable=AsyncMock, return_value=True)
+@patch("routes.chat.ollama_service.chat", new_callable=AsyncMock, return_value="Hello! I'm LocalMind.")
+@patch("routes.chat.rag_service.retrieve_context", return_value=("",  []))
 def test_chat_ok(m1, m2, m3):
     r = client.post("/api/sessions/", json={"title": "t"})
     sid = r.json()["id"]
-    r2 = client.post(
-        "/api/chat/", json={"message": "hello", "session_id": sid, "model": "llama3"}
-    )
+    r2 = client.post("/api/chat/", json={"message": "hello", "session_id": sid, "model": "llama3"})
     assert r2.status_code == 200
     assert "LocalMind" in r2.json()["reply"]
 
@@ -430,7 +383,6 @@ def test_chat_ok(m1, m2, m3):
 def test_export_not_found():
     r = client.get("/api/export/nonexistent/markdown")
     assert r.status_code == 404
-
 
 def test_export_json():
     r = client.post("/api/sessions/", json={"title": "Export Test"})
@@ -442,7 +394,6 @@ def test_export_json():
     data = json.loads(r2.content)
     assert len(data["messages"]) == 2
 
-
 def test_export_complete_session_flow():
     
     r = client.post(
@@ -452,11 +403,21 @@ def test_export_complete_session_flow():
 
     sid = r.json()["id"]
 
-    db.save_message(sid, "user", "What is LocalMind?")
+    db.save_message(
+        sid,
+        "user",
+        "What is LocalMind?"
+    )
 
-    db.save_message(sid, "assistant", "LocalMind is an offline AI assistant.")
+    db.save_message(
+        sid,
+        "assistant",
+        "LocalMind is an offline AI assistant."
+    )
 
-    export = client.get(f"/api/export/{sid}/json")
+    export = client.get(
+        f"/api/export/{sid}/json"
+    )
 
     assert export.status_code == 200
 
@@ -471,7 +432,6 @@ def test_export_complete_session_flow():
     assert payload["messages"][0]["content"] == "What is LocalMind?"
     assert payload["messages"][1]["content"] == "LocalMind is an offline AI assistant."
 
-
 def test_export_markdown():
     r = client.post("/api/sessions/", json={"title": "MD Export"})
     sid = r.json()["id"]
@@ -479,7 +439,6 @@ def test_export_markdown():
     r2 = client.get(f"/api/export/{sid}/markdown")
     assert r2.status_code == 200
     assert b"Test question" in r2.content
-
 
 def test_export_txt():
     r = client.post("/api/sessions/", json={"title": "TXT Export"})

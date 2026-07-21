@@ -1,5 +1,4 @@
 """Settings routes — /api/settings"""
-import logging\
 
 from fastapi import APIRouter
 
@@ -15,9 +14,7 @@ from fastapi import APIRouter, HTTPException, status
 from models.schemas import AppSettings
 from services.db_service import get_settings, save_setting, save_settings
 
-
 router = APIRouter()
-logger = logging.getLogger(__name__)
 
 DEFAULT_SETTINGS_API_TIMEOUT_SECONDS = 2.0
 
@@ -69,24 +66,8 @@ async def _run_with_timeout(operation: str, function: Callable[..., Any], *args:
 async def get_all():
     return await _run_with_timeout("read", get_settings)
 
-
 @router.put("/")
 async def update_settings(body: AppSettings):
-    current_settings = get_settings()
-
-    for key, val in body.model_dump().items():
-        if key == "default_model":
-            old_model = current_settings.get("default_model")
-            if old_model != val:
-                logger.info(
-                    "Model switched from '%s' to '%s'",
-                    old_model,
-                    val,
-                )
-
-        save_setting(key, val)
-
-    return get_settings()
     # 1. Enforce safety validation boundary limits on Temperature
     if body.temperature < 0.0 or body.temperature > 2.0:
         raise HTTPException(
@@ -97,7 +78,7 @@ async def update_settings(body: AppSettings):
                 "type": "value_error"
             }]
         )
-        
+
     # 2. Enforce safety validation boundary limits on RAG Context Chunks
     if body.rag_top_k < 1 or body.rag_top_k > 10:
         raise HTTPException(
@@ -108,7 +89,7 @@ async def update_settings(body: AppSettings):
                 "type": "value_error"
             }]
         )
-    
+
     # 3. Enforce safety validation boundary limits on RAG Chunk Overlap
     if body.rag_chunk_overlap < 0 or body.rag_chunk_overlap > 200:
         raise HTTPException(
@@ -120,10 +101,21 @@ async def update_settings(body: AppSettings):
             }]
         )
 
+    current_settings = get_settings()
     payload = body.model_dump()
+
+    old_model = current_settings.get("default_model")
+    new_model = payload.get("default_model")
+
+    if old_model != new_model:
+        logger.info(
+            "Model switched from '%s' to '%s'",
+            old_model,
+            new_model,
+        )
+
     await _run_with_timeout("save", save_settings, payload)
     return await _run_with_timeout("read", get_settings)
-
 
 @router.put("/{key}")
 async def update_one(key: str, value: dict):
@@ -138,7 +130,5 @@ async def update_one(key: str, value: dict):
                 new_value,
             )
 
-    save_setting(key, new_value)
-    return {"key": key, "updated": True}
-    await _run_with_timeout("save", save_setting, key, value.get("value"))
+    await _run_with_timeout("save", save_setting, key, new_value)
     return {"key": key, "updated": True}
