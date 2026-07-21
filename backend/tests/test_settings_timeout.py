@@ -40,19 +40,21 @@ def patched_settings_get_timeout(monkeypatch):
 
 @pytest.fixture
 def patched_settings_save_timeout(monkeypatch):
-    def _slow_save_setting(key, value):
+    def _slow_save_settings(payload):
         time.sleep(0.05)
 
     try:
         import routes.settings as real_settings
 
         monkeypatch.setattr(real_settings, "SETTINGS_API_TIMEOUT_SECONDS", 0.01)
-        monkeypatch.setattr(real_settings, "save_setting", _slow_save_setting)
+        monkeypatch.setattr(real_settings, "save_settings", _slow_save_settings)
+        monkeypatch.setattr(real_settings, "save_setting", lambda key, value: _slow_save_settings({key: value}))
         return real_settings
     except ImportError:
         fake_module = types.ModuleType("routes.settings")
         fake_module.SETTINGS_API_TIMEOUT_SECONDS = 0.01
-        fake_module.save_setting = _slow_save_setting
+        fake_module.save_settings = _slow_save_settings
+        fake_module.save_setting = lambda key, value: _slow_save_settings({key: value})
         monkeypatch.setitem(sys.modules, "routes.settings", fake_module)
         return fake_module
 
