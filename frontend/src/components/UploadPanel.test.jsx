@@ -32,6 +32,70 @@ function makeFile(name) {
   return new File(["dummy content"], name, { type: "text/plain" });
 }
 
+// --- Loading Skeleton Support Tests (#564) ---
+describe("UploadPanel Component - Skeleton Support (#564)", () => {
+  const defaultProps = {
+    sessionId: "session-123",
+    documents: [],
+    onUploaded: vi.fn(),
+    onClose: vi.fn(),
+    show: true,
+  };
+
+  it("renders loading skeletons when isLoading prop is true", () => {
+    render(<UploadPanel {...defaultProps} isLoading={true} />);
+
+    // Skeleton container should be present
+    expect(screen.getByTestId("upload-panel-skeleton")).toBeInTheDocument();
+
+    // Regular drop zone text should NOT be present while loading
+    expect(screen.queryByText(/Drop files here or click to browse/i)).not.toBeInTheDocument();
+  });
+
+  it("renders drop zone and documents when isLoading is false", () => {
+    const mockDocs = [{ filename: "doc1.pdf", chunks_indexed: 5 }];
+
+    render(<UploadPanel {...defaultProps} documents={mockDocs} isLoading={false} />);
+
+    // Skeleton should NOT be in the document
+    expect(screen.queryByTestId("upload-panel-skeleton")).not.toBeInTheDocument();
+
+    // Actual elements should render
+    expect(screen.getByText(/Drop files here or click to browse/i)).toBeInTheDocument();
+    expect(screen.getByText("doc1.pdf")).toBeInTheDocument();
+    expect(screen.getByText("5 chunks")).toBeInTheDocument();
+  });
+
+  it("renders inline skeleton status indicator when a file is actively uploading", async () => {
+    vi.mocked(api.uploadDocument).mockImplementation(
+      () => new Promise((resolve) => setTimeout(() => resolve({ filename: "uploaded.pdf", message: "Indexed" }), 200))
+    );
+
+    const { container } = render(<UploadPanel {...defaultProps} />);
+
+    const file = new File(["sample content"], "uploaded.pdf", { type: "application/pdf" });
+    const input = container.querySelector('input[type="file"]');
+
+    fireEvent.change(input, { target: { files: [file] } });
+
+    // Expect inline uploading skeleton indicator to appear
+    expect(screen.getByTestId("document-uploading-skeleton")).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(defaultProps.onUploaded).toHaveBeenCalledWith("uploaded.pdf");
+    });
+  });
+
+  it("triggers onClose callback when close button is clicked", () => {
+    render(<UploadPanel {...defaultProps} />);
+
+    const closeBtn = screen.getByRole("button", { name: "Close upload panel" });
+    fireEvent.click(closeBtn);
+
+    expect(defaultProps.onClose).toHaveBeenCalled();
+  });
+});
+
 describe("UploadPanel Empty-State Guidance Suite (#565)", () => {
   const defaultProps = {
     sessionId: "session-123",
