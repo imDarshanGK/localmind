@@ -1,7 +1,3 @@
-"""Settings routes — /api/settings"""
-
-from fastapi import APIRouter
-
 """Settings routes — /api/settings."""
 
 import asyncio
@@ -11,10 +7,12 @@ import time
 from typing import Any, Callable
 
 from fastapi import APIRouter, HTTPException, status
+
 from models.schemas import AppSettings
 from services.db_service import get_settings, save_setting, save_settings
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 DEFAULT_SETTINGS_API_TIMEOUT_SECONDS = 2.0
 
