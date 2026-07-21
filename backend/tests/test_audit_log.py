@@ -27,13 +27,37 @@ from app import app
 client = TestClient(app)
 
 
+
 @pytest.fixture
 def fake_rag_service(monkeypatch):
-    fake_module = types.ModuleType("services.rag_service")
-    fake_module.index_document = lambda *a, **kw: 5
-    monkeypatch.setitem(sys.modules, "services.rag_service", fake_module)
-    return fake_module
+    """Controls services.rag_service.index_document for these tests.
 
+    process_document_task does `from services import rag_service` lazily.
+    Once ANY test in the session (e.g. test_citations.py) has done a real
+    `import services.rag_service`, Python caches `rag_service` as an
+    attribute on the `services` package object — and `from services import
+    rag_service` checks that cached attribute before re-checking
+    sys.modules. So swapping sys.modules["services.rag_service"] alone can
+    silently be bypassed, letting the real (chromadb-backed) index_document
+    run instead of our fake.
+
+    To avoid that, we patch index_document IN PLACE on the real module when
+    it's importable (true whenever the full ML dependency stack is
+    installed, e.g. in CI). Only when the real module can't even be
+    imported (e.g. no chromadb in a stripped-down local sandbox) do we fall
+    back to injecting a standalone fake module via sys.modules — sufficient
+    there because nothing else in that environment could have imported the
+    real one first either.
+    """
+    try:
+        import services.rag_service as real_rag_service
+        monkeypatch.setattr(real_rag_service, "index_document", lambda *a, **kw: 5)
+        return real_rag_service
+    except ImportError:
+        fake_module = types.ModuleType("services.rag_service")
+        fake_module.index_document = lambda *a, **kw: 5  # default: succeeds with 5 chunks
+        monkeypatch.setitem(sys.modules, "services.rag_service", fake_module)
+        return fake_module
 
 @pytest.fixture(autouse=True)
 def _reset_listener():
