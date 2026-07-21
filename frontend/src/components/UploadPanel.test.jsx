@@ -1,14 +1,26 @@
 // @vitest-environment jsdom
+import React from "react";
 import { describe, it, test, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import UploadPanel from "./UploadPanel";
 import * as api from "../utils/api";
 
+// Mock API layer
 vi.mock("../utils/api", () => ({
   uploadDocument: vi.fn(),
   deleteDocument: vi.fn(),
   previewDocument: vi.fn(),
+}));
+
+// Mock icons for testing
+vi.mock("./Icons", () => ({
+  CheckIcon: () => <span data-testid="check-icon" />,
+  DocumentsIcon: () => <span data-testid="documents-icon" />,
+  ErrorIcon: () => <span data-testid="error-icon" />,
+  SpinnerIcon: () => <span data-testid="spinner-icon" />,
+  UploadIcon: () => <span data-testid="upload-icon" />,
+  FileIcon: () => <span data-testid="file-icon" />,
 }));
 
 afterEach(() => {
@@ -19,6 +31,98 @@ afterEach(() => {
 function makeFile(name) {
   return new File(["dummy content"], name, { type: "text/plain" });
 }
+
+// --- Loading Skeleton Support Tests (#564) ---
+describe("UploadPanel Component - Skeleton Support (#564)", () => {
+  const defaultProps = {
+    sessionId: "session-123",
+    documents: [],
+    onUploaded: vi.fn(),
+    onClose: vi.fn(),
+    show: true,
+  };
+
+  it("renders loading skeletons when isLoading prop is true", () => {
+    render(<UploadPanel {...defaultProps} isLoading={true} />);
+
+    // Skeleton container should be present
+    expect(screen.getByTestId("upload-panel-skeleton")).toBeInTheDocument();
+
+    // Regular drop zone text should NOT be present while loading
+    expect(screen.queryByText(/Drop files here or click to browse/i)).not.toBeInTheDocument();
+  });
+
+  it("renders drop zone and documents when isLoading is false", () => {
+    const mockDocs = [{ filename: "doc1.pdf", chunks_indexed: 5 }];
+
+    render(<UploadPanel {...defaultProps} documents={mockDocs} isLoading={false} />);
+
+    // Skeleton should NOT be in the document
+    expect(screen.queryByTestId("upload-panel-skeleton")).not.toBeInTheDocument();
+
+    // Actual elements should render
+    expect(screen.getByText(/Drop files here or click to browse/i)).toBeInTheDocument();
+    expect(screen.getByText("doc1.pdf")).toBeInTheDocument();
+    expect(screen.getByText("5 chunks")).toBeInTheDocument();
+  });
+
+  it("renders inline skeleton status indicator when a file is actively uploading", async () => {
+    vi.mocked(api.uploadDocument).mockImplementation(
+      () => new Promise((resolve) => setTimeout(() => resolve({ filename: "uploaded.pdf", message: "Indexed" }), 200))
+    );
+
+    const { container } = render(<UploadPanel {...defaultProps} />);
+
+    const file = new File(["sample content"], "uploaded.pdf", { type: "application/pdf" });
+    const input = container.querySelector('input[type="file"]');
+
+    fireEvent.change(input, { target: { files: [file] } });
+
+    // Expect inline uploading skeleton indicator to appear
+    expect(screen.getByTestId("document-uploading-skeleton")).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(defaultProps.onUploaded).toHaveBeenCalledWith("uploaded.pdf");
+    });
+  });
+
+  it("triggers onClose callback when close button is clicked", () => {
+    render(<UploadPanel {...defaultProps} />);
+
+    const closeBtn = screen.getByRole("button", { name: "Close upload panel" });
+    fireEvent.click(closeBtn);
+
+    expect(defaultProps.onClose).toHaveBeenCalled();
+  });
+});
+
+describe("UploadPanel Empty-State Guidance Suite (#565)", () => {
+  const defaultProps = {
+    sessionId: "session-123",
+    onUploaded: vi.fn(),
+    onClose: vi.fn(),
+    show: true,
+  };
+
+  it("renders empty-state guidance container when documents array is empty", () => {
+    render(<UploadPanel {...defaultProps} documents={[]} />);
+
+    expect(screen.getByTestId("upload-empty-state")).toBeInTheDocument();
+    expect(screen.getByText("No documents added yet")).toBeInTheDocument();
+    expect(
+      screen.getByText(/Upload files above to index context for your session workspace/i)
+    ).toBeInTheDocument();
+  });
+
+  it("does not render empty-state guidance when documents are present", () => {
+    const mockDocs = [{ filename: "report.pdf", chunks_indexed: 3 }];
+    render(<UploadPanel {...defaultProps} documents={mockDocs} />);
+
+    expect(screen.queryByTestId("upload-empty-state")).not.toBeInTheDocument();
+    expect(screen.getByText("report.pdf")).toBeInTheDocument();
+    expect(screen.getByText("3 chunks")).toBeInTheDocument();
+  });
+});
 
 describe("UploadPanel Persistence State Interface Suite (#570)", () => {
   let store = {};

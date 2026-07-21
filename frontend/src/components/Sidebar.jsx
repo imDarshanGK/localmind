@@ -36,6 +36,7 @@ export default function Sidebar({
 }) {
   const [search, setSearch] = useState("");
   const [activeIndex, setActiveIndex] = useState(-1);
+  const [copiedId, setCopiedId] = useState(null);
   const [creating, setCreating] = useState(false);
   
   // Responsive sidebar mobile drawer toggle state
@@ -61,6 +62,17 @@ export default function Sidebar({
   const [editingId, setEditingId] = useState(null);
   const [editTitle, setEditTitle] = useState("");
   const inputRef = useRef(null);
+
+  // Helper function to check for saved drafts (#563)
+  const hasSavedDraft = (session) => {
+    if (session.hasDraft !== undefined) return Boolean(session.hasDraft);
+    try {
+      const draft = localStorage.getItem(`draft_${session.id}`);
+      return Boolean(draft && draft.trim().length > 0);
+    } catch {
+      return false;
+    }
+  };
 
   // Auto-focus mechanic for renaming
   useEffect(() => {
@@ -149,6 +161,17 @@ export default function Sidebar({
     setPinnedIds(newPinned);
   };
 
+  const handleCopySession = (e, session) => {
+    e.stopPropagation();
+    const textToCopy = session.title || "New Chat";
+
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(textToCopy);
+      setCopiedId(session.id);
+      setTimeout(() => setCopiedId(null), 2000);
+    }
+  };
+
   const handleContextMenu = (e, sessionId) => {
     e.preventDefault();
     e.stopPropagation();
@@ -164,6 +187,7 @@ export default function Sidebar({
   const renderSessionRow = (s) => {
     const isActive = currentSession === s.id;
     const isPinned = pinnedIds.includes(s.id);
+    const isDraft = hasSavedDraft(s);
     const globalIdx = isPinned 
       ? pinnedSessions.findIndex(x => x.id === s.id) 
       : pinnedSessions.length + unpinnedSessions.findIndex(x => x.id === s.id);
@@ -173,7 +197,7 @@ export default function Sidebar({
     return (
       <div
         key={s.id}
-        data-testid={`sidebar-item-${globalIdx}`}
+        data-testid={`session-item-${s.id}`}
         onContextMenu={(e) => handleContextMenu(e, s.id)}
         className={`relative group flex items-center justify-between rounded-lg mb-0.5 transition pl-1 pr-1
           ${isActive || isFocusedViaKeyboard ? "bg-gray-700 ring-1 ring-purple-500" : "hover:bg-gray-800"}`}
@@ -211,6 +235,7 @@ export default function Sidebar({
           ) : (
             <button 
               type="button"
+              data-testid={`load-session-${s.id}`}
               onClick={() => {
                 onLoadSession(s.id);
                 setIsOpen(false);
@@ -230,48 +255,91 @@ export default function Sidebar({
                   <span className="truncate flex-1" title="Double click to rename">
                     {highlightText(sessionTitle, search)}
                   </span>
+
+                  {/* Saved Draft Badge (#563) */}
+                  {isDraft && (
+                    <span 
+                      data-testid={`draft-badge-${s.id}`}
+                      className="text-[10px] text-amber-400 bg-amber-950/60 border border-amber-800/80 px-1.5 py-0.5 rounded-full font-medium shrink-0"
+                      title="Session has unsaved draft"
+                    >
+                      Draft
+                    </span>
+                  )}
+
                   {s.message_count > 0 && (
-                    <span className="ml-1 text-gray-500 text-[10px] bg-gray-800/60 px-1.5 py-0.5 rounded-full shrink-0" aria-label={`${s.message_count} messages`}>
+                    <span 
+                      className="ml-1 text-gray-500 text-[10px] bg-gray-800/60 px-1.5 py-0.5 rounded-full shrink-0" 
+                      data-testid={`msg-count-${s.id}`} 
+                      aria-label={`${s.message_count} messages`}
+                    >
                       {s.message_count}
                     </span>
                   )}
                 </>
               ) : (
-                s.message_count > 0 && (
-                  <span className="absolute -top-1 -right-1 text-gray-400 text-[8px] bg-gray-900 px-1 rounded-full scale-90">
-                    {s.message_count}
-                  </span>
-                )
+                <>
+                  {isDraft && (
+                    <span 
+                      data-testid={`draft-badge-dot-${s.id}`}
+                      className="absolute -top-1 -left-1 w-2 h-2 bg-amber-400 rounded-full" 
+                      title="Session has unsaved draft" 
+                    />
+                  )}
+                  {s.message_count > 0 && (
+                    <span className="absolute -top-1 -right-1 text-gray-400 text-[8px] bg-gray-900 px-1 rounded-full scale-90">
+                      {s.message_count}
+                    </span>
+                  )}
+                </>
               )}
             </button>
           )}
         </div>
 
-        {isExpanded && (
-          <div className="flex items-center shrink-0">
-            <button
-              onClick={(e) => handleTogglePin(e, s.id)}
-              aria-label={isPinned ? "Unpin chat" : "Pin chat"}
-              title={isPinned ? "Unpin chat" : "Pin chat"}
-              tabIndex={-1}
-              className={`relative group/pin px-1 py-2 transition text-xs ${
-                isPinned ? "text-purple-400 opacity-100" : "text-gray-500 opacity-0 group-hover:opacity-100 hover:text-gray-300"
-              }`}
-            >
-              <PinIcon className="w-3.5 h-3.5 shrink-0" filled={isPinned} />
-            </button>
+        <div className="flex items-center shrink-0">
+          {/* Copy Feedback Action Button (#561) */}
+          <button
+            onClick={(e) => handleCopySession(e, s)}
+            title={copiedId === s.id ? "Copied!" : "Copy session title"}
+            aria-label={`Copy session title for ${s.title || "New Chat"}`}
+            className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-purple-400 px-1 py-2 transition text-xs flex items-center shrink-0"
+          >
+            {copiedId === s.id ? (
+              <span className="text-green-400 text-[10px] font-semibold">Copied!</span>
+            ) : (
+              <span className="text-xs">📋</span>
+            )}
+          </button>
 
-            <button
-              onClick={() => setDeleteConfirm({ sessionId: s.id, sessionName: sessionTitle })}
-              aria-label={`Delete session ${sessionTitle}`}
-              title={`Delete session "${sessionTitle}"`}
-              tabIndex={-1}
-              className="relative group/del opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 px-1.5 py-2 transition text-sm font-medium shrink-0"
-            >
-              ×
-            </button>
-          </div>
-        )}
+          {/* Pin Action Button */}
+          <button
+            onClick={(e) => handleTogglePin(e, s.id)}
+            aria-label={isPinned ? "Unpin chat" : "Pin chat"}
+            tabIndex={-1}
+            className={`relative group/pin px-1 py-2 transition text-xs ${
+              isPinned ? "text-purple-400 opacity-100" : "text-gray-500 opacity-0 group-hover:opacity-100 hover:text-gray-300"
+            }`}
+          >
+            <PinIcon className="w-3.5 h-3.5 shrink-0" filled={isPinned} />
+            <span className="hidden md:block absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-gray-800 border border-gray-700 text-gray-300 text-[10px] rounded opacity-0 group-hover/pin:opacity-100 pointer-events-none whitespace-nowrap z-50 transition-opacity">
+              {isPinned ? "Unpin chat" : "Pin chat"}
+            </span>
+          </button>
+
+          {/* Delete Action Button */}
+          <button
+            onClick={() => setDeleteConfirm({ sessionId: s.id, sessionName: s.title })}
+            aria-label={`Delete chat session ${s.title || "New Chat"}`}
+            tabIndex={-1}
+            className="relative group/del opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 px-1.5 py-2 transition text-sm font-medium shrink-0"
+          >
+            ×
+            <span className="hidden md:block absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-gray-800 border border-gray-700 text-gray-300 text-[10px] rounded opacity-0 group-hover/del:opacity-100 pointer-events-none whitespace-nowrap z-50 transition-opacity">
+              Delete
+            </span>
+          </button>
+        </div>
       </div>
     );
   };
@@ -339,6 +407,7 @@ export default function Sidebar({
             </button>
           </div>
           <button
+            data-testid="new-chat-btn"
             onClick={handleCreateChat}
             disabled={creating}
             title="Start a new chat session"
@@ -398,6 +467,7 @@ export default function Sidebar({
             </div>
             <select
               id="ai-model-select"
+              data-testid="model-select"
               value={model}
               onChange={(e) => onModelChange(e.target.value)}
               title="Select AI Model for active conversation"
@@ -411,6 +481,7 @@ export default function Sidebar({
             <label htmlFor="language-select" className="text-xs text-gray-500 block mb-1 mt-2">Language</label>
             <select
               id="language-select"
+              data-testid="language-select"
               value={language}
               onChange={(e) => onLanguageChange(e.target.value)}
               title="Change sidebar interface language"
@@ -427,6 +498,7 @@ export default function Sidebar({
         {/* Search Bar container */}
         <div role="search" className="px-3 py-2 border-b border-gray-800">
           <input
+            data-testid="search-input"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             disabled={!isExpanded}
@@ -446,7 +518,7 @@ export default function Sidebar({
           className="flex-1 overflow-y-auto px-2 py-2 outline-none"
         >
           {isExpanded && filtered.length === 0 && (
-            <p className="text-xs text-gray-600 px-2 py-1">
+            <p className="text-xs text-gray-600 px-2 py-1" data-testid="empty-message">
               {sessions.length === 0 ? "No chats yet. Start one!" : "No results."}
             </p>
           )}
