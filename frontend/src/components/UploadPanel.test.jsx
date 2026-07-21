@@ -6,14 +6,14 @@ import "@testing-library/jest-dom/vitest";
 import UploadPanel from "./UploadPanel";
 import * as api from "../utils/api";
 
-// Mock the API layer
+// Mock API layer
 vi.mock("../utils/api", () => ({
   uploadDocument: vi.fn(),
   deleteDocument: vi.fn(),
   previewDocument: vi.fn(),
 }));
 
-// Mock icons for clean testing
+// Mock icons for testing
 vi.mock("./Icons", () => ({
   CheckIcon: () => <span data-testid="check-icon" />,
   DocumentsIcon: () => <span data-testid="documents-icon" />,
@@ -93,6 +93,34 @@ describe("UploadPanel Component - Skeleton Support (#564)", () => {
     fireEvent.click(closeBtn);
 
     expect(defaultProps.onClose).toHaveBeenCalled();
+  });
+});
+
+describe("UploadPanel Empty-State Guidance Suite (#565)", () => {
+  const defaultProps = {
+    sessionId: "session-123",
+    onUploaded: vi.fn(),
+    onClose: vi.fn(),
+    show: true,
+  };
+
+  it("renders empty-state guidance container when documents array is empty", () => {
+    render(<UploadPanel {...defaultProps} documents={[]} />);
+
+    expect(screen.getByTestId("upload-empty-state")).toBeInTheDocument();
+    expect(screen.getByText("No documents added yet")).toBeInTheDocument();
+    expect(
+      screen.getByText(/Upload files above to index context for your session workspace/i)
+    ).toBeInTheDocument();
+  });
+
+  it("does not render empty-state guidance when documents are present", () => {
+    const mockDocs = [{ filename: "report.pdf", chunks_indexed: 3 }];
+    render(<UploadPanel {...defaultProps} documents={mockDocs} />);
+
+    expect(screen.queryByTestId("upload-empty-state")).not.toBeInTheDocument();
+    expect(screen.getByText("report.pdf")).toBeInTheDocument();
+    expect(screen.getByText("3 chunks")).toBeInTheDocument();
   });
 });
 

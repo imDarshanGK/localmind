@@ -357,8 +357,8 @@ export default function UploadPanel({ sessionId, documents, isLoading = false, o
 
             {result && <p className="text-xs text-green-400 mb-2 inline-flex items-center gap-1"><CheckIcon className="w-3.5 h-3.5" />{result.message}</p>}
 
-            {/* Uploaded docs list */}
-            {documents.length > 0 && (
+            {/* Uploaded docs list OR Empty-state guidance (#565) inside the expanded panel */}
+            {documents && documents.length > 0 ? (
               <div aria-label="Indexed documents collection">
                 <p className="text-xs text-gray-500 mb-1">Indexed documents:</p>
                 <ul className="space-y-1">
@@ -390,6 +390,16 @@ export default function UploadPanel({ sessionId, documents, isLoading = false, o
                     );
                   })}
                 </ul>
+              </div>
+            ) : (
+              <div 
+                data-testid="upload-empty-state" 
+                className="bg-gray-950/40 border border-gray-800/80 rounded-xl p-4 text-center my-2"
+              >
+                <p className="text-xs font-medium text-gray-400 mb-1">No documents added yet</p>
+                <p className="text-[11px] text-gray-500 leading-relaxed">
+                  Upload files above to index context for your session workspace. Supported formats include PDF, TXT, CSV, DOCX, MD, and HTML.
+                </p>
               </div>
             )}
           </div>
