@@ -297,54 +297,49 @@ export default function Sidebar({
           )}
         </div>
 
-        {isExpanded && (
-          <div className="flex items-center shrink-0">
-            {/* Copy Feedback Action Button */}
-            <button
-              onClick={(e) => handleCopySession(e, s)}
-              title={copiedId === s.id ? "Copied!" : "Copy session title"}
-              aria-label={`Copy session title for ${sessionTitle}`}
-              className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-purple-400 px-1 py-2 transition text-xs flex items-center shrink-0"
-            >
-              {copiedId === s.id ? (
-                <span className="text-green-400 text-[10px] font-semibold">Copied!</span>
-              ) : (
-                <span className="text-xs">📋</span>
-              )}
-            </button>
+        <div className="flex items-center shrink-0">
+          {/* Copy Feedback Action Button (#561) */}
+          <button
+            onClick={(e) => handleCopySession(e, s)}
+            title={copiedId === s.id ? "Copied!" : "Copy session title"}
+            aria-label={`Copy session title for ${s.title || "New Chat"}`}
+            className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-purple-400 px-1 py-2 transition text-xs flex items-center shrink-0"
+          >
+            {copiedId === s.id ? (
+              <span className="text-green-400 text-[10px] font-semibold">Copied!</span>
+            ) : (
+              <span className="text-xs">📋</span>
+            )}
+          </button>
 
-            {/* Pin Action Button */}
-            <button
-              onClick={(e) => handleTogglePin(e, s.id)}
-              aria-label={isPinned ? "Unpin chat" : "Pin chat"}
-              title={isPinned ? "Unpin chat" : "Pin chat"}
-              tabIndex={-1}
-              className={`relative group/pin px-1 py-2 transition text-xs ${
-                isPinned ? "text-purple-400 opacity-100" : "text-gray-500 opacity-0 group-hover:opacity-100 hover:text-gray-300"
-              }`}
-            >
-              <PinIcon className="w-3.5 h-3.5 shrink-0" filled={isPinned} />
-              <span className="hidden md:block absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-gray-800 border border-gray-700 text-gray-300 text-[10px] rounded opacity-0 group-hover/pin:opacity-100 pointer-events-none whitespace-nowrap z-50 transition-opacity">
-                {isPinned ? "Unpin chat" : "Pin chat"}
-              </span>
-            </button>
+          {/* Pin Action Button */}
+          <button
+            onClick={(e) => handleTogglePin(e, s.id)}
+            aria-label={isPinned ? "Unpin chat" : "Pin chat"}
+            tabIndex={-1}
+            className={`relative group/pin px-1 py-2 transition text-xs ${
+              isPinned ? "text-purple-400 opacity-100" : "text-gray-500 opacity-0 group-hover:opacity-100 hover:text-gray-300"
+            }`}
+          >
+            <PinIcon className="w-3.5 h-3.5 shrink-0" filled={isPinned} />
+            <span className="hidden md:block absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-gray-800 border border-gray-700 text-gray-300 text-[10px] rounded opacity-0 group-hover/pin:opacity-100 pointer-events-none whitespace-nowrap z-50 transition-opacity">
+              {isPinned ? "Unpin chat" : "Pin chat"}
+            </span>
+          </button>
 
-            {/* Delete Action Button */}
-            <button
-              data-testid={`delete-session-${s.id}`}
-              onClick={() => setDeleteConfirm({ sessionId: s.id, sessionName: sessionTitle })}
-              aria-label={`Delete session ${sessionTitle}`}
-              title={`Delete session "${sessionTitle}"`}
-              tabIndex={-1}
-              className="relative group/del opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 px-1.5 py-2 transition text-sm font-medium shrink-0"
-            >
-              ×
-              <span className="hidden md:block absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-gray-800 border border-gray-700 text-gray-300 text-[10px] rounded opacity-0 group-hover/del:opacity-100 pointer-events-none whitespace-nowrap z-50 transition-opacity">
-                Delete
-              </span>
-            </button>
-          </div>
-        )}
+          {/* Delete Action Button */}
+          <button
+            onClick={() => setDeleteConfirm({ sessionId: s.id, sessionName: s.title })}
+            aria-label={`Delete chat session ${s.title || "New Chat"}`}
+            tabIndex={-1}
+            className="relative group/del opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 px-1.5 py-2 transition text-sm font-medium shrink-0"
+          >
+            ×
+            <span className="hidden md:block absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-gray-800 border border-gray-700 text-gray-300 text-[10px] rounded opacity-0 group-hover/del:opacity-100 pointer-events-none whitespace-nowrap z-50 transition-opacity">
+              Delete
+            </span>
+          </button>
+        </div>
       </div>
     );
   };
