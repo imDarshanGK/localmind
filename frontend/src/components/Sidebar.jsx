@@ -511,7 +511,7 @@ export default function Sidebar({
 
         {/* Chat Sessions Wrapper */}
         <nav 
-          data-testid="sidebar-sessions-list"
+          data-testid="sessions-list"
           tabIndex={0}
           onKeyDown={handleKeyDown}
           aria-label="Chat Sessions History"

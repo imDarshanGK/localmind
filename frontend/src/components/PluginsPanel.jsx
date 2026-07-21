@@ -135,17 +135,14 @@ export default function PluginsPanel({ sessionId, onClose }) {
   };
 
   return (
-    <div
-      data-testid="plugins-panel"
-      className="fixed inset-0 z-50 flex flex-col bg-gray-900 px-5 py-4 overflow-y-auto md:relative md:inset-auto md:z-auto md:border-b md:border-gray-800 md:shrink-0 md:bg-gray-900"
-    >
-      <div className="flex items-center justify-between mb-4 md:mb-3 shrink-0">
+    <div className="border-b border-gray-800 bg-gray-900 px-5 py-4 shrink-0" data-testid="plugins-panel">
+      <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-1.5">
-          {/* Collapse/Expand Toggle Button (#592) */}
+          {/* Collapse/Expand toggle button */}
           <button
             type="button"
             onClick={() => setIsCollapsed(!isCollapsed)}
-            className="text-gray-400 hover:text-white text-xs p-1 focus:outline-none focus:ring-1 focus:ring-purple-500 rounded transition"
+            className="text-gray-400 hover:text-white text-xs p-1 rounded focus:outline-none focus:ring-1 focus:ring-purple-500 transition"
             aria-label={isCollapsed ? "Expand plugins section" : "Collapse plugins section"}
           >
             {isCollapsed ? "▶" : "▼"}
@@ -156,7 +153,7 @@ export default function PluginsPanel({ sessionId, onClose }) {
             Plugins Workspace
           </p>
 
-          {/* Interactive Help Tooltip Utility Box (#593) */}
+          {/* FIXED (#593): Pure CSS/Tailwind interactive help tooltip utility box */}
           <div className="group relative inline-block">
             <button
               type="button"

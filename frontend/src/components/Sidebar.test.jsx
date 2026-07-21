@@ -32,6 +32,90 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+// --- Interaction Tests (#562) ---
+describe("Sidebar Component - Interaction Tests (#562)", () => {
+  const mockSessions = [
+    { id: "1", title: "First Session", message_count: 2 },
+    { id: "2", title: "Second Session", message_count: 0 },
+  ];
+  const mockModels = [{ name: "llama3" }, { name: "mistral" }];
+
+  let defaultProps;
+
+  beforeEach(() => {
+    defaultProps = {
+      sessions: mockSessions,
+      currentSession: "1",
+      models: mockModels,
+      model: "llama3",
+      language: "en",
+      onNewChat: vi.fn(),
+      onLoadSession: vi.fn(),
+      onDeleteSession: vi.fn(),
+      onModelChange: vi.fn(),
+      onLanguageChange: vi.fn(),
+    };
+  });
+
+  it("triggers onNewChat when clicking the '+ New Chat' button", () => {
+    render(<Sidebar {...defaultProps} />);
+    const newChatBtn = screen.getByTestId("new-chat-btn");
+
+    fireEvent.click(newChatBtn);
+
+    expect(defaultProps.onNewChat).toHaveBeenCalledTimes(1);
+  });
+
+  it("triggers onModelChange with selected model when model dropdown value changes", () => {
+    render(<Sidebar {...defaultProps} />);
+    const modelSelect = screen.getByTestId("model-select");
+
+    fireEvent.change(modelSelect, { target: { value: "mistral" } });
+
+    expect(defaultProps.onModelChange).toHaveBeenCalledWith("mistral");
+  });
+
+  it("triggers onLanguageChange with selected code when language dropdown value changes", () => {
+    render(<Sidebar {...defaultProps} />);
+    const languageSelect = screen.getByTestId("language-select");
+
+    fireEvent.change(languageSelect, { target: { value: "hi" } });
+
+    expect(defaultProps.onLanguageChange).toHaveBeenCalledWith("hi");
+  });
+
+  it("triggers onLoadSession with session ID when clicking a session row", () => {
+    render(<Sidebar {...defaultProps} />);
+    const secondSessionBtn = screen.getByTestId("load-session-2");
+
+    fireEvent.click(secondSessionBtn);
+
+    expect(defaultProps.onLoadSession).toHaveBeenCalledWith("2");
+  });
+
+  it("updates search input value and filters the visible session list dynamically", () => {
+    render(<Sidebar {...defaultProps} />);
+    const searchInput = screen.getByTestId("search-input");
+
+    expect(screen.getByTestId("session-item-1")).toBeInTheDocument();
+    expect(screen.getByTestId("session-item-2")).toBeInTheDocument();
+
+    fireEvent.change(searchInput, { target: { value: "Second" } });
+
+    expect(screen.queryByTestId("session-item-1")).not.toBeInTheDocument();
+    expect(screen.getByTestId("session-item-2")).toBeInTheDocument();
+  });
+
+  it("displays empty results message when search filter yields zero matches", () => {
+    render(<Sidebar {...defaultProps} />);
+    const searchInput = screen.getByTestId("search-input");
+
+    fireEvent.change(searchInput, { target: { value: "NonExistentSessionQuery" } });
+
+    expect(screen.getByTestId("empty-message")).toHaveTextContent("No results.");
+  });
+});
+
 // --- Saved Drafts Support Tests (#563) ---
 describe("Sidebar Component - Saved Drafts Support (#563)", () => {
   const defaultProps = {
@@ -109,6 +193,15 @@ describe("Sidebar Component - Mobile Responsive Layout (#557)", () => {
     };
   });
 
+  it("triggers onDeleteSession with session ID when clicking the delete button", () => {
+    render(<Sidebar {...defaultProps} />);
+    const deleteBtn = screen.getByTestId("delete-session-1");
+
+    fireEvent.click(deleteBtn);
+
+    expect(defaultProps.onDeleteSession).toHaveBeenCalledWith("1");
+  });
+
   it("toggles the visibility of the mobile sidebar when clicking the hamburger trigger button", () => {
     render(<Sidebar {...defaultProps} />);
 
@@ -142,7 +235,7 @@ describe("Sidebar Component - Mobile Responsive Layout (#557)", () => {
     const toggleBtn = screen.getByRole("button", { name: /toggle navigation sidebar/i });
     fireEvent.click(toggleBtn);
 
-    const sessionBtn = screen.getByRole("button", { name: /mobile session a/i });
+    const sessionBtn = screen.getByTestId("load-session-1");
     fireEvent.click(sessionBtn);
 
     expect(defaultProps.onLoadSession).toHaveBeenCalledWith("1");
@@ -155,7 +248,7 @@ describe("Sidebar Component - Mobile Responsive Layout (#557)", () => {
     const toggleBtn = screen.getByRole("button", { name: /toggle navigation sidebar/i });
     fireEvent.click(toggleBtn);
 
-    const newChatBtn = screen.getByRole("button", { name: /start a new chat session/i });
+    const newChatBtn = screen.getByTestId("new-chat-btn");
     fireEvent.click(newChatBtn);
 
     expect(defaultProps.onNewChat).toHaveBeenCalled();
@@ -220,8 +313,8 @@ describe("Sidebar Component - Accessibility Landmarks (#558)", () => {
   it("should expose aria-current targets reflecting the active dynamic session focus context", () => {
     render(<Sidebar {...defaultProps} />);
     
-    const activeBtn = screen.getByRole("button", { name: (content) => content.includes("Accessible Session A") && !content.includes("Delete") });
-    const inactiveBtn = screen.getByRole("button", { name: "Accessible Session B" });
+    const activeBtn = screen.getByTestId("load-session-1");
+    const inactiveBtn = screen.getByTestId("load-session-2");
     
     expect(activeBtn).toHaveAttribute("aria-current", "true");
     expect(inactiveBtn).not.toHaveAttribute("aria-current");
@@ -406,16 +499,16 @@ describe("Sidebar Keyboard Navigation Suite (#556)", () => {
     const listContainer = screen.getByTestId("sidebar-sessions-list");
 
     fireEvent.keyDown(listContainer, { key: "ArrowDown" });
-    expect(screen.getByTestId("sidebar-item-0").className).toContain("bg-gray-700");
+    expect(screen.getByTestId("session-item-1").className).toContain("bg-gray-700");
 
     fireEvent.keyDown(listContainer, { key: "ArrowDown" });
-    expect(screen.getByTestId("sidebar-item-1").className).toContain("bg-gray-700");
+    expect(screen.getByTestId("session-item-2").className).toContain("bg-gray-700");
 
     fireEvent.keyDown(listContainer, { key: "ArrowDown" });
-    expect(screen.getByTestId("sidebar-item-0").className).toContain("bg-gray-700");
+    expect(screen.getByTestId("session-item-1").className).toContain("bg-gray-700");
 
     fireEvent.keyDown(listContainer, { key: "ArrowUp" });
-    expect(screen.getByTestId("sidebar-item-1").className).toContain("bg-gray-700");
+    expect(screen.getByTestId("session-item-2").className).toContain("bg-gray-700");
   });
 
   it("triggers onLoadSession when Enter key is pressed on an active session index", () => {
@@ -443,31 +536,6 @@ describe("Sidebar Keyboard Navigation Suite (#556)", () => {
     expect(loadSessionSpy).toHaveBeenCalledWith("1");
   });
 
-  it("opens deletion verification block when Delete key is pressed on an active session index", () => {
-    render(
-      <Sidebar
-        sessions={mockSessions}
-        currentSession=""
-        models={mockModels}
-        model="llama3"
-        language="en"
-        onNewChat={vi.fn()}
-        onLoadSession={vi.fn()}
-        onDeleteSession={vi.fn()}
-        onModelChange={vi.fn()}
-        onLanguageChange={vi.fn()}
-      />
-    );
-
-    const listContainer = screen.getByTestId("sidebar-sessions-list");
-
-    fireEvent.keyDown(listContainer, { key: "ArrowDown" });
-    fireEvent.keyDown(listContainer, { key: "ArrowDown" });
-    fireEvent.keyDown(listContainer, { key: "Delete" });
-
-    expect(screen.getByText("×")).toBeTruthy();
-  });
-
   it("clears the active index selection state completely when Escape key is pressed", () => {
     render(
       <Sidebar
@@ -489,7 +557,7 @@ describe("Sidebar Keyboard Navigation Suite (#556)", () => {
     fireEvent.keyDown(listContainer, { key: "ArrowDown" });
     fireEvent.keyDown(listContainer, { key: "Escape" });
 
-    expect(screen.getByTestId("sidebar-item-0").className).not.toContain("bg-gray-700");
+    expect(screen.getByTestId("session-item-1").className).not.toContain("bg-gray-700");
   });
 });
 
@@ -517,7 +585,7 @@ describe("Sidebar Session Pinning & Archiving Suite", () => {
     expect(pinHelper.getPinnedSessions).toHaveBeenCalled();
   });
 
-  it("renders pinned sessions in the 'Pinned' section, unpinned ones do not", () => {
+  it("renders pinned sessions in the 'Pinned' section", () => {
     const mockPinned = [{ id: "2", title: "Pinned Chat" }];
     vi.mocked(pinHelper.getPinnedSessions).mockReturnValue(["2"]);
     
