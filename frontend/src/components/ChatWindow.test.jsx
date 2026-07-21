@@ -1,20 +1,12 @@
 // @vitest-environment jsdom
-import { describe, test, expect, vi, afterEach, beforeEach } from "vitest";
-import { render, screen, fireEvent, cleanup, act } from "@testing-library/react";
-import "@testing-library/jest-dom/vitest";
-import ChatWindow from "./ChatWindow";
-import { exportSession } from "../utils/api";
+import { render, screen, fireEvent, act, cleanup } from '@testing-library/react';
+import { vi, describe, test, expect, beforeEach, afterEach } from 'vitest';
+import * as jestDomMatchers from "@testing-library/jest-dom/matchers";
+import ChatWindow from './ChatWindow';
+import { exportSession } from '../utils/api';
+expect.extend(jestDomMatchers);
 
-// --- GLOBAL MOCKS & SETUP ---
-vi.mock("../utils/api", () => ({
-  exportSession: vi.fn(),
-}));
-
-vi.mock("./Icons", () => ({
-  AppLogoIcon: () => <span data-testid="app-logo-icon" />,
-  FileIcon: () => <span data-testid="file-icon" />,
-  LockIcon: () => <span data-testid="lock-icon" />,
-}));
+expect.extend(jestDomMatchers);
 
 // Mock clipboard API functionality using Vitest utilities
 Object.assign(navigator, {
@@ -119,6 +111,8 @@ describe('ChatWindow Copy Feedback', () => {
   });
 
   afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
     vi.useRealTimers();
   });
 
@@ -142,12 +136,19 @@ describe('ChatWindow Copy Feedback', () => {
     const copyButton = screen.getByTitle('Copy response');
     fireEvent.click(copyButton);
 
+    // Flush the microtasks so the clipboard promise resolves safely inside act
+    await act(async () => {
+      await Promise.resolve(); 
+    });
+
+    // Check that writeText was called with the correct message content
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith('Hello from LocalMind!');
 
     act(() => {
       vi.advanceTimersByTime(1500);
     });
 
-    expect(screen.getByTitle('Copy response')).toBeDefined();
+    // Verify copy state reverts back to original state (showing the default icon title)
+    expect(screen.getByTitle('Copy response')).toBeInTheDocument();
   });
 });
