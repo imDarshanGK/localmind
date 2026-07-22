@@ -8,7 +8,7 @@ The cache intercepts requests for detailed model metadata. When a request for a 
 1. **Cache Hit**: If the model's metadata was fetched recently, it is returned instantly from memory.
 2. **Cache Miss**: If the metadata is not in memory (or has expired), the backend fetches it from Ollama's `/api/show` endpoint, stores it in the cache, and returns it.
 
-## Configuration
+## Cache Configuration
 
 The cache is defined in `backend/utils/cache.py` using the `TTLCache` class.
 The global instance `model_metadata_cache` is initialized in `backend/services/ollama_service.py` with a **5-minute (300 seconds) TTL**.

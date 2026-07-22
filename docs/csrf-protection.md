@@ -50,7 +50,7 @@ app.add_middleware(CORSMiddleware, ...)
 The CSRF middleware is registered **between** GZip and CORS so that rejected
 requests never receive `Access-Control-Allow-*` headers.
 
-## Configuration
+## CSRF Configuration
 
 The allowed-origins list is read from the `CORS_ORIGINS` environment variable
 (already required for CORS). No additional configuration is needed.
@@ -63,7 +63,7 @@ CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173
 To add a new allowed origin (e.g. a staging URL), append it to `CORS_ORIGINS`.
 The CSRF check will automatically pick it up.
 
-## Testing
+## CSRF Testing
 
 ```bash
 # Run all tests including the CSRF suite
