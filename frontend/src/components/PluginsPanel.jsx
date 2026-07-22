@@ -121,25 +121,41 @@ export default function PluginsPanel({ sessionId, onClose }) {
   }
 
   return (
-    <div
-      data-testid="plugins-panel"
-      className="fixed inset-0 z-50 flex flex-col bg-gray-900 px-5 py-4 overflow-y-auto md:relative md:inset-auto md:z-auto md:border-b md:border-gray-800 md:shrink-0 md:bg-gray-900"
-    >
-      <div className="flex items-center justify-between mb-4 md:mb-3 shrink-0">
+    <div className="border-b border-gray-800 bg-gray-900 px-5 py-4 shrink-0" data-testid="plugins-panel">
+      <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-1.5">
+          {/* Collapse/Expand toggle button */}
           <button
             type="button"
             onClick={() => setIsCollapsed(!isCollapsed)}
-            className="text-gray-400 hover:text-white text-xs p-1 focus:outline-none focus:ring-1 focus:ring-purple-500 rounded transition"
+            className="text-gray-400 hover:text-white text-xs p-1 rounded focus:outline-none focus:ring-1 focus:ring-purple-500 transition"
             aria-label={isCollapsed ? "Expand plugins section" : "Collapse plugins section"}
           >
             {isCollapsed ? "▶" : "▼"}
           </button>
+
           <p className="text-sm font-semibold text-white inline-flex items-center gap-1.5">
             <PlugIcon className="w-4 h-4" />
-            Plugins
+            Plugins Workspace
           </p>
+
+          {/* FIXED (#593): Pure CSS/Tailwind interactive help tooltip utility box */}
+          <div className="group relative inline-block">
+            <button
+              type="button"
+              className="text-gray-500 hover:text-purple-400 text-xs font-mono border border-gray-700 hover:border-purple-500/40 rounded-full w-4 h-4 inline-flex items-center justify-center bg-gray-950 cursor-help transition-colors focus:outline-none focus:ring-1 focus:ring-purple-500"
+              aria-label="Plugins panel information description"
+            >
+              i
+            </button>
+            <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 hidden group-hover:block group-focus-within:block w-52 bg-gray-950 border border-gray-800 text-gray-400 text-[10px] p-2 rounded shadow-xl z-50 pointer-events-none leading-relaxed">
+              <span className="font-semibold text-white block mb-0.5">Plugins Workspace Help:</span>
+              Select an active plugin tool to run utility scripts or perform automated text/data transformations on your workspace inputs.
+              <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-950"></div>
+            </div>
+          </div>
         </div>
+
         <button
           type="button"
           onClick={onClose}
@@ -236,7 +252,7 @@ export default function PluginsPanel({ sessionId, onClose }) {
               <PlugIcon className="w-8 h-8 text-gray-600 mb-2 animate-pulse" />
               <p className="text-xs font-medium text-gray-300">No Plugin Selected</p>
               <p className="text-[11px] text-gray-500 max-w-[260px] mt-1 leading-relaxed">
-                Select an option from the tools list above to open a plugin workspace workspace.
+                Select an option from the tools list above to open a plugin workspace.
               </p>
             </div>
           )}

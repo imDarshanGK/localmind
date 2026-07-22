@@ -34,6 +34,7 @@ describe("PluginsPanel Interaction Tests (#595)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     api.getPlugins.mockResolvedValue({ plugins: mockPluginsList });
+    api.getPluginLogs.mockResolvedValue({ logs: [] });
   });
 
   afterEach(() => {
@@ -118,6 +119,21 @@ describe("PluginsPanel Interaction Tests (#595)", () => {
 
     expect(handleClose).toHaveBeenCalledTimes(1);
   });
+
+  test("renders the plugins panel header title and info tooltip icon", async () => {
+    render(<PluginsPanel sessionId="test-session" onClose={vi.fn()} />);
+
+    expect(screen.getByText(/Plugins/i)).toBeInTheDocument();
+
+    // Verify info button trigger renders
+    const helpButton = screen.getByLabelText(/Plugins panel information description/i);
+    expect(helpButton).toBeInTheDocument();
+    expect(helpButton.textContent.trim()).toBe("i");
+
+    // Verify tooltip text is rendered in DOM
+    const helpText = screen.getByText(/Plugins Workspace Help:/i);
+    expect(helpText).toBeInTheDocument();
+  });
 });
 
 describe("PluginsPanel View State & Persistence Suite (#592)", () => {
@@ -135,6 +151,7 @@ describe("PluginsPanel View State & Persistence Suite (#592)", () => {
     });
 
     api.getPlugins.mockResolvedValue({ plugins: mockPluginsList });
+    api.getPluginLogs.mockResolvedValue({ logs: [] });
   });
 
   afterEach(() => {
