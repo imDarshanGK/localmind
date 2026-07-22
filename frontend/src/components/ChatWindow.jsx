@@ -164,6 +164,12 @@ export default function ChatWindow({ messages = [], loading = false, onSend, onD
     if (e.key === "Enter" && !e.shiftKey) { 
       e.preventDefault(); 
       send(); 
+    } else if (e.key === "Escape") {
+      if (input) {
+        setInput("");
+      } else {
+        textareaRef.current?.blur();
+      }
     }
   }
 
@@ -201,9 +207,26 @@ export default function ChatWindow({ messages = [], loading = false, onSend, onD
     if (textareaRef.current) {
       textareaRef.current.focus();
       setTimeout(() => {
+        if (!textareaRef.current) return;
         textareaRef.current.style.height = "auto";
         textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 160) + "px";
       }, 0);
+    }
+  }
+
+  // --- Keyboard Navigation (#545) for Suggestion Pills ---
+  function handleSuggestionKeyDown(e, index) {
+    const pills = document.querySelectorAll('[data-testid="suggestion-pill"]');
+    if (!pills.length) return;
+
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+      e.preventDefault();
+      const nextIndex = (index + 1) % pills.length;
+      pills[nextIndex]?.focus();
+    } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+      e.preventDefault();
+      const prevIndex = (index - 1 + pills.length) % pills.length;
+      pills[prevIndex]?.focus();
     }
   }
 
@@ -252,20 +275,32 @@ export default function ChatWindow({ messages = [], loading = false, onSend, onD
         )}
       </div>
 
-      {/* Messages Viewport */}
+      {/* Messages Container */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5">
         {messages.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-full text-center gap-4">
+          <div data-testid="empty-state-guidance" className="flex flex-col items-center justify-center h-full text-center gap-4">
             <AppLogoIcon className="w-14 h-14 text-purple-400 opacity-70" />
             <div>
               <p className="text-xl font-semibold text-gray-200 mb-1">LocalMind is ready</p>
-              <p className="text-sm text-gray-400">100% private · runs offline · no cloud</p>
+              <div className="flex items-center justify-center gap-3 text-xs text-gray-400 mt-1">
+                <span>💡 Select a suggestion below</span>
+                <span>•</span>
+                <span>📄 Upload documents to query</span>
+                <span>•</span>
+                <span>🔒 Encrypted & Local</span>
+              </div>
             </div>
+
             {!minimalMode && (
-              <div className="grid grid-cols-2 gap-2 mt-4 max-w-lg w-full">
-                {SUGGESTIONS.map(s => (
-                  <button key={s} onClick={() => handleSuggestionClick(s)}
-                    className="text-xs text-left border border-gray-800 rounded-xl px-3 py-2.5 text-gray-400 hover:border-purple-600 hover:text-purple-300 hover:bg-purple-900/20 transition">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-4 max-w-lg w-full" role="group" aria-label="Prompt suggestions">
+                {SUGGESTIONS.map((s, index) => (
+                  <button 
+                    key={s} 
+                    data-testid="suggestion-pill"
+                    onClick={() => handleSuggestionClick(s)}
+                    onKeyDown={(e) => handleSuggestionKeyDown(e, index)}
+                    className="text-xs text-left border border-gray-800 rounded-xl px-3 py-2.5 text-gray-400 hover:border-purple-600 hover:text-purple-300 hover:bg-purple-900/20 focus:outline-none focus:ring-2 focus:ring-purple-500 transition"
+                  >
                     {s}
                   </button>
                 ))}
@@ -279,7 +314,7 @@ export default function ChatWindow({ messages = [], loading = false, onSend, onD
           const messageId = msg.id || i;
           return (
             <div key={messageId} className={`flex group ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-              <div className="max-w-2xl">
+              <div className="max-w-[88%] sm:max-w-2xl">
                 {msg.role === "assistant" && (
                   <div className="flex items-center gap-2 mb-1.5 ml-1">
                     <div className="flex items-center gap-1.5">
