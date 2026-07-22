@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { exportSession } from "../utils/api";
 import { AppLogoIcon, FileIcon, LockIcon } from "./Icons";
 
-export default function ChatWindow({ messages, loading, onSend, sessionId }) {
+export default function ChatWindow({ messages = [], loading = false, onSend, sessionId }) {
   const [input, setInput] = useState("");
   const bottomRef = useRef(null);
   const textareaRef = useRef(null);
@@ -50,7 +50,7 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5">
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center gap-4">
-              <AppLogoIcon className="w-14 h-14 text-purple-400 opacity-70" />
+            <AppLogoIcon className="w-14 h-14 text-purple-400 opacity-70" />
             <div>
               <p className="text-xl font-semibold text-gray-200 mb-1">LocalMind is ready</p>
               <p className="text-sm text-gray-500">100% private · runs offline · no cloud</p>
@@ -104,19 +104,16 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
           </div>
         ))}
 
-        {loading && !messages.find(m => m.streaming) && (
-          <div className="flex justify-start">
-            <div className="bg-gray-800 border border-gray-700 px-4 py-3 rounded-2xl rounded-bl-sm">
-              <div className="flex items-center gap-1.5 mb-1.5">
-                <AppLogoIcon className="w-4 h-4 text-purple-400" />
-                <span className="text-xs font-semibold text-purple-400">LocalMind</span>
+        {/* Loading Skeleton */}
+        {Boolean(loading) && !messages.some(m => m.streaming) && (
+          <div className="flex justify-start" data-testid="message-skeleton">
+            <div className="w-full max-w-md bg-gray-800/80 border border-gray-700/80 px-4 py-3 rounded-2xl rounded-bl-sm animate-pulse space-y-2.5">
+              <div className="flex items-center gap-1.5 mb-2">
+                <AppLogoIcon className="w-4 h-4 text-purple-400/60" />
+                <span className="text-xs font-semibold text-purple-400/60">LocalMind</span>
               </div>
-              <div className="flex gap-1">
-                {[0,1,2].map(i => (
-                  <div key={i} className="w-2 h-2 bg-purple-400 rounded-full animate-bounce"
-                    style={{ animationDelay: `${i*0.15}s` }} />
-                ))}
-              </div>
+              <div className="h-3.5 bg-gray-700 rounded-full w-3/4" />
+              <div className="h-3.5 bg-gray-700 rounded-full w-1/2" />
             </div>
           </div>
         )}
