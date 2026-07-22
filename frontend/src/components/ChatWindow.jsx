@@ -7,8 +7,8 @@ import PromptTemplateDialog from "./PromptTemplateDialog";
 
 export default function ChatWindow({ messages = [], loading = false, onSend, onDeleteMessage, onStop, sessionId, minimalMode }) {
   const [input, setInput] = useState("");
-  const [copiedId, setCopiedId] = useState(null); // Tracking temporary copy confirmation state
-  const [searchTerm, setSearchTerm] = useState(""); // Issue #275: Message search filter
+  const [copiedId, setCopiedId] = useState(null);
+  const [searchTerm, setSearchTerm] = useState("");
   const [showPlusMenu, setShowPlusMenu] = useState(false);
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
@@ -16,7 +16,6 @@ export default function ChatWindow({ messages = [], loading = false, onSend, onD
   const textareaRef = useRef(null);
   const plusMenuRef = useRef(null);
 
-  // --- Issue #267: Smarter Auto-Scroll Pause Routine ---
   useEffect(() => {
     const hasSelection = window.getSelection()?.toString();
     if (!hasSelection) {
@@ -52,7 +51,7 @@ export default function ChatWindow({ messages = [], loading = false, onSend, onD
     const activeReactions = localReactions[msg.id] ?? msg.reactions ?? [];
     
     return (
-      <div className="flex items-center gap-1.5 mt-1">
+      <div className="flex items-center gap-1.5 mt-1 flex-wrap">
         {activeReactions.length > 0 && (
           <div className="flex items-center gap-1 flex-wrap mr-1">
             {Object.entries(
@@ -73,14 +72,14 @@ export default function ChatWindow({ messages = [], loading = false, onSend, onD
           </div>
         )}
 
-        <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-gray-900 border border-gray-800 rounded-full px-1 py-0.5 shadow-md gap-0.5">
+        <div className="flex items-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200 bg-gray-900 border border-gray-800 rounded-full px-1 py-0.5 shadow-md gap-0.5">
           {REACTION_EMOJIS.map(emoji => {
             const isSelected = activeReactions.includes(emoji);
             return (
               <button
                 key={emoji}
                 onClick={() => handleReactionToggle(msg.id, emoji)}
-                className={`p-0.5 text-xs hover:scale-125 transition-transform rounded-full ${isSelected ? 'bg-purple-500/20' : 'hover:bg-gray-800'}`}
+                className={`p-1 text-xs hover:scale-125 transition-transform rounded-full ${isSelected ? 'bg-purple-500/20' : 'hover:bg-gray-800'}`}
                 title={`React with ${emoji}`}
               >
                 {emoji}
@@ -98,19 +97,19 @@ export default function ChatWindow({ messages = [], loading = false, onSend, onD
         <span className="text-gray-500">Delete?</span>
         <button
           onClick={() => { onDeleteMessage?.(msgId); setConfirmDeleteId(null); }}
-          className="px-1.5 py-0.5 rounded bg-red-600/80 hover:bg-red-600 text-white transition"
+          className="px-2 py-0.5 rounded bg-red-600/80 hover:bg-red-600 text-white transition min-h-[28px]"
           title="Confirm delete"
         >Yes</button>
         <button
           onClick={() => setConfirmDeleteId(null)}
-          className="px-1.5 py-0.5 rounded hover:bg-gray-700 text-gray-400 transition"
+          className="px-2 py-0.5 rounded hover:bg-gray-700 text-gray-400 transition min-h-[28px]"
           title="Cancel"
         >No</button>
       </span>
     ) : (
       <button
         onClick={() => setConfirmDeleteId(msgId)}
-        className="p-1 rounded hover:bg-gray-800 text-gray-500 hover:text-red-400 transition"
+        className="p-1.5 sm:p-1 rounded hover:bg-gray-800 text-gray-500 hover:text-red-400 transition"
         title="Delete message"
         aria-label="Delete message"
       >
@@ -165,6 +164,12 @@ export default function ChatWindow({ messages = [], loading = false, onSend, onD
     if (e.key === "Enter" && !e.shiftKey) { 
       e.preventDefault(); 
       send(); 
+    } else if (e.key === "Escape") {
+      if (input) {
+        setInput("");
+      } else {
+        textareaRef.current?.blur();
+      }
     }
   }
 
@@ -176,6 +181,25 @@ export default function ChatWindow({ messages = [], loading = false, onSend, onD
     } catch (err) {
       console.error("Failed to copy text: ", err);
     }
+  };
+
+  const handleRegenerate = (currentIndex) => {
+    for (let idx = currentIndex - 1; idx >= 0; idx--) {
+      if (messages[idx].role === "user") {
+        onSend(messages[idx].content);
+        break;
+      }
+    }
+  };
+
+  const handleExportSingleMessage = (text, index) => {
+    const element = document.createElement("a");
+    const file = new Blob([text], { type: "text/plain;charset=utf-8" });
+    element.href = URL.createObjectURL(file);
+    element.download = `localmind_message_${index + 1}.txt`;
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
   };
 
   function handleSuggestionClick(text) {
@@ -202,256 +226,375 @@ export default function ChatWindow({ messages = [], loading = false, onSend, onD
   );
 
   return (
-    <>
-      <div className="flex flex-col flex-1 overflow-hidden bg-gray-950 text-gray-100">
-        {/* Export bar */}
-        {messages.length > 0 && (
-          <div className="flex justify-end gap-2 px-5 pt-2">
-            {["markdown","json","txt"].map(f => (
-              <button key={f} onClick={() => exportSession(sessionId, f)}
-                className="text-xs text-gray-500 hover:text-purple-400 transition px-2 py-1 rounded hover:bg-gray-800">
-                ↓ .{f}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Search Bar */}
-        {messages.length > 0 && (
-          <div className="px-4 pt-2">
-            <input
-              type="text"
-              placeholder="Search messages..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg bg-gray-900 border border-gray-700 text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:border-purple-500"
-            />
-            {searchTerm && (
-              <button onClick={() => setSearchTerm("")} className="text-xs text-purple-400 mt-1">
-                Clear search
-              </button>
-            )}
-          </div>
-        )}
-
-        {/* Messages Viewport */}
-        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5">
-          {/* Empty-State Guidance (#543) */}
-          {messages.length === 0 && (
-            <div 
-              data-testid="empty-state-guidance"
-              className="flex flex-col items-center justify-center h-full text-center gap-4 py-8"
-            >
-              <AppLogoIcon className="w-16 h-16 text-purple-400 opacity-80 animate-pulse" />
-              <div>
-                <p className="text-xl font-semibold text-gray-200 mb-1">LocalMind is ready</p>
-                <p className="text-sm text-gray-400">100% private · runs offline · no cloud</p>
-              </div>
-
-              {/* Feature Guidance Highlights */}
-              <div className="flex flex-wrap items-center justify-center gap-2 text-xs text-gray-400 max-w-md my-1">
-                <span className="bg-gray-900 border border-gray-800 rounded-full px-3 py-1">
-                  💡 Select a suggestion below
-                </span>
-                <span className="bg-gray-900 border border-gray-800 rounded-full px-3 py-1">
-                  📄 Upload documents to query
-                </span>
-                <span className="bg-gray-900 border border-gray-800 rounded-full px-3 py-1">
-                  🔒 Encrypted & Local
-                </span>
-              </div>
-
-              {!minimalMode && (
-                <div className="grid grid-cols-2 gap-2 mt-2 max-w-lg w-full">
-                  {SUGGESTIONS.map(s => (
-                    <button key={s} onClick={() => handleSuggestionClick(s)}
-                      className="text-xs text-left border border-gray-800 rounded-xl px-3 py-2.5 text-gray-400 hover:border-purple-600 hover:text-purple-300 hover:bg-purple-900/20 transition">
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Messages list */}
-          {filteredMessages.map((msg, i) => {
-            const messageId = msg.id || i;
-            return (
-              <div key={messageId} className={`flex group ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                <div className="max-w-2xl">
-                  {msg.role === "assistant" && (
-                    <div className="flex items-center gap-2 mb-1.5 ml-1">
-                      <div className="flex items-center gap-1.5">
-                        <AppLogoIcon className="w-4 h-4 text-purple-400" />
-                        <span className="text-xs font-semibold text-purple-400">LocalMind</span>
-                      </div>
-
-                      {(msg.token_count > 0 || (!msg.streaming && msg.content)) && (
-                        <span className="text-[10px] bg-purple-950/60 text-purple-300 border border-purple-800/40 font-mono px-1.5 py-0.5 rounded-md shadow-sm">
-                          {(msg.token_count > 0 ? msg.token_count : (msg.content ? Math.round(msg.content.trim().split(/\s+/).length * 1.3) : 0))} tokens
-                        </span>
-                      )}
-
-                      {msg.streaming && <span className="text-xs text-gray-400 animate-pulse">typing...</span>}
-                    </div>
-                  )}
-
-                  <div className={`px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words
-                    ${msg.role === "user"
-                      ? "bg-purple-700 text-white rounded-br-sm"
-                      : "bg-gray-800 text-gray-100 rounded-bl-sm border border-gray-700"}`}>
-                    <ReactMarkdown rehypePlugins={[rehypeSanitize]}>
-                      {msg.content}
-                    </ReactMarkdown>
-                    {msg.streaming && <span className="inline-block w-1.5 h-4 bg-purple-400 ml-1 animate-pulse rounded" />}
-                  </div>
-
-                  {msg.sources?.length > 0 && (
-                    <div className="mt-1.5 ml-1 flex flex-wrap gap-1">
-                      {msg.sources.map((s, idx) => (
-                        <span key={idx} className="text-xs bg-gray-800 text-blue-400 px-2 py-0.5 rounded-full border border-gray-700">
-                          <span className="inline-flex items-center gap-1">
-                            <FileIcon className="w-3 h-3" />
-                            <span>{typeof s === "string" ? s : s.source}</span>
-                          </span>
-                        </span>
-                      ))}
-                    </div>
-                  )}
-
-                  {msg.role === "assistant" && (
-                    <div className="flex justify-between items-center mt-1 mr-1">
-                      {renderReactionsBar(msg)}
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => handleCopy(messageId, msg.content)}
-                          className="p-1 rounded hover:bg-gray-800 text-gray-500 hover:text-gray-300 transition"
-                          title="Copy response"
-                        >
-                          {copiedId === messageId ? <span className="text-xs text-green-400">Copied!</span> : <CopyIcon className="w-4 h-4" />}
-                        </button>
-                        {renderDeleteControl(messageId)}
-                      </div>
-                    </div>
-                  )}
-
-                  {msg.role === "user" && (
-                    <div className="flex justify-end items-center gap-2 mt-1 mr-1">
-                      <span className="text-xs text-gray-600">You</span>
-                      {renderDeleteControl(messageId)}
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-
-          {/* Skeleton Loading (#542) */}
-          {loading && !messages.some(m => m.streaming) && (
-            <div className="flex justify-start" data-testid="message-skeleton">
-              <div className="w-full max-w-md bg-gray-800/80 border border-gray-700/80 px-4 py-3 rounded-2xl rounded-bl-sm animate-pulse space-y-2.5">
-                <div className="flex items-center gap-1.5 mb-2">
-                  <AppLogoIcon className="w-4 h-4 text-purple-400/60" />
-                  <span className="text-xs font-semibold text-purple-400/60">LocalMind</span>
-                </div>
-                <div className="h-3.5 bg-gray-700 rounded-full w-3/4" />
-                <div className="h-3.5 bg-gray-700 rounded-full w-1/2" />
-              </div>
-            </div>
-          )}
-
-          <div ref={bottomRef} />
+    <div className="flex flex-col flex-1 overflow-hidden bg-gray-950 text-gray-100">
+      {/* Export bar */}
+      {messages.length > 0 && (
+        <div className="flex justify-end gap-1.5 sm:gap-2 px-3 sm:px-5 pt-2 flex-wrap">
+          {["markdown", "json", "txt"].map(f => (
+            <button key={f} onClick={() => exportSession(sessionId, f)}
+              className="text-xs text-gray-500 hover:text-purple-400 transition px-2 py-1 rounded hover:bg-gray-800 min-h-[32px] sm:min-h-0">
+              ↓ .{f}
+            </button>
+          ))}
         </div>
+      )}
 
-        {/* Input Controls */}
-        <div className="px-4 pb-4 pt-2 shrink-0">
-          <div className="flex items-end gap-2 bg-gray-900 border border-gray-700 rounded-2xl px-4 py-3 focus-within:border-purple-500 transition-colors">
-            
-            <div className="relative" ref={plusMenuRef}>
-              <button
-                type="button"
-                onClick={() => setShowPlusMenu(!showPlusMenu)}
-                className="text-gray-400 hover:text-purple-400 p-1 rounded-lg transition"
-                title="Add action"
-              >
-                <PlusCircleIcon className="w-5 h-5" />
-              </button>
-
-              {showPlusMenu && (
-                <div className="absolute bottom-10 left-0 bg-gray-900 border border-gray-700 rounded-xl shadow-xl p-1 z-20 min-w-[160px]">
-                  <button
-                    type="button"
-                    onClick={() => setShowTemplateDialog(true)}
-                    className="w-full text-left px-3 py-2 text-xs text-gray-300 hover:bg-gray-800 rounded-lg flex items-center gap-2 transition"
-                  >
-                    <TemplateIcon className="w-4 h-4 text-purple-400" />
-                    Prompt Templates
-                  </button>
-                </div>
-              )}
-            </div>
-
-            <div className="flex-1 flex flex-col gap-1.5">
-              {selectedTemplate && (
-                <div className="flex items-center gap-1.5 bg-gray-800 rounded-lg px-2.5 py-1 w-fit">
-                  <TemplateIcon className="w-3.5 h-3.5 text-purple-400" />
-                  <span className="text-xs text-gray-300">{selectedTemplate.prompt_title}</span>
-                  <button onClick={() => setSelectedTemplate(null)} className="text-gray-500 hover:text-gray-300 transition">
-                    <CloseIcon className="w-3 h-3" />
-                  </button>
-                </div>
-              )}
-
-              <textarea
-                ref={textareaRef}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKey}
-                placeholder={loading ? "LocalMind is computing..." : "Ask anything... (Enter to send, Shift+Enter for new line)"}
-                rows={1}
-                disabled={loading}
-                className="bg-transparent text-sm text-gray-100 placeholder-gray-500 resize-none outline-none w-full disabled:text-gray-500"
-                style={{ minHeight: "24px", maxHeight: "160px" }}
-              />
-            </div>
-
-            {loading ? (
-              <button
-                type="button"
-                onClick={onStop}
-                className="shrink-0 text-sm bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-xl transition font-medium flex items-center gap-1.5"
-              >
-                <span className="w-2 h-2 bg-white rounded-sm" />
-                Stop
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={send}
-                disabled={!input.trim() && !selectedTemplate}
-                className="shrink-0 text-sm bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white px-4 py-2 rounded-xl transition font-medium"
-              >
-                Send →
-              </button>
-            )}
-          </div>
-
-          <p className="text-center text-xs text-gray-700 mt-2">
-            <span className="inline-flex items-center gap-1">
-              <LockIcon className="w-3.5 h-3.5" />
-              <span>Everything is processed locally. No data leaves your machine.</span>
-            </span>
-          </p>
-        </div>
-
-        {showTemplateDialog && (
-          <PromptTemplateDialog
-            onClose={() => setShowTemplateDialog(false)}
-            onSelect={handleSelectTemplate}
+      {/* Search Bar */}
+      {messages.length > 0 && (
+        <div className="px-3 sm:px-4 pt-2">
+          <input
+            type="text"
+            placeholder="Search messages..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full px-3 py-2 rounded-lg bg-gray-900 border border-gray-700 text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:border-purple-500"
           />
+          {searchTerm && (
+            <button onClick={() => setSearchTerm("")} className="text-xs text-purple-400 mt-1">
+              Clear search
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Messages Viewport */}
+      <div className="flex-1 overflow-y-auto px-3 sm:px-4 py-4 space-y-4 sm:space-y-5">
+        {/* Empty-State Guidance (#543) */}
+        {messages.length === 0 && (
+          <div 
+            data-testid="empty-state-guidance"
+            className="flex flex-col items-center justify-center h-full text-center gap-4 py-8 px-2"
+          >
+            <AppLogoIcon className="w-12 h-12 sm:w-16 sm:h-16 text-purple-400 opacity-80 animate-pulse" />
+            <div>
+              <p className="text-lg sm:text-xl font-semibold text-gray-200 mb-1">LocalMind is ready</p>
+              <p className="text-xs sm:text-sm text-gray-400">100% private · runs offline · no cloud</p>
+            </div>
+
+            {/* Feature Guidance Highlights */}
+            <div className="flex flex-wrap items-center justify-center gap-2 text-xs text-gray-400 max-w-md my-1">
+              <span className="bg-gray-900 border border-gray-800 rounded-full px-3 py-1">
+                💡 Select a suggestion below
+              </span>
+              <span className="bg-gray-900 border border-gray-800 rounded-full px-3 py-1">
+                📄 Upload documents to query
+              </span>
+              <span className="bg-gray-900 border border-gray-800 rounded-full px-3 py-1">
+                🔒 Encrypted & Local
+              </span>
+            </div>
+
+            {!minimalMode && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2 sm:mt-4 max-w-lg w-full" role="group" aria-label="Prompt suggestions">
+                {SUGGESTIONS.map(s => (
+                  <button key={s} onClick={() => handleSuggestionClick(s)}
+                    className="text-xs text-left border border-gray-800 rounded-xl px-3 py-2.5 text-gray-400 hover:border-purple-600 hover:text-purple-300 hover:bg-purple-900/20 transition min-h-[40px] sm:min-h-0">
+                    {s}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         )}
+
+        {/* Messages list */}
+        {filteredMessages.map((msg, i) => {
+          const messageId = msg.id || i;
+          return (
+            <div key={messageId} className={`flex group ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+              <div className="max-w-[88%] sm:max-w-2xl">
+                {msg.role === "assistant" && (
+                  <div className="flex items-center gap-2 mb-1.5 ml-1 flex-wrap">
+                    <div className="flex items-center gap-1.5">
+                      <AppLogoIcon className="w-4 h-4 text-purple-400" />
+                      <span className="text-xs font-semibold text-purple-400">LocalMind</span>
+                    </div>
+                    {(msg.token_count > 0 || (!msg.streaming && msg.content)) && (
+                      <span className="text-[10px] bg-purple-950/60 text-purple-300 border border-purple-800/40 font-mono px-1.5 py-0.5 rounded-md shadow-sm">
+                        {(msg.token_count > 0 ? msg.token_count : (msg.content ? Math.round(msg.content.trim().split(/\s+/).length * 1.3) : 0))} tokens
+                      </span>
+                    )}
+                    {msg.streaming && <span className="text-xs text-gray-400 animate-pulse">typing...</span>}
+                  </div>
+                )}
+                <div className={`px-3.5 sm:px-4 py-2.5 sm:py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words
+                  ${msg.role === "user"
+                    ? "bg-purple-700 text-white rounded-br-sm"
+                    : "bg-gray-800 text-gray-100 rounded-bl-sm border border-gray-700"}`}>
+                  <ReactMarkdown
+                    rehypePlugins={[rehypeSanitize]}
+                    components={{
+                      code({ inline, className, children }) {
+                        let language = "text";
+                        const match = /language-(\w+)/.exec(className || "");
+                        if (match) {
+                          language = match[1];
+                        } else {
+                          const codeText = String(children);
+                          if (codeText.includes("def ") || codeText.includes("print(")) {
+                            language = "python";
+                          } else if (codeText.includes("function") || codeText.includes("console.log")) {
+                            language = "javascript";
+                          } else if (codeText.includes("#include") || codeText.includes("cout")) {
+                            language = "cpp";
+                          }
+                        }
+
+                        if (inline) {
+                          return <code>{children}</code>;
+                        }
+
+                        return (
+                          <div className="relative bg-gray-900 rounded-lg mt-2">
+                            <div className="absolute top-2 right-2 text-xs bg-gray-700 px-2 py-1 rounded text-white">
+                              {language.toUpperCase()}
+                            </div>
+                            <pre className="p-3 sm:p-4 overflow-x-auto text-xs sm:text-sm">
+                              <code>{children}</code>
+                            </pre>
+                          </div>
+                        );
+                      }
+                    }}
+                  >
+                    {msg.content}
+                  </ReactMarkdown>
+                  {msg.streaming && <span className="inline-block w-1.5 h-4 bg-purple-400 ml-1 animate-pulse rounded" />}
+                </div>
+
+                {msg.sources?.length > 0 && (() => {
+                  const normalizeSrc = (s) => typeof s === "string" ? { source: s, chunk: null, preview: null } : s;
+                  return (
+                    <div className="mt-1.5 ml-1 flex flex-wrap gap-1.5">
+                      {msg.sources.map((raw, idx) => {
+                        const s = normalizeSrc(raw);
+                        const hasPreview = s.preview && s.preview.trim().length > 0;
+                        return (
+                          <span key={idx} className="relative group inline-flex">
+                            <span className="text-xs bg-gray-800 text-blue-400 px-2 py-0.5 rounded-full border border-gray-700 cursor-default inline-flex items-center gap-1 group-hover:border-blue-500 group-hover:bg-gray-750 transition-colors">
+                              <FileIcon className="w-3 h-3 shrink-0" />
+                              <span className="max-w-[120px] sm:max-w-none truncate">{s.source}</span>
+                              {s.chunk !== null && <span className="text-gray-500 text-[10px]">#{s.chunk + 1}</span>}
+                            </span>
+                            {hasPreview && (
+                              <div className="absolute bottom-full left-0 mb-2 z-50 w-64 sm:w-72 invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-all duration-150 pointer-events-none">
+                                <div className="absolute left-3 -bottom-1.5 w-3 h-3 rotate-45 bg-gray-700 border-r border-b border-gray-600" />
+                                <div className="relative bg-gray-700 border border-gray-600 rounded-xl shadow-xl px-3 py-2.5">
+                                  <div className="flex items-center gap-1.5 mb-1.5 border-b border-gray-600 pb-1.5">
+                                    <FileIcon className="w-3 h-3 text-blue-400 shrink-0" />
+                                    <span className="text-xs font-semibold text-blue-400 truncate">{s.source}</span>
+                                    <span className="ml-auto text-[10px] text-gray-400 shrink-0">chunk {s.chunk + 1}</span>
+                                  </div>
+                                  <p className="text-xs text-gray-300 leading-relaxed line-clamp-5 whitespace-pre-wrap break-words">
+                                    {s.preview}
+                                  </p>
+                                </div>
+                              </div>
+                            )}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+
+                {/* Embedded Action Toolbar */}
+                {!msg.streaming && (
+                  <div className={`flex items-center gap-3 mt-1.5 px-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200
+                    ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                    <button 
+                      onClick={() => handleCopy(messageId, msg.content)}
+                      className="text-[11px] text-gray-500 hover:text-purple-400 transition-colors p-1"
+                    >
+                      {copiedId === messageId ? "✓ Copied" : "Copy"}
+                    </button>
+                    
+                    {msg.role === "assistant" && (
+                      <button 
+                        onClick={() => handleRegenerate(i)}
+                        disabled={loading}
+                        className="text-[11px] text-gray-500 hover:text-purple-400 transition-colors disabled:opacity-30 p-1"
+                      >
+                        Regenerate
+                      </button>
+                    )}
+                    
+                    <button 
+                      onClick={() => handleExportSingleMessage(msg.content, i)}
+                      className="text-[11px] text-gray-500 hover:text-purple-400 transition-colors p-1"
+                    >
+                      Export
+                    </button>
+                  </div>
+                )}
+
+                {msg.role === "user" && (
+                  <div className="flex justify-end items-center gap-1 mt-1 mr-1">
+                    {renderDeleteControl(msg.id)}
+                    <span className="text-xs text-gray-400">You</span>
+                  </div>
+                )}
+
+                {msg.role === "assistant" && !msg.streaming && (
+                  <div className="flex justify-end mt-1.5 mr-1 items-center gap-1 flex-wrap">
+                    {renderReactionsBar(msg)}
+                    <button
+                      onClick={() => handleCopy(messageId, msg.content)}
+                      className="p-1.5 sm:p-1 rounded hover:bg-gray-800 text-gray-500 hover:text-gray-300 transition"
+                      title="Copy response"
+                    >
+                      {copiedId === messageId ? (
+                        <svg className="w-4 h-4 text-green-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+                      ) : (
+                        <CopyIcon className="w-4 h-4" />
+                      )}
+                    </button>
+                    {renderDeleteControl(msg.id)}
+                    <div className="relative" onMouseEnter={() => setHoveredStatsId(msg.id)} onMouseLeave={() => setHoveredStatsId(null)}>
+                      <button className="p-1.5 sm:p-1 rounded hover:bg-gray-800 text-gray-500 hover:text-gray-300 transition" title="Performance stats">
+                        <ChartIcon className="w-4 h-4" />
+                      </button>
+                      {hoveredStatsId === msg.id && msg.benchmarks && Object.keys(msg.benchmarks).length > 0 && (
+                        <div className="absolute right-0 bottom-0 translate-x-full pl-2 z-50">
+                          <div className="bg-gray-900 border border-gray-700 rounded-lg p-3 shadow-xl min-w-[200px] sm:min-w-[220px]">
+                            <p className="text-xs font-semibold text-gray-300 mb-2">Performance</p>
+                            <div className="space-y-1.5 text-xs text-gray-400">
+                              <div className="flex justify-between">
+                                <span>Time to first token</span>
+                                <span className="text-gray-300">{(msg.benchmarks.ttft_ms / 1000).toFixed(2)}s</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Total duration</span>
+                                <span className="text-gray-300">{(msg.benchmarks.total_duration_ms / 1000).toFixed(2)}s</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Tokens generated</span>
+                                <span className="text-gray-300">{msg.benchmarks.token_count}</span>
+                              </div>
+                              {msg.benchmarks.memory_used_gb && (
+                                <div className="flex justify-between items-center">
+                                  <span>RAM usage</span>
+                                  <span className="text-gray-300">{msg.benchmarks.memory_used_gb} / {msg.benchmarks.memory_total_gb} GB</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+
+        {filteredMessages.length === 0 && messages.length > 0 && (
+          <p className="text-center text-gray-500 text-sm mt-4">No messages found</p>
+        )}
+
+        {/* Loading Skeleton Placeholder */}
+        {Boolean(loading) && !messages.some(m => m.streaming) && (
+          <div className="flex justify-start" data-testid="message-skeleton">
+            <div className="w-full max-w-md bg-gray-800/80 border border-gray-700/80 px-4 py-3 rounded-2xl rounded-bl-sm animate-pulse space-y-2.5">
+              <div className="flex items-center gap-1.5 mb-2">
+                <AppLogoIcon className="w-4 h-4 text-purple-400/60" />
+                <span className="text-xs font-semibold text-purple-400/60">LocalMind</span>
+              </div>
+              <div className="h-3.5 bg-gray-700 rounded-full w-3/4" />
+              <div className="h-3.5 bg-gray-700 rounded-full w-1/2" />
+            </div>
+          </div>
+        )}
+        <div ref={bottomRef} />
       </div>
-    </>
+
+      {/* Input panel */}
+      <div className="px-2 sm:px-4 pb-3 sm:pb-4 pt-2 shrink-0">
+        <div className="flex items-end gap-2 bg-gray-900 border border-gray-700 rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3 focus-within:border-purple-500 transition-colors">
+          
+          <div className="relative" ref={plusMenuRef}>
+            <button
+              type="button"
+              onClick={() => setShowPlusMenu(!showPlusMenu)}
+              className="text-gray-400 hover:text-purple-400 p-1 rounded-lg transition"
+              title="Add action"
+            >
+              <PlusCircleIcon className="w-5 h-5" />
+            </button>
+
+            {showPlusMenu && (
+              <div className="absolute bottom-10 left-0 bg-gray-900 border border-gray-700 rounded-xl shadow-xl p-1 z-20 min-w-[160px]">
+                <button
+                  type="button"
+                  onClick={() => setShowTemplateDialog(true)}
+                  className="w-full text-left px-3 py-2 text-xs text-gray-300 hover:bg-gray-800 rounded-lg flex items-center gap-2 transition"
+                >
+                  <TemplateIcon className="w-4 h-4 text-purple-400" />
+                  Prompt Templates
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="flex-1 flex flex-col gap-1.5">
+            {selectedTemplate && (
+              <div className="flex items-center gap-1.5 bg-gray-800 rounded-lg px-2.5 py-1 w-fit">
+                <TemplateIcon className="w-3.5 h-3.5 text-purple-400" />
+                <span className="text-xs text-gray-300 truncate max-w-[150px] sm:max-w-xs">{selectedTemplate.prompt_title}</span>
+                <button onClick={() => setSelectedTemplate(null)} className="text-gray-500 hover:text-gray-300 transition">
+                  <CloseIcon className="w-3 h-3" />
+                </button>
+              </div>
+            )}
+            <textarea
+              ref={textareaRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKey}
+              placeholder={loading ? "LocalMind is computing..." : "Ask anything... (Enter to send)"}
+              rows={1}
+              disabled={loading}
+              className="bg-transparent text-sm text-gray-100 placeholder-gray-500 resize-none outline-none w-full disabled:text-gray-500"
+              style={{ minHeight: "24px", maxHeight: "160px" }}
+            />
+          </div>
+
+          {loading ? (
+            <button
+              type="button"
+              onClick={onStop}
+              className="shrink-0 text-xs sm:text-sm bg-red-600 hover:bg-red-500 text-white px-3 sm:px-4 py-2 rounded-xl transition font-medium flex items-center gap-1.5 min-h-[36px] sm:min-h-0"
+            >
+              <span className="w-2 h-2 bg-white rounded-sm" />
+              Stop
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={send}
+              disabled={!input.trim() && !selectedTemplate}
+              className="shrink-0 text-xs sm:text-sm bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white px-3 sm:px-4 py-2 rounded-xl transition font-medium min-h-[36px] sm:min-h-0"
+            >
+              Send →
+            </button>
+          )}
+        </div>
+
+        <p className="text-center text-[10px] sm:text-xs text-gray-700 mt-1.5 sm:mt-2">
+          <span className="inline-flex items-center gap-1">
+            <LockIcon className="w-3 sm:w-3.5 h-3 sm:h-3.5" />
+            <span>Everything is processed locally. No data leaves your machine.</span>
+          </span>
+        </p>
+      </div>
+
+      {showTemplateDialog && (
+        <PromptTemplateDialog
+          onClose={() => setShowTemplateDialog(false)}
+          onSelect={handleSelectTemplate}
+        />
+      )}
+    </div>
   );
 }

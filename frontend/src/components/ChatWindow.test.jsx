@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { render, screen, fireEvent, act, cleanup } from '@testing-library/react';
 import { vi, describe, test, expect, beforeEach, afterEach } from 'vitest';
 import * as jestDomMatchers from "@testing-library/jest-dom/matchers";
 import ChatWindow from './ChatWindow';
@@ -16,10 +16,11 @@ vi.mock('./Icons', () => ({
   AppLogoIcon: () => <span data-testid="app-logo" />,
   FileIcon: () => <span data-testid="file-icon" />,
   LockIcon: () => <span data-testid="lock-icon" />,
+  ChartIcon: () => <span data-testid="chart-icon" />,
+  CloseIcon: () => <span data-testid="close-icon" />,
   CopyIcon: () => <span data-testid="copy-icon" />,
   PlusCircleIcon: () => <span data-testid="plus-icon" />,
   TemplateIcon: () => <span data-testid="template-icon" />,
-  CloseIcon: () => <span data-testid="close-icon" />,
 }));
 
 // Mock clipboard API functionality using Vitest utilities
@@ -71,16 +72,41 @@ describe("ChatWindow Empty State Guidance (#543)", () => {
 describe("ChatWindow Skeleton Loading Tests (#542)", () => {
   test("renders loading skeleton when loading is true and no message is streaming", () => {
     render(<ChatWindow messages={[]} loading={true} onSend={vi.fn()} sessionId="test-1" />);
+
     expect(screen.getByTestId("message-skeleton")).toBeInTheDocument();
   });
 
   test("does not render skeleton when loading is false", () => {
     render(<ChatWindow messages={[]} loading={false} onSend={vi.fn()} sessionId="test-1" />);
+
     expect(screen.queryByTestId("message-skeleton")).not.toBeInTheDocument();
   });
 });
 
-// --- SUITE 3: GENERAL REGRESSIONS & INPUT CONTROLS ---
+// --- SUITE 3: MOBILE LAYOUT & RESPONSIVENESS (#546) ---
+describe("ChatWindow Mobile Layout (#546)", () => {
+  test("renders prompt suggestion grid with responsive single/double column classes", () => {
+    render(<ChatWindow messages={[]} loading={false} onSend={vi.fn()} sessionId="s1" />);
+
+    const grid = screen.getByRole("group", { name: "Prompt suggestions" });
+    expect(grid).toHaveClass("grid-cols-1");
+    expect(grid).toHaveClass("sm:grid-cols-2");
+  });
+
+  test("applies responsive max-width classes to user and assistant messages", () => {
+    const mockMessages = [
+      { id: "m1", role: "user", content: "Mobile test message" }
+    ];
+    render(<ChatWindow messages={mockMessages} loading={false} onSend={vi.fn()} sessionId="s1" />);
+
+    const messageText = screen.getByText("Mobile test message");
+    const bubbleWrapper = messageText.closest(".max-w-\\[88\\%\\]");
+    expect(bubbleWrapper).toBeInTheDocument();
+    expect(bubbleWrapper).toHaveClass("sm:max-w-2xl");
+  });
+});
+
+// --- SUITE 4: GENERAL REGRESSIONS & INPUT CONTROLS ---
 describe("ChatWindow Core Regressions", () => {
   describe("Message Stream Rendering Matrix", () => {
     const mockMessages = [
@@ -134,5 +160,50 @@ describe("ChatWindow Core Regressions", () => {
       
       expect(onSendSpy).not.toHaveBeenCalled();
     });
+  });
+});
+
+// --- SUITE 5: COPY FEEDBACK SUITE (#750) ---
+describe('ChatWindow Copy Feedback', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
+
+  test('should show checkmark icon / "Copy" state change on click and revert after 1.5 seconds', async () => {
+    const mockMessages = [
+      { id: 'msg-1', role: 'assistant', content: 'Hello from LocalMind!', streaming: false }
+    ];
+
+    render(
+      <ChatWindow 
+        messages={mockMessages} 
+        loading={false} 
+        onSend={vi.fn()} 
+        onDeleteMessage={vi.fn()} 
+        onStop={vi.fn()} 
+        sessionId="session-1" 
+        minimalMode={false} 
+      />
+    );
+
+    const copyButton = screen.getByTitle('Copy response');
+    fireEvent.click(copyButton);
+
+    await act(async () => {
+      await Promise.resolve(); 
+    });
+
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith('Hello from LocalMind!');
+
+    act(() => {
+      vi.advanceTimersByTime(1500);
+    });
+
+    expect(screen.getByTitle('Copy response')).toBeInTheDocument();
   });
 });
