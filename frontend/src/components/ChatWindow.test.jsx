@@ -38,31 +38,80 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-// --- SUITE 1: REGRESSION SUITE (#751) ---
-describe("ChatWindow Regression Suite (#751)", () => {
-  describe("Empty Welcome State Framework", () => {
-    test("renders baseline readiness text and suggestions when message logs are empty", () => {
-      render(<ChatWindow messages={[]} loading={false} onSend={vi.fn()} sessionId="s1" />);
-      
-      expect(screen.getByText("LocalMind is ready")).toBeInTheDocument();
-      expect(screen.getByText("Summarize the uploaded document")).toBeInTheDocument();
-    });
+// --- SUITE 1: FEATURE #543 - EMPTY STATE GUIDANCE ---
+describe("ChatWindow Empty State Guidance (#543)", () => {
+  test("renders empty state guidance container and feature badges when messages are empty", () => {
+    render(<ChatWindow messages={[]} loading={false} onSend={vi.fn()} sessionId="s1" />);
 
-    test("fires onSend with the exact suggestion content when a pill is clicked", () => {
-      const onSendSpy = vi.fn();
-      render(<ChatWindow messages={[]} loading={false} onSend={onSendSpy} sessionId="s1" />);
-      
-      const suggestionButton = screen.getByText("Explain in simple terms");
-      fireEvent.click(suggestionButton);
-      
-      expect(onSendSpy).toHaveBeenCalledWith("Explain in simple terms");
-    });
+    expect(screen.getByTestId("empty-state-guidance")).toBeInTheDocument();
+    expect(screen.getByText("LocalMind is ready")).toBeInTheDocument();
+    expect(screen.getByText("💡 Select a suggestion below")).toBeInTheDocument();
+    expect(screen.getByText("📄 Upload documents to query")).toBeInTheDocument();
+    expect(screen.getByText("🔒 Encrypted & Local")).toBeInTheDocument();
   });
 
+  test("populates prompt input and focuses textarea when a suggestion pill is clicked", () => {
+    render(<ChatWindow messages={[]} loading={false} onSend={vi.fn()} sessionId="s1" />);
+    
+    const suggestionButton = screen.getByText("Explain in simple terms");
+    fireEvent.click(suggestionButton);
+    
+    const textarea = screen.getByPlaceholderText(/Ask anything.../i);
+    expect(textarea.value).toBe("Explain in simple terms");
+  });
+
+  test("hides empty state guidance container once active messages exist", () => {
+    const mockMessages = [{ id: "m1", role: "user", content: "Hello LocalMind" }];
+    render(<ChatWindow messages={mockMessages} loading={false} onSend={vi.fn()} sessionId="s1" />);
+
+    expect(screen.queryByTestId("empty-state-guidance")).not.toBeInTheDocument();
+  });
+});
+
+// --- SUITE 2: FEATURE #542 - SKELETON LOADING ---
+describe("ChatWindow Skeleton Loading Tests (#542)", () => {
+  test("renders loading skeleton when loading is true and no message is streaming", () => {
+    render(<ChatWindow messages={[]} loading={true} onSend={vi.fn()} sessionId="test-1" />);
+
+    expect(screen.getByTestId("message-skeleton")).toBeInTheDocument();
+  });
+
+  test("does not render skeleton when loading is false", () => {
+    render(<ChatWindow messages={[]} loading={false} onSend={vi.fn()} sessionId="test-1" />);
+
+    expect(screen.queryByTestId("message-skeleton")).not.toBeInTheDocument();
+  });
+});
+
+// --- SUITE 3: MOBILE LAYOUT & RESPONSIVENESS (#546) ---
+describe("ChatWindow Mobile Layout (#546)", () => {
+  test("renders prompt suggestion grid with responsive single/double column classes", () => {
+    render(<ChatWindow messages={[]} loading={false} onSend={vi.fn()} sessionId="s1" />);
+
+    const grid = screen.getByRole("group", { name: "Prompt suggestions" });
+    expect(grid).toHaveClass("grid-cols-1");
+    expect(grid).toHaveClass("sm:grid-cols-2");
+  });
+
+  test("applies responsive max-width classes to user and assistant messages", () => {
+    const mockMessages = [
+      { id: "m1", role: "user", content: "Mobile test message" }
+    ];
+    render(<ChatWindow messages={mockMessages} loading={false} onSend={vi.fn()} sessionId="s1" />);
+
+    const messageText = screen.getByText("Mobile test message");
+    const bubbleWrapper = messageText.closest(".max-w-\\[88\\%\\]");
+    expect(bubbleWrapper).toBeInTheDocument();
+    expect(bubbleWrapper).toHaveClass("sm:max-w-2xl");
+  });
+});
+
+// --- SUITE 4: GENERAL REGRESSIONS & INPUT CONTROLS ---
+describe("ChatWindow Core Regressions", () => {
   describe("Message Stream Rendering Matrix", () => {
     const mockMessages = [
       { id: "m1", role: "user", content: "Hello world" },
-      { id: "m2", role: "assistant", content: "Hello User!", streaming: true, sources: ["doc1.pdf", "doc2.txt"] }
+      { id: "m2", role: "assistant", content: "Hello User!", streaming: true, sources: [{ source: "doc1.pdf" }, { source: "doc2.txt" }] }
     ];
 
     test("accurately reflects user/assistant visual variations and maps document sources", () => {
@@ -114,22 +163,7 @@ describe("ChatWindow Regression Suite (#751)", () => {
   });
 });
 
-// --- SUITE 2: SKELETON LOADING SUITE (#542) ---
-describe("ChatWindow Skeleton Loading Tests (#542)", () => {
-  test("renders loading skeleton when loading is true and no message is streaming", () => {
-    render(<ChatWindow messages={[]} loading={true} onSend={vi.fn()} sessionId="test-1" />);
-
-    expect(screen.getByTestId("message-skeleton")).toBeInTheDocument();
-  });
-
-  test("does not render skeleton when loading is false", () => {
-    render(<ChatWindow messages={[]} loading={false} onSend={vi.fn()} sessionId="test-1" />);
-
-    expect(screen.queryByTestId("message-skeleton")).not.toBeInTheDocument();
-  });
-});
-
-// --- SUITE 3: COPY FEEDBACK SUITE (#750) ---
+// --- SUITE 5: COPY FEEDBACK SUITE (#750) ---
 describe('ChatWindow Copy Feedback', () => {
   beforeEach(() => {
     vi.useFakeTimers();
