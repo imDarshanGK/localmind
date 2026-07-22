@@ -2,7 +2,7 @@
 
 LocalMind supports reliable cancellation of long-running LLM stream generations. This document explains how stream cancellation works, expected behavior, and limitations.
 
-## How it works
+## How Stream Cancellation Works
 
 1. **Frontend Request**: When the user clicks the "Stop" button during an active generation in the UI, the frontend does two things:
    - Aborts the active fetch connection using the standard `AbortController` API. This instantly stops processing incoming Server-Sent Events (SSE) and updates the UI state.
