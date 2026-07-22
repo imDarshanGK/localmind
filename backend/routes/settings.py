@@ -7,6 +7,7 @@ import time
 from typing import Any, Callable
 
 from fastapi import APIRouter, HTTPException, status
+
 from models.schemas import AppSettings
 from services.db_service import get_settings, save_setting, save_settings
 
@@ -63,7 +64,6 @@ async def _run_with_timeout(operation: str, function: Callable[..., Any], *args:
 async def get_all():
     return await _run_with_timeout("read", get_settings)
 
-
 @router.put("/")
 async def update_settings(body: AppSettings):
     # 1. Enforce safety validation boundary limits on Temperature
@@ -76,7 +76,7 @@ async def update_settings(body: AppSettings):
                 "type": "value_error"
             }]
         )
-        
+
     # 2. Enforce safety validation boundary limits on RAG Context Chunks
     if body.rag_top_k < 1 or body.rag_top_k > 10:
         raise HTTPException(
@@ -87,7 +87,7 @@ async def update_settings(body: AppSettings):
                 "type": "value_error"
             }]
         )
-    
+
     # 3. Enforce safety validation boundary limits on RAG Chunk Overlap
     if body.rag_chunk_overlap < 0 or body.rag_chunk_overlap > 200:
         raise HTTPException(
@@ -99,12 +99,34 @@ async def update_settings(body: AppSettings):
             }]
         )
 
+    current_settings = get_settings()
     payload = body.model_dump()
+
+    old_model = current_settings.get("default_model")
+    new_model = payload.get("default_model")
+
+    if old_model != new_model:
+        logger.info(
+            "Model switched from '%s' to '%s'",
+            old_model,
+            new_model,
+        )
+
     await _run_with_timeout("save", save_settings, payload)
     return await _run_with_timeout("read", get_settings)
 
-
 @router.put("/{key}")
 async def update_one(key: str, value: dict):
-    await _run_with_timeout("save", save_setting, key, value.get("value"))
+    new_value = value.get("value")
+
+    if key == "default_model":
+        old_model = get_settings().get("default_model")
+        if old_model != new_value:
+            logger.info(
+                "Model switched from '%s' to '%s'",
+                old_model,
+                new_value,
+            )
+
+    await _run_with_timeout("save", save_setting, key, new_value)
     return {"key": key, "updated": True}
