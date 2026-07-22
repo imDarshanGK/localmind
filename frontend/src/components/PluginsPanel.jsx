@@ -17,11 +17,12 @@ export default function PluginsPanel({ sessionId, onClose }) {
   const [input, setInput] = useState("");
   const [output, setOutput] = useState("");
   const [running, setRunning] = useState(false);
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [copied, setCopied] = useState(false);
   const [logs, setLogs] = useState([]);
 
-  // Persistence: View collapsed state
+  // Persistence: View collapsed state (#592)
   const [isCollapsed, setIsCollapsed] = useState(() => {
     try {
       const saved = localStorage.getItem(`plugins-panel-collapsed:${sessionId}`);
@@ -31,7 +32,7 @@ export default function PluginsPanel({ sessionId, onClose }) {
     }
   });
 
-  // Persistence: Selected plugin ID state
+  // Persistence: Selected plugin ID state (#592)
   const [selectedPluginId, setSelectedPluginId] = useState(() => {
     try {
       return localStorage.getItem(`plugins-panel-selected:${sessionId}`) || null;
@@ -40,7 +41,7 @@ export default function PluginsPanel({ sessionId, onClose }) {
     }
   });
 
-  // Sync collapsed state to localStorage
+  // Sync collapsed state to localStorage (#592)
   useEffect(() => {
     try {
       localStorage.setItem(`plugins-panel-collapsed:${sessionId}`, String(isCollapsed));
@@ -49,7 +50,7 @@ export default function PluginsPanel({ sessionId, onClose }) {
     }
   }, [isCollapsed, sessionId]);
 
-  // Sync selected plugin ID to localStorage
+  // Sync selected plugin ID to localStorage (#592)
   useEffect(() => {
     try {
       if (selectedPluginId) {
@@ -71,7 +72,7 @@ export default function PluginsPanel({ sessionId, onClose }) {
     }
   };
 
-  // Fetch plugins & restore selected plugin object if ID was saved
+  // Fetch plugins & restore selected plugin object if ID was saved (#592)
   useEffect(() => {
     setLoading(true);
     setError("");
@@ -98,6 +99,7 @@ export default function PluginsPanel({ sessionId, onClose }) {
     setSelectedPluginId(plugin.id);
     setOutput("");
     setError("");
+    setCopied(false);
   }
 
   async function run() {
@@ -105,6 +107,7 @@ export default function PluginsPanel({ sessionId, onClose }) {
     setRunning(true);
     setOutput("");
     setError("");
+    setCopied(false);
     try {
       const r = await runPlugin({ plugin: selected.id, input, session_id: sessionId });
       if (r.success) {
@@ -119,6 +122,17 @@ export default function PluginsPanel({ sessionId, onClose }) {
       setRunning(false);
     }
   }
+
+  const handleCopy = async () => {
+    if (!output) return;
+    try {
+      await navigator.clipboard.writeText(output);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy text: ", err);
+    }
+  };
 
   return (
     <div className="border-b border-gray-800 bg-gray-900 px-5 py-4 shrink-0" data-testid="plugins-panel">
@@ -165,7 +179,7 @@ export default function PluginsPanel({ sessionId, onClose }) {
         </button>
       </div>
 
-      {/* FIXED (#588): Top-Level Prominent Global Inline Error Banner */}
+      {/* Global Inline Error Banner (#588) */}
       {error && (
         <div className="mb-3 text-xs bg-red-950/40 border border-red-900/50 text-red-400 p-2.5 rounded-xl flex items-start gap-2 shadow-sm transition-all duration-200">
           <ErrorIcon className="w-4 h-4 mt-0.5 shrink-0 text-red-400" />
@@ -183,6 +197,7 @@ export default function PluginsPanel({ sessionId, onClose }) {
         </div>
       )}
 
+      {/* Collapsible Panel Section (#592) */}
       {!isCollapsed && (
         <>
           {/* Plugin selector row */}
@@ -227,14 +242,28 @@ export default function PluginsPanel({ sessionId, onClose }) {
                   {running ? "Running..." : `Run ${selected.name}`}
                 </button>
               </div>
+
+              {/* Output block with copy feedback button (#594) */}
               {output && (
-                <pre className="text-xs bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-green-300 whitespace-pre-wrap max-h-60 md:max-h-40 overflow-y-auto font-mono mt-2">
-                  {output}
-                </pre>
+                <div className="relative mt-2">
+                  <div className="flex items-center justify-between bg-gray-800 border border-gray-700 rounded-t-xl px-3 py-1.5 text-xs text-gray-400">
+                    <span className="font-mono text-[11px]">Output</span>
+                    <button
+                      type="button"
+                      onClick={handleCopy}
+                      className="text-xs px-2 py-0.5 rounded bg-gray-700 hover:bg-gray-600 text-gray-200 transition font-sans flex items-center gap-1"
+                    >
+                      {copied ? "Copied!" : "Copy"}
+                    </button>
+                  </div>
+                  <pre className="text-xs bg-gray-800 border border-t-0 border-gray-700 rounded-b-xl px-3 py-2 text-green-300 whitespace-pre-wrap max-h-40 overflow-y-auto font-mono">
+                    {output}
+                  </pre>
+                </div>
               )}
             </div>
           ) : (
-            /* FIXED (#587): Added Empty-State Guidance Layout Placeholder Card */
+            /* Empty State Guidance Card (#587) */
             <div className="flex-1 md:flex-initial flex flex-col items-center justify-center text-center p-6 my-2 border border-dashed border-gray-800 rounded-xl bg-gray-900/40">
               <PlugIcon className="w-8 h-8 text-gray-600 mb-2 animate-pulse" />
               <p className="text-xs font-medium text-gray-300">No Plugin Selected</p>
