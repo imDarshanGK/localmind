@@ -4,9 +4,24 @@ import { vi, describe, test, expect, beforeEach, afterEach } from 'vitest';
 import * as jestDomMatchers from "@testing-library/jest-dom/matchers";
 import ChatWindow from './ChatWindow';
 import { exportSession } from '../utils/api';
-expect.extend(jestDomMatchers);
 
 expect.extend(jestDomMatchers);
+
+// Mock Icons and API dependencies
+vi.mock('../utils/api', () => ({
+  exportSession: vi.fn(),
+}));
+
+vi.mock('./Icons', () => ({
+  AppLogoIcon: () => <span data-testid="app-logo" />,
+  FileIcon: () => <span data-testid="file-icon" />,
+  LockIcon: () => <span data-testid="lock-icon" />,
+  ChartIcon: () => <span data-testid="chart-icon" />,
+  CloseIcon: () => <span data-testid="close-icon" />,
+  CopyIcon: () => <span data-testid="copy-icon" />,
+  PlusCircleIcon: () => <span data-testid="plus-icon" />,
+  TemplateIcon: () => <span data-testid="template-icon" />,
+}));
 
 // Mock clipboard API functionality using Vitest utilities
 Object.assign(navigator, {
@@ -59,11 +74,6 @@ describe("ChatWindow Regression Suite (#751)", () => {
       expect(screen.getByText("doc1.pdf")).toBeInTheDocument();
       expect(screen.getByText("doc2.txt")).toBeInTheDocument();
     });
-
-    test("displays fallback mechanical loading dots if thread is active but text buffer is dry", () => {
-      render(<ChatWindow messages={[]} loading={true} onSend={vi.fn()} sessionId="s1" />);
-      expect(screen.getByText("LocalMind")).toBeInTheDocument();
-    });
   });
 
   describe("Data Utility Export Layer", () => {
@@ -104,7 +114,22 @@ describe("ChatWindow Regression Suite (#751)", () => {
   });
 });
 
-// --- SUITE 2: COPY FEEDBACK SUITE (#750) ---
+// --- SUITE 2: SKELETON LOADING SUITE (#542) ---
+describe("ChatWindow Skeleton Loading Tests (#542)", () => {
+  test("renders loading skeleton when loading is true and no message is streaming", () => {
+    render(<ChatWindow messages={[]} loading={true} onSend={vi.fn()} sessionId="test-1" />);
+
+    expect(screen.getByTestId("message-skeleton")).toBeInTheDocument();
+  });
+
+  test("does not render skeleton when loading is false", () => {
+    render(<ChatWindow messages={[]} loading={false} onSend={vi.fn()} sessionId="test-1" />);
+
+    expect(screen.queryByTestId("message-skeleton")).not.toBeInTheDocument();
+  });
+});
+
+// --- SUITE 3: COPY FEEDBACK SUITE (#750) ---
 describe('ChatWindow Copy Feedback', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -112,7 +137,6 @@ describe('ChatWindow Copy Feedback', () => {
 
   afterEach(() => {
     cleanup();
-    vi.restoreAllMocks();
     vi.useRealTimers();
   });
 
@@ -136,19 +160,16 @@ describe('ChatWindow Copy Feedback', () => {
     const copyButton = screen.getByTitle('Copy response');
     fireEvent.click(copyButton);
 
-    // Flush the microtasks so the clipboard promise resolves safely inside act
     await act(async () => {
       await Promise.resolve(); 
     });
 
-    // Check that writeText was called with the correct message content
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith('Hello from LocalMind!');
 
     act(() => {
       vi.advanceTimersByTime(1500);
     });
 
-    // Verify copy state reverts back to original state (showing the default icon title)
     expect(screen.getByTitle('Copy response')).toBeInTheDocument();
   });
 });

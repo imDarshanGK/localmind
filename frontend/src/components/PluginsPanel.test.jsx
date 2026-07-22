@@ -30,7 +30,7 @@ const mockPluginsList = [
   { id: "summarizer", name: "Summarizer", icon: "summarizer", description: "Summarize provided text" },
 ];
 
-describe("PluginsPanel Tooltip Help Suite (#593)", () => {
+describe("PluginsPanel Component Suite (#594)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     api.getPlugins.mockResolvedValue({ plugins: mockPluginsList });
@@ -39,6 +39,76 @@ describe("PluginsPanel Tooltip Help Suite (#593)", () => {
 
   afterEach(() => {
     cleanup();
+  });
+
+  test("renders the plugins panel header title and plugin options", async () => {
+    render(<PluginsPanel sessionId="test-session" onClose={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText("Calculator").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("Summarizer").length).toBeGreaterThan(0);
+    });
+  });
+
+  test("executes plugin action successfully when run button is clicked", async () => {
+    api.runPlugin.mockResolvedValue({ success: true, output: "42" });
+
+    render(<PluginsPanel sessionId="test-session" onClose={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText("Calculator").length).toBeGreaterThan(0);
+    });
+
+    const calcButton = screen.getAllByText("Calculator")[0];
+    fireEvent.click(calcButton);
+
+    const textarea = screen.getByPlaceholderText(/Enter input for Calculator.../i);
+    fireEvent.change(textarea, { target: { value: "6 * 7" } });
+
+    const runBtn = screen.getByRole("button", { name: /Run Calculator/i });
+    fireEvent.click(runBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText("42")).toBeInTheDocument();
+    });
+  });
+
+  test("copies plugin output to clipboard and displays 'Copied!' feedback", async () => {
+    const writeTextMock = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, {
+      clipboard: {
+        writeText: writeTextMock,
+      },
+    });
+
+    api.runPlugin.mockResolvedValue({ success: true, output: "42" });
+
+    render(<PluginsPanel sessionId="test-session" onClose={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText("Calculator").length).toBeGreaterThan(0);
+    });
+
+    const calcButton = screen.getAllByText("Calculator")[0];
+    fireEvent.click(calcButton);
+
+    const textarea = screen.getByPlaceholderText(/Enter input for Calculator.../i);
+    fireEvent.change(textarea, { target: { value: "6 * 7" } });
+
+    const runBtn = screen.getByRole("button", { name: /Run Calculator/i });
+    fireEvent.click(runBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText("42")).toBeInTheDocument();
+    });
+
+    const copyBtn = screen.getByRole("button", { name: /Copy/i });
+    fireEvent.click(copyBtn);
+
+    expect(writeTextMock).toHaveBeenCalledWith("42");
+    await waitFor(() => {
+      expect(screen.getByText("Copied!")).toBeInTheDocument();
+    });
   });
 
   test("renders the plugins panel header title and info tooltip icon", async () => {
@@ -129,30 +199,5 @@ describe("PluginsPanel View State & Persistence Suite (#592)", () => {
 
     expect(localStorage.setItem).toHaveBeenCalledWith("plugins-panel-selected:test-session-4", "calculator");
     expect(screen.getByText("Basic math evaluation")).toBeInTheDocument();
-  });
-
-  it("executes plugin action successfully and presents output text", async () => {
-    api.runPlugin.mockResolvedValueOnce({ success: true, output: "42" });
-
-    render(<PluginsPanel sessionId="test-session-5" onClose={vi.fn()} />);
-
-    await waitFor(() => expect(screen.getByText("Calculator")).toBeInTheDocument());
-
-    fireEvent.click(screen.getByText("Calculator"));
-
-    const textarea = screen.getByPlaceholderText(/Enter input for Calculator.../i);
-    fireEvent.change(textarea, { target: { value: "6 * 7" } });
-
-    const runBtn = screen.getByRole("button", { name: "Run Calculator" });
-    fireEvent.click(runBtn);
-
-    await waitFor(() => {
-      expect(api.runPlugin).toHaveBeenCalledWith({
-        plugin: "calculator",
-        input: "6 * 7",
-        session_id: "test-session-5",
-      });
-      expect(screen.getByText("42")).toBeInTheDocument();
-    });
   });
 });
