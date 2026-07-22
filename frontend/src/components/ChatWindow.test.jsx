@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen, fireEvent, act, cleanup } from '@testing-library/react';
+import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { vi, describe, test, expect, beforeEach, afterEach } from 'vitest';
 import * as jestDomMatchers from "@testing-library/jest-dom/matchers";
 import ChatWindow from './ChatWindow';
@@ -16,6 +16,10 @@ vi.mock('./Icons', () => ({
   AppLogoIcon: () => <span data-testid="app-logo" />,
   FileIcon: () => <span data-testid="file-icon" />,
   LockIcon: () => <span data-testid="lock-icon" />,
+  CopyIcon: () => <span data-testid="copy-icon" />,
+  PlusCircleIcon: () => <span data-testid="plus-icon" />,
+  TemplateIcon: () => <span data-testid="template-icon" />,
+  CloseIcon: () => <span data-testid="close-icon" />,
 }));
 
 // Mock clipboard API functionality using Vitest utilities
@@ -81,7 +85,7 @@ describe("ChatWindow Core Regressions", () => {
   describe("Message Stream Rendering Matrix", () => {
     const mockMessages = [
       { id: "m1", role: "user", content: "Hello world" },
-      { id: "m2", role: "assistant", content: "Hello User!", streaming: true, sources: ["doc1.pdf", "doc2.txt"] }
+      { id: "m2", role: "assistant", content: "Hello User!", streaming: true, sources: [{ source: "doc1.pdf" }, { source: "doc2.txt" }] }
     ];
 
     test("accurately reflects user/assistant visual variations and maps document sources", () => {
