@@ -132,9 +132,9 @@ export default function App() {
         setOllamaOk(false);
       }
     } catch (error) {
-      console.error(error);
+        console.error(error);
     } finally {
-      setSettingsLoading(false);
+        setSettingsLoading(false);
     }
   }
 
@@ -428,7 +428,7 @@ export default function App() {
     }, 5000);
   }
 
-  // --- Issue #261: Undo Handler Mechanism ---
+  // --- Issue #261: Undo Mechanism ---
   const handleUndoDelete = () => {
     if (!deletedSessionCache) return;
 
@@ -478,18 +478,6 @@ export default function App() {
     await api.clearMessages(sessionId);
     setMessages([]);
   }
-  if (settingsLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-gray-950">
-        <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-600 border-t-white"></div>
-      </div>
-    );
-  }
-
-  // ─── Routing Interceptor ───
-  if (isSharedPath) {
-    return <SharedView />;
-  }
 
   const handleLanguageChange = useCallback(
     async (newLang) => {
@@ -536,6 +524,19 @@ export default function App() {
       prev.map((s) => (s.id === sid ? { ...s, color } : s)),
     );
   }, []);
+
+  // ─── Early Layout Rendering Interceptors (Placed safely AFTER all Hook declarations) ───
+  if (settingsLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-gray-950">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-600 border-t-white"></div>
+      </div>
+    );
+  }
+
+  if (isSharedPath) {
+    return <SharedView />;
+  }
 
   return (
     <div
@@ -625,8 +626,6 @@ export default function App() {
               sessionId={sessionId}
               minimalMode={minimalMode}
             />
-            {/* Custom Waveform Component Element Injection */}
-            
 
             {/* --- Issue #261: Dynamic Absolute Positioned Undo Toast Element --- */}
             {showUndoToast && deletedSessionCache && (
