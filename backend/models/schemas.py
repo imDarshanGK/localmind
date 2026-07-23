@@ -102,7 +102,7 @@ class SessionOut(BaseModel):
     id: str
     title: str
     model: str
-    language: str="en"
+    language: str = "en"
     message_count: int = 0
     created_at: str
     updated_at: str
@@ -127,6 +127,15 @@ class AppSettings(BaseModel):
     temperature: float = 0.7
     max_history_turns: int = 10
     rag_top_k: int = 4
+    rag_chunk_size: int = 600
+    """Target chunk size in characters for the RAG splitter.
+
+    Backward-compatible default of 600 matches the previous hardcoded
+    behaviour introduced in PR #418. Validated in `routes/settings.py`
+    against the documented bounds (200..2000). The splitter is a
+    *best-effort* target — `RecursiveCharacterTextSplitter` may emit
+    slightly-smaller chunks when the separators don't align.
+    """
     rag_chunk_overlap: int = 50
     theme: str = "dark"
     minimal_mode: bool = False
@@ -142,12 +151,15 @@ class SessionRenameItem(BaseModel):
     session_id: str
     new_title: str
 
+
 class BulkSessionRenameRequest(BaseModel):
     sessions: List[SessionRenameItem]
+
 
 class PromptTemplateCreate(BaseModel):
     prompt_title: str = Field(..., min_length=1, max_length=200)
     prompt: str = Field(..., min_length=1)
+
 
 class PromptTemplateUpdate(BaseModel):
     prompt_title: Optional[str] = None
