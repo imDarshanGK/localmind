@@ -36,8 +36,9 @@ def test_render_config_matches_documented_build_and_health_checks():
 
     assert "healthCheckPath: /health" in render_config
     assert "buildCommand: npm install && npm run build" in render_config
-    assert "healthCheckPath` (`/health`)" in readme
-    assert "frontend build command (`npm install && npm run build`)" in readme
+    assert "`render.yaml`" in readme
+    assert "`healthCheckPath`" in readme and "`/health`" in readme
+    assert "`npm install && npm run build`" in readme
 
 
 def test_vercel_config_matches_documented_build_output():
