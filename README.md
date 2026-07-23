@@ -12,13 +12,13 @@
 [![React](https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev)
 [![Ollama](https://img.shields.io/badge/Ollama-Local_LLM-black?style=flat-square)](https://ollama.ai)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
-[![SSoC 2026](https://img.shields.io/badge/SSoC-2026-blueviolet?style=flat-square)](https://ssoc.dev)
+![SSoC 2026](https://img.shields.io/badge/SSoC-2026-blueviolet?style=flat-square)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square)](CONTRIBUTING.md)
 [![Discord](https://img.shields.io/badge/Discord-Join%20Community-5865F2?style=flat-square&logo=discord&logoColor=white)](https://discord.gg/gvTUuMXk)
 
 <br/>
 
-[Quick Start](#quick-start) · [Features](#features) · [Tech Stack](#tech-stack) · [Troubleshooting](#macos-install-troubleshooting) · [Contributing](#contributing) · [Screenshots](#screenshots)
+[Quick Start](#quick-start) · [Features](#all-features) · [Tech Stack](#tech-stack) · [Troubleshooting](#macos-install-troubleshooting) · [Contributing](#contributing) · [Screenshots](docs/screenshots.md)
 
 ---
 
@@ -63,7 +63,7 @@
 
 ---
 
-## 🛠 Tech Stack
+## Tech Stack
 
 ```text
 ┌────────────────────────────────────────────────┐
@@ -467,6 +467,7 @@ Run the following command within your active virtual environment inside the back
 ```bash
 cd backend
 python warmup.py
+```
 
 ## 🤝 Contributing
 
@@ -517,4 +518,5 @@ pip install pip-audit
 
 # Run the vulnerability audit against your requirements file
 pip-audit -r requirements.txt
+```
 </div>
