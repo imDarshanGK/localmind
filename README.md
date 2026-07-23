@@ -136,6 +136,30 @@ VITE_API_BASE_URL=https://<your-backend>.onrender.com/api
 
 The included `render.yaml` defines a backend web service and a frontend static site for the same repo.
 
+#### Build and deploy config validation
+
+Before opening a deployment PR or triggering a hosted build, validate the config that the docs and deploy files depend on:
+
+```bash
+# Validate local Docker Compose syntax and service wiring
+docker compose config --quiet
+
+# Validate Vercel's JSON deploy config
+python -m json.tool vercel.json > /dev/null
+
+# Validate the frontend build used by Render and Vercel
+cd frontend
+npm install
+npm run build
+```
+
+Check these environment values before deploy:
+
+- Backend: `OLLAMA_HOST` must point at a reachable Ollama server, `DEFAULT_MODEL` must be pulled on that server, and `CORS_ORIGINS` must list the exact frontend origin without a path.
+- Frontend: `VITE_API_BASE_URL` must point at the deployed backend API and include `/api`.
+- Render: keep `render.yaml` aligned with the documented backend `healthCheckPath` (`/health`) and frontend build command (`npm install && npm run build`).
+- Vercel: keep `vercel.json` aligned with the documented frontend output directory (`frontend/dist`) and build command (`cd frontend && npm run build`).
+
 ## macOS Install Troubleshooting
 
 ### `node` or `npm` not found
