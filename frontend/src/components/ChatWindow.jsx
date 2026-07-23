@@ -51,7 +51,7 @@ export default function ChatWindow({ messages = [], loading = false, onSend, onD
     const activeReactions = localReactions[msg.id] ?? msg.reactions ?? [];
     
     return (
-      <div className="flex items-center gap-1.5 mt-1">
+      <div className="flex items-center gap-1.5 mt-1 flex-wrap">
         {activeReactions.length > 0 && (
           <div className="flex items-center gap-1 flex-wrap mr-1">
             {Object.entries(
@@ -72,14 +72,14 @@ export default function ChatWindow({ messages = [], loading = false, onSend, onD
           </div>
         )}
 
-        <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-gray-900 border border-gray-800 rounded-full px-1 py-0.5 shadow-md gap-0.5">
+        <div className="flex items-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200 bg-gray-900 border border-gray-800 rounded-full px-1 py-0.5 shadow-md gap-0.5">
           {REACTION_EMOJIS.map(emoji => {
             const isSelected = activeReactions.includes(emoji);
             return (
               <button
                 key={emoji}
                 onClick={() => handleReactionToggle(msg.id, emoji)}
-                className={`p-0.5 text-xs hover:scale-125 transition-transform rounded-full ${isSelected ? 'bg-purple-500/20' : 'hover:bg-gray-800'}`}
+                className={`p-1 text-xs hover:scale-125 transition-transform rounded-full ${isSelected ? 'bg-purple-500/20' : 'hover:bg-gray-800'}`}
                 title={`React with ${emoji}`}
               >
                 {emoji}
@@ -97,19 +97,19 @@ export default function ChatWindow({ messages = [], loading = false, onSend, onD
         <span className="text-gray-500">Delete?</span>
         <button
           onClick={() => { onDeleteMessage?.(msgId); setConfirmDeleteId(null); }}
-          className="px-1.5 py-0.5 rounded bg-red-600/80 hover:bg-red-600 text-white transition"
+          className="px-2 py-0.5 rounded bg-red-600/80 hover:bg-red-600 text-white transition min-h-[28px]"
           title="Confirm delete"
         >Yes</button>
         <button
           onClick={() => setConfirmDeleteId(null)}
-          className="px-1.5 py-0.5 rounded hover:bg-gray-700 text-gray-400 transition"
+          className="px-2 py-0.5 rounded hover:bg-gray-700 text-gray-400 transition min-h-[28px]"
           title="Cancel"
         >No</button>
       </span>
     ) : (
       <button
         onClick={() => setConfirmDeleteId(msgId)}
-        className="p-1 rounded hover:bg-gray-800 text-gray-500 hover:text-red-400 transition"
+        className="p-1.5 sm:p-1 rounded hover:bg-gray-800 text-gray-500 hover:text-red-400 transition"
         title="Delete message"
         aria-label="Delete message"
       >
@@ -164,6 +164,12 @@ export default function ChatWindow({ messages = [], loading = false, onSend, onD
     if (e.key === "Enter" && !e.shiftKey) { 
       e.preventDefault(); 
       send(); 
+    } else if (e.key === "Escape") {
+      if (input) {
+        setInput("");
+      } else {
+        textareaRef.current?.blur();
+      }
     }
   }
 
@@ -201,9 +207,25 @@ export default function ChatWindow({ messages = [], loading = false, onSend, onD
     if (textareaRef.current) {
       textareaRef.current.focus();
       setTimeout(() => {
+        if (!textareaRef.current) return;
         textareaRef.current.style.height = "auto";
         textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 160) + "px";
       }, 0);
+    }
+  }
+
+  function handleSuggestionKeyDown(e, index) {
+    const pills = document.querySelectorAll('[data-testid="suggestion-pill"]');
+    if (!pills.length) return;
+
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+      e.preventDefault();
+      const nextIndex = (index + 1) % pills.length;
+      pills[nextIndex]?.focus();
+    } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+      e.preventDefault();
+      const prevIndex = (index - 1 + pills.length) % pills.length;
+      pills[prevIndex]?.focus();
     }
   }
 
@@ -220,12 +242,15 @@ export default function ChatWindow({ messages = [], loading = false, onSend, onD
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden bg-gray-950 text-gray-100">
-      {/* Export bar */}
+      {/* Export bar - wraps gracefully on mobile viewports */}
       {messages.length > 0 && (
-        <div className="flex justify-end gap-2 px-5 pt-2">
-          {["markdown","json","txt"].map(f => (
-            <button key={f} onClick={() => exportSession(sessionId, f)}
-              className="text-xs text-gray-500 hover:text-purple-400 transition px-2 py-1 rounded hover:bg-gray-800">
+        <div className="flex justify-end gap-1.5 sm:gap-2 px-3 sm:px-5 pt-2 flex-wrap">
+          {["markdown", "json", "txt"].map((f) => (
+            <button
+              key={f}
+              onClick={() => exportSession(sessionId, f)}
+              className="text-xs text-gray-500 hover:text-purple-400 transition px-2 py-1 rounded hover:bg-gray-800 min-h-[32px] sm:min-h-0"
+            >
               ↓ .{f}
             </button>
           ))}
@@ -233,7 +258,7 @@ export default function ChatWindow({ messages = [], loading = false, onSend, onD
       )}
 
       {/* Search Bar */}
-      <div className="px-4 pt-2">
+      <div className="px-3 sm:px-4 pt-2">
         <input
           type="text"
           placeholder="Search messages..."
@@ -253,19 +278,24 @@ export default function ChatWindow({ messages = [], loading = false, onSend, onD
       </div>
 
       {/* Messages Viewport */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5">
+      <div className="flex-1 overflow-y-auto px-3 sm:px-4 py-4 space-y-4 sm:space-y-5" data-testid="messages-viewport">
         {messages.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-full text-center gap-4">
-            <AppLogoIcon className="w-14 h-14 text-purple-400 opacity-70" />
+          <div className="flex flex-col items-center justify-center h-full text-center gap-4 px-2">
+            <AppLogoIcon className="w-12 h-12 sm:w-14 sm:h-14 text-purple-400 opacity-70" />
             <div>
-              <p className="text-xl font-semibold text-gray-200 mb-1">LocalMind is ready</p>
-              <p className="text-sm text-gray-400">100% private · runs offline · no cloud</p>
+              <p className="text-lg sm:text-xl font-semibold text-gray-200 mb-1">LocalMind is ready</p>
+              <p className="text-xs sm:text-sm text-gray-400">100% private · runs offline · no cloud</p>
             </div>
             {!minimalMode && (
-              <div className="grid grid-cols-2 gap-2 mt-4 max-w-lg w-full">
-                {SUGGESTIONS.map(s => (
-                  <button key={s} onClick={() => handleSuggestionClick(s)}
-                    className="text-xs text-left border border-gray-800 rounded-xl px-3 py-2.5 text-gray-400 hover:border-purple-600 hover:text-purple-300 hover:bg-purple-900/20 transition">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2 sm:mt-4 max-w-lg w-full" role="group" aria-label="Prompt suggestions">
+                {SUGGESTIONS.map((s, index) => (
+                  <button
+                    key={s}
+                    data-testid="suggestion-pill"
+                    onClick={() => handleSuggestionClick(s)}
+                    onKeyDown={(e) => handleSuggestionKeyDown(e, index)}
+                    className="text-xs text-left border border-gray-800 rounded-xl px-3 py-2.5 text-gray-400 hover:border-purple-600 hover:text-purple-300 hover:bg-purple-900/20 focus:outline-none focus:ring-2 focus:ring-purple-500 transition min-h-[40px] sm:min-h-0"
+                  >
                     {s}
                   </button>
                 ))}
@@ -279,9 +309,9 @@ export default function ChatWindow({ messages = [], loading = false, onSend, onD
           const messageId = msg.id || i;
           return (
             <div key={messageId} className={`flex group ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-              <div className="max-w-2xl">
+              <div className="max-w-[88%] sm:max-w-2xl">
                 {msg.role === "assistant" && (
-                  <div className="flex items-center gap-2 mb-1.5 ml-1">
+                  <div className="flex items-center gap-2 mb-1.5 ml-1 flex-wrap">
                     <div className="flex items-center gap-1.5">
                       <AppLogoIcon className="w-4 h-4 text-purple-400" />
                       <span className="text-xs font-semibold text-purple-400">LocalMind</span>
@@ -294,7 +324,7 @@ export default function ChatWindow({ messages = [], loading = false, onSend, onD
                     {msg.streaming && <span className="text-xs text-gray-400 animate-pulse">typing...</span>}
                   </div>
                 )}
-                <div className={`px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words
+                <div className={`px-3.5 sm:px-4 py-2.5 sm:py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words
                   ${msg.role === "user"
                     ? "bg-purple-700 text-white rounded-br-sm"
                     : "bg-gray-800 text-gray-100 rounded-bl-sm border border-gray-700"}`}>
@@ -326,7 +356,7 @@ export default function ChatWindow({ messages = [], loading = false, onSend, onD
                             <div className="absolute top-2 right-2 text-xs bg-gray-700 px-2 py-1 rounded text-white">
                               {language.toUpperCase()}
                             </div>
-                            <pre className="p-4 overflow-x-auto">
+                            <pre className="p-3 sm:p-4 overflow-x-auto text-xs sm:text-sm">
                               <code>{children}</code>
                             </pre>
                           </div>
@@ -338,7 +368,7 @@ export default function ChatWindow({ messages = [], loading = false, onSend, onD
                   </ReactMarkdown>
                   {msg.streaming && <span className="inline-block w-1.5 h-4 bg-purple-400 ml-1 animate-pulse rounded" />}
                 </div>
-                
+
                 {msg.sources?.length > 0 && (() => {
                   const normalizeSrc = (s) => typeof s === "string" ? { source: s, chunk: null, preview: null } : s;
                   return (
@@ -350,11 +380,11 @@ export default function ChatWindow({ messages = [], loading = false, onSend, onD
                           <span key={idx} className="relative group inline-flex">
                             <span className="text-xs bg-gray-800 text-blue-400 px-2 py-0.5 rounded-full border border-gray-700 cursor-default inline-flex items-center gap-1 group-hover:border-blue-500 group-hover:bg-gray-750 transition-colors">
                               <FileIcon className="w-3 h-3 shrink-0" />
-                              <span>{s.source}</span>
+                              <span className="max-w-[120px] sm:max-w-none truncate">{s.source}</span>
                               {s.chunk !== null && <span className="text-gray-500 text-[10px]">#{s.chunk + 1}</span>}
                             </span>
                             {hasPreview && (
-                              <div className="absolute bottom-full left-0 mb-2 z-50 w-72 invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-all duration-150 pointer-events-none">
+                              <div className="absolute bottom-full left-0 mb-2 z-50 w-64 sm:w-72 invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-all duration-150 pointer-events-none">
                                 <div className="absolute left-3 -bottom-1.5 w-3 h-3 rotate-45 bg-gray-700 border-r border-b border-gray-600" />
                                 <div className="relative bg-gray-700 border border-gray-600 rounded-xl shadow-xl px-3 py-2.5">
                                   <div className="flex items-center gap-1.5 mb-1.5 border-b border-gray-600 pb-1.5">
@@ -377,11 +407,11 @@ export default function ChatWindow({ messages = [], loading = false, onSend, onD
 
                 {/* Embedded Action Toolbar */}
                 {!msg.streaming && (
-                  <div className={`flex items-center gap-3 mt-1.5 px-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200
+                  <div className={`flex items-center gap-3 mt-1.5 px-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200
                     ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
                     <button 
                       onClick={() => handleCopy(messageId, msg.content)}
-                      className="text-[11px] text-gray-500 hover:text-purple-400 transition-colors"
+                      className="text-[11px] text-gray-500 hover:text-purple-400 transition-colors p-1"
                     >
                       {copiedId === messageId ? "✓ Copied" : "Copy"}
                     </button>
@@ -390,7 +420,7 @@ export default function ChatWindow({ messages = [], loading = false, onSend, onD
                       <button 
                         onClick={() => handleRegenerate(i)}
                         disabled={loading}
-                        className="text-[11px] text-gray-500 hover:text-purple-400 transition-colors disabled:opacity-30"
+                        className="text-[11px] text-gray-500 hover:text-purple-400 transition-colors disabled:opacity-30 p-1"
                       >
                         Regenerate
                       </button>
@@ -398,7 +428,7 @@ export default function ChatWindow({ messages = [], loading = false, onSend, onD
                     
                     <button 
                       onClick={() => handleExportSingleMessage(msg.content, i)}
-                      className="text-[11px] text-gray-500 hover:text-purple-400 transition-colors"
+                      className="text-[11px] text-gray-500 hover:text-purple-400 transition-colors p-1"
                     >
                       Export
                     </button>
@@ -413,11 +443,11 @@ export default function ChatWindow({ messages = [], loading = false, onSend, onD
                 )}
 
                 {msg.role === "assistant" && !msg.streaming && (
-                  <div className="flex justify-end mt-1.5 mr-1 items-center gap-1">
+                  <div className="flex justify-end mt-1.5 mr-1 items-center gap-1 flex-wrap">
                     {renderReactionsBar(msg)}
                     <button
                       onClick={() => handleCopy(messageId, msg.content)}
-                      className="p-1 rounded hover:bg-gray-800 text-gray-500 hover:text-gray-300 transition"
+                      className="p-1.5 sm:p-1 rounded hover:bg-gray-800 text-gray-500 hover:text-gray-300 transition"
                       title="Copy response"
                     >
                       {copiedId === messageId ? (
@@ -428,12 +458,12 @@ export default function ChatWindow({ messages = [], loading = false, onSend, onD
                     </button>
                     {renderDeleteControl(msg.id)}
                     <div className="relative" onMouseEnter={() => setHoveredStatsId(msg.id)} onMouseLeave={() => setHoveredStatsId(null)}>
-                      <button className="p-1 rounded hover:bg-gray-800 text-gray-500 hover:text-gray-300 transition" title="Performance stats">
+                      <button className="p-1.5 sm:p-1 rounded hover:bg-gray-800 text-gray-500 hover:text-gray-300 transition" title="Performance stats">
                         <ChartIcon className="w-4 h-4" />
                       </button>
                       {hoveredStatsId === msg.id && msg.benchmarks && Object.keys(msg.benchmarks).length > 0 && (
                         <div className="absolute right-0 bottom-0 translate-x-full pl-2 z-50">
-                          <div className="bg-gray-900 border border-gray-700 rounded-lg p-3 shadow-xl min-w-[220px]">
+                          <div className="bg-gray-900 border border-gray-700 rounded-lg p-3 shadow-xl min-w-[200px] sm:min-w-[220px]">
                             <p className="text-xs font-semibold text-gray-300 mb-2">Performance</p>
                             <div className="space-y-1.5 text-xs text-gray-400">
                               <div className="flex justify-between">
@@ -486,14 +516,14 @@ export default function ChatWindow({ messages = [], loading = false, onSend, onD
         <div ref={bottomRef} />
       </div>
 
-      {/* Input panel */}
-      <div className="px-4 pb-4 pt-2 shrink-0">
-        <div className="flex items-end gap-2 bg-gray-900 border border-gray-700 rounded-2xl px-4 py-3 focus-within:border-purple-500 transition-colors">
+      {/* Input panel framework */}
+      <div className="px-2 sm:px-4 pb-3 sm:pb-4 pt-2 shrink-0">
+        <div className="flex items-end gap-2 bg-gray-900 border border-gray-700 rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3 focus-within:border-purple-500 transition-colors">
           <div className="flex-1 flex flex-col gap-1.5">
             {selectedTemplate && (
               <div className="flex items-center gap-1.5 bg-gray-800 rounded-lg px-2.5 py-1 w-fit">
                 <TemplateIcon className="w-3.5 h-3.5 text-purple-400" />
-                <span className="text-xs text-gray-300">{selectedTemplate.prompt_title}</span>
+                <span className="text-xs text-gray-300 truncate max-w-[150px] sm:max-w-xs">{selectedTemplate.prompt_title}</span>
                 <button onClick={() => setSelectedTemplate(null)} className="text-gray-500 hover:text-gray-300 transition">
                   <CloseIcon className="w-3 h-3" />
                 </button>
@@ -504,28 +534,29 @@ export default function ChatWindow({ messages = [], loading = false, onSend, onD
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKey}
-              placeholder={loading ? "LocalMind is computing..." : "Ask anything... (Enter to send, Shift+Enter for new line)"}
+              placeholder={loading ? "LocalMind is computing..." : "Ask anything... (Enter to send)"}
               rows={1}
               disabled={loading}
               className="bg-transparent text-sm text-gray-100 placeholder-gray-500 resize-none outline-none w-full disabled:text-gray-500"
               style={{ minHeight: "24px", maxHeight: "160px" }}
             />
           </div>
+
           {loading ? (
-            <button type="button" onClick={onStop} className="shrink-0 text-sm bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-xl transition font-medium flex items-center gap-1.5">
+            <button type="button" onClick={onStop} className="shrink-0 text-xs sm:text-sm bg-red-600 hover:bg-red-500 text-white px-3 sm:px-4 py-2 rounded-xl transition font-medium flex items-center gap-1.5 min-h-[36px] sm:min-h-0">
               <span className="w-2 h-2 bg-white rounded-sm" />
               Stop
             </button>
           ) : (
-            <button type="button" onClick={send} disabled={!input.trim() && !selectedTemplate} className="shrink-0 text-sm bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white px-4 py-2 rounded-xl transition font-medium">
+            <button type="button" onClick={send} disabled={!input.trim() && !selectedTemplate} className="shrink-0 text-xs sm:text-sm bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white px-3 sm:px-4 py-2 rounded-xl transition font-medium min-h-[36px] sm:min-h-0">
               Send →
             </button>
           )}
         </div>
-
-        <p className="text-center text-xs text-gray-700 mt-2">
+        
+        <p className="text-center text-[10px] sm:text-xs text-gray-700 mt-1.5 sm:mt-2">
           <span className="inline-flex items-center gap-1">
-            <LockIcon className="w-3.5 h-3.5" />
+            <LockIcon className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
             <span>Everything is processed locally. No data leaves your machine.</span>
           </span>
         </p>
