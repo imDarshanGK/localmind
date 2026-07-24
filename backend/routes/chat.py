@@ -11,9 +11,8 @@ from types import SimpleNamespace
 import psutil
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
-
 from models.schemas import ChatRequest, ChatResponse
+from pydantic import BaseModel
 from services import db_service, ollama_service
 
 logger = logging.getLogger(__name__)
