@@ -4,10 +4,10 @@ import asyncio
 import logging
 import os
 import time
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, status
-
 from models.schemas import AppSettings
 from services.db_service import get_settings, save_setting, save_settings
 

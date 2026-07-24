@@ -2,7 +2,7 @@
 Custom CSV Loader that ignores trailing blank rows
 """
 import csv
-from typing import List
+
 from langchain_core.documents import Document
 
 
@@ -14,7 +14,7 @@ class CleanCSVLoader:
     def __init__(self, file_path: str):
         self.file_path = file_path
 
-    def load(self) -> List[Document]:
+    def load(self) -> list[Document]:
         """Load CSV and filter out trailing blank rows."""
 
         # Read CSV file

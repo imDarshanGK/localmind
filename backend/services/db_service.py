@@ -3,14 +3,15 @@ Database Service — SQLite (fully local, no external DB needed)
 Handles: sessions, messages, documents, settings, plugins log
 """
 
-import sqlite3
 import json
-import os
 import logging
-from contextlib import contextmanager
-import uuid
+import os
+import sqlite3
 import time
+import uuid
+from contextlib import contextmanager
 from sqlite3 import OperationalError
+
 import grapheme
 
 # ------------------------Vacuum Scheduling--------------------------------------------------------
@@ -284,7 +285,7 @@ def get_session(session_id: str) -> dict | None:
         return dict(row) if row else None
 
 
-def update_session(session_id: str, title: str = None, model: str = None, language: str = None):
+def update_session(session_id: str, title: str | None = None, model: str | None = None, language: str | None = None):
     with get_db() as conn:
         if title is not None:
             conn.execute("UPDATE sessions SET title=?, updated_at=datetime('now') WHERE id=?", (title, session_id))
@@ -306,8 +307,8 @@ def delete_session(session_id: str):
                     if os.path.exists(physical_path) and os.path.isfile(physical_path):
                         os.remove(physical_path)
                         print(f"Cleaned up session document asset: {physical_path}")
-                except Exception as file_err:
-                    print(f"Warning: Failed to delete session asset {physical_path}: {str(file_err)}")
+                except Exception as file_err:  # noqa: BLE001
+                    print(f"Warning: Failed to delete session asset {physical_path}: {file_err!s}")
 
         # 2. Gather counts for vacuum scheduling metric tracking
         msg_count = conn.execute(
@@ -393,7 +394,7 @@ def get_session_reactions_map(session_id: str) -> dict[int, list[str]]:
                 reactions_map[msg_id] = []
             reactions_map[msg_id].append(r["emoji"])
         return reactions_map
-def save_message(session_id: str, role: str, content: str, sources: list = None, benchmarks: dict = None):
+def save_message(session_id: str, role: str, content: str, sources: list | None = None, benchmarks: dict | None = None):
     sources = sources or []
     with get_db() as conn:
         conn.execute(
@@ -483,7 +484,7 @@ def save_document(session_id: str, filename: str, file_path: str, chunks: int, s
         )
         return cursor.lastrowid
 
-def update_document_status(doc_id: int, status: str, chunks_indexed: int = None):
+def update_document_status(doc_id: int, status: str, chunks_indexed: int | None = None):
     with get_db() as conn:
         if chunks_indexed is not None:
             conn.execute("UPDATE documents SET status=?, chunks_indexed=? WHERE id=?", (status, chunks_indexed, doc_id))
@@ -513,9 +514,9 @@ def delete_document(doc_id: int):
                 if os.path.exists(physical_path) and os.path.isfile(physical_path):
                     os.remove(physical_path)
                     print(f"Successfully deleted physical file asset: {physical_path}")
-            except Exception as file_err:
+            except Exception as file_err:  # noqa: BLE001
                 # Log the error but continue so the database doesn't lock or desync
-                print(f"Warning: Failed to clean up disk file {physical_path}: {str(file_err)}")
+                print(f"Warning: Failed to clean up disk file {physical_path}: {file_err!s}")
 
         # 3. Clean up the database record entries
         cur = conn.execute("DELETE FROM documents WHERE id=?", (doc_id,))
@@ -650,7 +651,7 @@ def get_all_prompt_templates() -> list[dict]:
         return [dict(r) for r in rows]
 
 
-def update_prompt_template(template_id: int, prompt_title: str = None, prompt: str = None) -> dict | None:
+def update_prompt_template(template_id: int, prompt_title: str | None = None, prompt: str | None = None) -> dict | None:
     with get_db() as conn:
         if prompt_title:
             conn.execute("UPDATE prompt_templates SET name=? WHERE id=?", (prompt_title, template_id))

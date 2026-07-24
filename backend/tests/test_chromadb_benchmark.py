@@ -1,13 +1,13 @@
 """
 Benchmark for ChromaDB retrieval latency.
 """
-import time
-import statistics
-import uuid
-import pytest
 import os
+import statistics
+import time
+import uuid
 
 import chromadb
+import pytest
 from chromadb.config import Settings
 from sentence_transformers import SentenceTransformer
 
@@ -80,7 +80,7 @@ def _measure_latency(session_id: str, query: str, top_k: int = 4, runs: int = 10
 def _cleanup(session_id: str):
     try:
         chroma_client.delete_collection(f"bench_{session_id}")
-    except Exception:
+    except Exception:  # noqa: BLE001, S110
         pass
 
 
@@ -102,7 +102,7 @@ class TestChromaDBRetrievalLatency:
         """Single retrieval completes within acceptable time."""
         _seed_collection(session_id, num_chunks=50)
         start = time.perf_counter()
-        context, docs = _retrieve("document information topic", session_id, top_k=4)
+        context, _docs = _retrieve("document information topic", session_id, top_k=4)
         elapsed_ms = (time.perf_counter() - start) * 1000
         print(f"\nSingle query latency: {elapsed_ms:.3f}ms")
         assert elapsed_ms < 5000
@@ -141,7 +141,7 @@ class TestChromaDBRetrievalLatency:
     def test_empty_collection_latency(self, session_id):
         """Retrieval on empty collection is fast."""
         start = time.perf_counter()
-        context, docs = _retrieve("any query", session_id, top_k=4)
+        context, _docs = _retrieve("any query", session_id, top_k=4)
         elapsed_ms = (time.perf_counter() - start) * 1000
         print(f"\nEmpty collection latency: {elapsed_ms:.3f}ms")
         assert elapsed_ms < 1000
