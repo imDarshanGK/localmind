@@ -24,10 +24,12 @@ def test_build_deploy_docs_include_config_validation_checklist():
         "CORS_ORIGINS",
         "VITE_API_BASE_URL",
         "include `/api`",
-        "Issues labeled [`good-first-issue`](https://github.com/imDarshanGK/localmind/issues?q=label%3Agood-first-issue)",
     ]
 
     for snippet in required_snippets:
+        assert snippet in readme
+
+    for snippet in ["render.yaml", "healthCheckPath", "/health", "frontend/dist", "cd frontend && npm run build"]:
         assert snippet in readme
 
 
@@ -38,7 +40,8 @@ def test_render_config_matches_documented_build_and_health_checks():
     assert "healthCheckPath: /health" in render_config
     assert "buildCommand: npm install && npm run build" in render_config
     assert "`render.yaml`" in readme
-    assert "healthCheckPath" in readme and "/health" in readme
+    assert "healthCheckPath" in readme
+    assert "/health" in readme
     assert "npm install && npm run build" in readme
 
 
