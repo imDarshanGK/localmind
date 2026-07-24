@@ -13,10 +13,10 @@ from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 
-from app import app
 import routes.upload as upload_module
 import services.db_service as db
-import utils.audit_log as audit_log
+from app import app
+from utils import audit_log
 
 _tmp = tempfile.mktemp(suffix=".db")
 db.DB_PATH = _tmp

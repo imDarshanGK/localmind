@@ -14,6 +14,7 @@ import logging.handlers
 import os
 import queue
 import time
+from contextlib import suppress
 from typing import Any
 
 _module_logger = logging.getLogger(__name__)
@@ -78,10 +79,8 @@ def _ensure_started() -> None:
 def _stop_listener() -> None:
     global _listener
     if _listener is not None:
-        try:
+        with suppress(Exception):
             _listener.stop()
-        except Exception:
-            pass
         _listener = None
 
 
@@ -90,7 +89,7 @@ def _safe_emit(event: str, fields: dict[str, Any]) -> None:
     try:
         _ensure_started()
         _audit_logger.info(event, extra={"event": event, "audit_fields": fields})
-    except Exception as e:
+    except (RuntimeError, ValueError, TypeError, OSError, LookupError) as e:
         _module_logger.warning("audit_log_emit_failed event=%s error=%s", event, e)
 
 

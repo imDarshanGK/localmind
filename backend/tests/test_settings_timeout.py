@@ -1,9 +1,9 @@
 """Timeout regression tests for settings routes."""
 
+import sys
 import tempfile
 import time
 import types
-import sys
 
 import pytest
 from fastapi.testclient import TestClient

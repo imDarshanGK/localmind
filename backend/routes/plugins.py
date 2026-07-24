@@ -5,13 +5,15 @@ Built-in plugins: calculator, web-search (Searxng), code-runner, summarizer, tra
 
 import ast
 import math
+import os
 import re
 import subprocess
-import tempfile
-import os
 import sys
+import tempfile
+
 from fastapi import APIRouter, HTTPException
-from models.schemas import PluginRun, PluginResult
+
+from models.schemas import PluginResult, PluginRun
 from services import db_service
 
 router = APIRouter()
@@ -36,8 +38,8 @@ async def get_plugin_logs(limit: int = 50):
     try:
         logs = db_service.get_plugin_logs(limit)
         return {"logs": logs}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch logs: {str(e)}")
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"Failed to fetch logs: {e!s}")
 
 @router.post("/run", response_model=PluginResult)
 async def run_plugin(body: PluginRun):
@@ -67,7 +69,7 @@ async def run_plugin(body: PluginRun):
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return PluginResult(plugin=plugin, output="", success=False, error=str(e))
 
 
@@ -80,14 +82,13 @@ def _calculator(expr: str) -> str:
     try:
         tree = ast.parse(expr, mode="eval")
         for node in ast.walk(tree):
-            if isinstance(node, ast.Call):
-                if not (isinstance(node.func, ast.Name) and node.func.id in SAFE_NAMES):
-                    raise ValueError("Unsafe function call")
+            if isinstance(node, ast.Call) and not (isinstance(node.func, ast.Name) and node.func.id in SAFE_NAMES):
+                raise ValueError("Unsafe function call")
             if isinstance(node, ast.Attribute):
-                raise ValueError("Attribute access not allowed")
+                raise TypeError("Attribute access not allowed")
         result = eval(compile(tree, "<calc>", "eval"), {"__builtins__": {}}, SAFE_NAMES)
         return f"Result: {result}"
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return f"Error: {e}"
 
 
@@ -162,13 +163,13 @@ def _coderunner(code: str) -> str:
     try:
         result = subprocess.run(
             [sys.executable, tmp],
-            capture_output=True, text=True, timeout=5
+            capture_output=True, text=True, timeout=5, check=False
         )
         output = result.stdout or result.stderr or "(no output)"
         return f"Output:\n{output[:2000]}"
     except subprocess.TimeoutExpired:
         return "⏱ Timeout: code took more than 5 seconds."
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return f"Error: {e}"
     finally:
         os.unlink(tmp)

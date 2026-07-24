@@ -1,11 +1,21 @@
 """Upload routes — /api/upload"""
+import logging
 import os
 import time
 import traceback
 from pathlib import Path
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Query, BackgroundTasks
+
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    UploadFile,
+)
+
 from models.schemas import UploadResponse
-import logging
 from services import db_service
 from utils import audit_log
 
@@ -16,7 +26,7 @@ def _safe_audit(fn, **kwargs):
     """Extra call-site guard around audit_log hooks (Issue #797)."""
     try:
         fn(**kwargs)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.warning("audit_hook_failed hook=%s error=%s", getattr(fn, "__name__", fn), e)
 
 
@@ -34,7 +44,7 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 
 @router.post("/", response_model=UploadResponse)
-async def upload(file: UploadFile = File(...), session_id: str = Form(...), background_tasks: BackgroundTasks = None):
+async def upload(file: UploadFile = File(...), session_id: str = Form(...), background_tasks: BackgroundTasks = None):  # noqa: B008
     logger.info("upload_request route=/upload session=%s file=%s", session_id, file.filename)
     ext = Path(file.filename).suffix.lower()
     if ext not in ALLOWED:
@@ -109,7 +119,7 @@ def process_document_task(file_path: str, session_id: str, doc_id: int):
             user_id=session_id,
             duration_ms=duration_ms,
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.error(
             "document_failed route=/upload session=%s doc_id=%s error=%s",
             session_id, doc_id, e,

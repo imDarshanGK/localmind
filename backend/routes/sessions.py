@@ -1,11 +1,17 @@
 """Sessions routes — /api/sessions — full CRUD"""
 
+import logging
 import os
 import shutil
 import uuid
+
 from fastapi import APIRouter, HTTPException
-from models.schemas import SessionCreate, SessionUpdate, BulkSessionRenameRequest
+
+logger = logging.getLogger(__name__)
+
+from models.schemas import BulkSessionRenameRequest, SessionCreate, SessionUpdate
 from services import db_service
+
 # from backend.models.schemas import BulkSessionRenameRequest  # Adjust if other items are imported from here
 
 router = APIRouter()
@@ -59,10 +65,10 @@ async def bulk_rename_sessions(body: BulkSessionRenameRequest):
             "message": f"Successfully processed all {updated_count} session updates."
         }
         
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         raise HTTPException(
             status_code=500, 
-            detail=f"Bulk rename failed: {str(e)}"
+            detail=f"Bulk rename failed: {e!s}"
         )
     
     
@@ -103,16 +109,16 @@ async def delete_session(session_id: str):
         from services import rag_service
 
         rag_service.delete_session_index(session_id)
-    except Exception:
-        pass
-        
+    except Exception as e:  # noqa: BLE001
+        logger.warning("Failed to delete session index for %s: %s", session_id, e)
+
     upload_dir = f"./data/uploads/{session_id}"
     if os.path.exists(upload_dir):
         try:
             shutil.rmtree(upload_dir)
-        except Exception:
+        except Exception as e:  # noqa: BLE001
             # Continue even if directory deletion fails (e.g. file lock)
-            pass
+            logger.warning("Failed to remove upload dir %s: %s", upload_dir, e)
             
     return {"status": "deleted", "session_id": session_id}
 
@@ -149,7 +155,7 @@ async def rag_stats(session_id: str):
         from services import rag_service
 
         count = rag_service.get_indexed_count(session_id)
-    except Exception:
+    except Exception:  # noqa: BLE001
         count = 0
     return {"session_id": session_id, "indexed_chunks": count}
 

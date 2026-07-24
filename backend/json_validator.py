@@ -4,8 +4,9 @@ Provides safe validation of plugin output against predefined schemas.
 """
 
 import json
-from jsonschema import validate, ValidationError, SchemaError
-from typing import Dict, Any, Optional
+from typing import Any
+
+from jsonschema import SchemaError, ValidationError, validate
 
 # Predefined schemas for different plugin types
 PLUGIN_SCHEMAS = {
@@ -87,7 +88,7 @@ class JSONValidator:
         self.schema_name = schema_name
         self.schema = PLUGIN_SCHEMAS.get(schema_name, PLUGIN_SCHEMAS["plugin_response"])
     
-    def validate(self, data: Any) -> tuple[bool, Optional[str], Optional[Dict]]:
+    def validate(self, data: Any) -> tuple[bool, str | None, dict | None]:
         """
         Validate JSON data against the schema.
         
@@ -103,13 +104,13 @@ class JSONValidator:
             return True, None, data
             
         except json.JSONDecodeError as e:
-            return False, f"Invalid JSON: {str(e)}", None
+            return False, f"Invalid JSON: {e!s}", None
         except ValidationError as e:
             return False, f"Schema validation failed: {e.message}", None
         except SchemaError as e:
-            return False, f"Invalid schema: {str(e)}", None
+            return False, f"Invalid schema: {e!s}", None
     
-    def safe_validate(self, data: Any, default: Optional[Dict] = None) -> Dict:
+    def safe_validate(self, data: Any, default: dict | None = None) -> dict:
         """
         Validate with safe fallback - returns validated data or default.
         """
@@ -123,7 +124,7 @@ class PluginResponseValidator:
     """Convenience class for validating plugin responses."""
     
     @staticmethod
-    def validate_response(response: Dict) -> Dict:
+    def validate_response(response: dict) -> dict:
         """Validate a plugin response and return sanitized version."""
         validator = JSONValidator("plugin_response")
         is_valid, error, validated = validator.validate(response)
@@ -140,14 +141,14 @@ class PluginResponseValidator:
         return validated
     
     @staticmethod
-    def is_valid_response(response: Dict) -> bool:
+    def is_valid_response(response: dict) -> bool:
         """Quick check if response is valid."""
         validator = JSONValidator("plugin_response")
         is_valid, _, _ = validator.validate(response)
         return is_valid
     
     @staticmethod
-    def extract_data(response: Dict, key: str, default=None):
+    def extract_data(response: dict, key: str, default=None):
         """Safely extract data from validated response."""
         if not PluginResponseValidator.is_valid_response(response):
             return default
@@ -164,7 +165,7 @@ def validate_json_file(filepath: str, schema_name: str = "plugin_response") -> b
         if not is_valid:
             print(f"Validation failed for {filepath}: {error}")
         return is_valid
-    except Exception as e:
+    except (OSError, json.JSONDecodeError, ValidationError, SchemaError) as e:
         print(f"Error reading/validating {filepath}: {e}")
         return False
 

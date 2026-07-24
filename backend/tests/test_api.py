@@ -1,16 +1,15 @@
 """LocalMind v2 Tests — run: pytest -v"""
 
 import json
-import tempfile
-import os
-from unittest.mock import AsyncMock, patch
 import logging
+import os
+import tempfile
+from unittest.mock import AsyncMock, patch
 
 from fastapi.testclient import TestClient
 
 import services.db_service as db
 from app import app
-
 
 _tmp = tempfile.mktemp(suffix=".db")
 db.DB_PATH = _tmp

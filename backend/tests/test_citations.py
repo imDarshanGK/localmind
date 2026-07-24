@@ -28,7 +28,7 @@ client = TestClient(app)
 
 # ─── _build_sources() pure helper ───────────────────────────────
 # Import only the pure helper — no chromadb / sentence_transformers needed.
-from services.citation_utils import build_sources  # noqa: E402
+from services.citation_utils import build_sources
 
 
 class TestBuildSources:

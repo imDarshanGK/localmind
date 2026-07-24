@@ -3,13 +3,14 @@ LocalMind v2.0 — Offline AI Assistant Platform
 Backend: FastAPI + Ollama + LangChain + ChromaDB + WebSockets
 """
 
+import asyncio
 import logging
 import os
+import sqlite3
+import time
 import uuid
-import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
-import time
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,17 +18,17 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from routes.chat import router as chat_router
-from routes.upload import router as upload_router
-from routes.models import router as models_router
-from routes.sessions import router as sessions_router
-from routes.plugins import router as plugins_router
-from routes.export import router as export_router
-from routes.settings import router as settings_router
-from routes.prompt_templates import router as prompt_templates_router
-
 from middleware.csrf import OriginValidationMiddleware
-from services.db_service import init_db, get_db
+from routes.chat import router as chat_router
+from routes.export import router as export_router
+from routes.models import router as models_router
+from routes.plugins import router as plugins_router
+from routes.prompt_templates import router as prompt_templates_router
+from routes.sessions import router as sessions_router
+from routes.settings import router as settings_router
+from routes.upload import router as upload_router
+from services.db_service import get_db, init_db
+
 
 # --- Issue #284 Engine Stability: Contextual Thread-Safe Log Formatter ---
 class CorrelationIdFormatter(logging.Formatter):
@@ -60,19 +61,19 @@ def run_preflight_checks():
     try:
         os.makedirs("./data/uploads", exist_ok=True)
         checks.append(("Uploads directory", True))
-    except Exception:
+    except OSError:
         checks.append(("Uploads directory", False))
 
     try:
         os.makedirs("./data/chromadb", exist_ok=True)
         checks.append(("ChromaDB directory", True))
-    except Exception:
+    except OSError:
         checks.append(("ChromaDB directory", False))
 
     try:
         os.makedirs("./data/exports", exist_ok=True)
         checks.append(("Exports directory", True))
-    except Exception:
+    except OSError:
         checks.append(("Exports directory", False))
 
     try:
@@ -80,7 +81,7 @@ def run_preflight_checks():
         with get_db() as conn:
             conn.execute("SELECT 1")
         checks.append(("SQLite database", True))
-    except Exception:
+    except sqlite3.Error:
         checks.append(("SQLite database", False))
 
     for name, ok in checks:
@@ -205,5 +206,5 @@ async def db_health():
         with get_db() as conn:
             conn.execute("SELECT 1")
         return {"status": "healthy"}
-    except Exception:
+    except sqlite3.Error:
         return {"status": "unhealthy"}

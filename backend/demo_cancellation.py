@@ -3,8 +3,8 @@ import tempfile
 from unittest.mock import AsyncMock, patch
 
 import services.db_service as db
-from routes.chat import chat_stream, cancel_stream
 from models.schemas import ChatRequest
+from routes.chat import cancel_stream, chat_stream
 
 db.DB_PATH = tempfile.mktemp(suffix=".db")
 db.init_db()

@@ -3,9 +3,9 @@ Embeddings Cache Warmup Utility
 Ensures sentence-transformers weights are pre-downloaded and cached locally.
 """
 
+import logging
 import os
 import sys
-import logging
 
 # --- FIX PYTHON PATHS ---
 # Dynamically add the current script's directory (backend) to the Python path
@@ -27,7 +27,7 @@ def warmup_model():
     
     try:
         # Import embedder dynamically from the existing RAG service
-        from services.rag_service import embedder, EMBED_MODEL
+        from services.rag_service import EMBED_MODEL, embedder
         
         logger.info(f"Target model detected: '{EMBED_MODEL}'")
         
@@ -40,8 +40,8 @@ def warmup_model():
         logger.info(f"Success! Model warmed up. Vector shape output: {len(embedding[0])}")
         logger.info("Embeddings engine is fully cached and ready for local inference.")
         
-    except Exception as e:
-        logger.error(f"Warmup sequence failed: {str(e)}")
+    except (ImportError, OSError, RuntimeError, ValueError) as e:
+        logger.error(f"Warmup sequence failed: {e!s}")
         sys.exit(1)
 
 if __name__ == "__main__":

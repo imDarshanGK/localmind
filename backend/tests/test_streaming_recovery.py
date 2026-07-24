@@ -1,12 +1,13 @@
 import asyncio
 import tempfile
 import time
-import pytest
 from unittest.mock import AsyncMock, patch
 
+import pytest
+
 import services.db_service as db
-from routes.chat import chat_stream, ACTIVE_STREAMS, StreamBuffer
 from models.schemas import ChatRequest
+from routes.chat import ACTIVE_STREAMS, StreamBuffer, chat_stream
 
 # Initialize a temp SQLite database for tests
 _tmp = tempfile.mktemp(suffix=".db")
