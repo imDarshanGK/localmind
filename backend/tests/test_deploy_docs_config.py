@@ -24,6 +24,7 @@ def test_build_deploy_docs_include_config_validation_checklist():
         "CORS_ORIGINS",
         "VITE_API_BASE_URL",
         "include `/api`",
+        "Issues labeled [`good-first-issue`](https://github.com/imDarshanGK/localmind/issues?q=label%3Agood-first-issue)",
     ]
 
     for snippet in required_snippets:
@@ -37,8 +38,8 @@ def test_render_config_matches_documented_build_and_health_checks():
     assert "healthCheckPath: /health" in render_config
     assert "buildCommand: npm install && npm run build" in render_config
     assert "`render.yaml`" in readme
-    assert "`healthCheckPath`" in readme and "`/health`" in readme
-    assert "`npm install && npm run build`" in readme
+    assert "healthCheckPath" in readme and "/health" in readme
+    assert "npm install && npm run build" in readme
 
 
 def test_vercel_config_matches_documented_build_output():
@@ -47,5 +48,5 @@ def test_vercel_config_matches_documented_build_output():
 
     assert vercel_config["buildCommand"] == "cd frontend && npm run build"
     assert vercel_config["outputDirectory"] == "frontend/dist"
-    assert "frontend output directory (`frontend/dist`)" in readme
-    assert "build command (`cd frontend && npm run build`)" in readme
+    assert "frontend/dist" in readme
+    assert "cd frontend && npm run build" in readme

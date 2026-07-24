@@ -18,7 +18,7 @@
 
 <br/>
 
-[Quick Start](#quick-start) · [Features](#all-features) · [Tech Stack](#tech-stack) · [Troubleshooting](#macos-install-troubleshooting) · [Contributing](#contributing) · [Screenshots](docs/screenshots.md)
+[Quick Start](#quick-start) · [Features](#all-features) · [Tech Stack](#tech-stack) · [Troubleshooting](#macos-install-troubleshooting) · [Contributing](#-contributing) · [Screenshots](docs/screenshots.md)
 
 ---
 
@@ -92,7 +92,7 @@
 ollama pull llama3
 
 # 2. Clone and start
-git clone https://github.com/yourusername/localmind.git
+git clone https://github.com/imDarshanGK/localmind.git
 cd localmind && docker compose up
 
 # 3. Open browser
@@ -102,7 +102,7 @@ open http://localhost:3000
 ### Option 2 - Manual Setup
 
 ```bash
-git clone https://github.com/yourusername/localmind.git
+git clone https://github.com/imDarshanGK/localmind.git
 cd localmind
 
 # Backend
@@ -475,7 +475,7 @@ python warmup.py
 2. Make changes → Write tests → Commit (`git commit -m "feat: ..."`)
 3. Push → Open Pull Request
 
-Issues labeled [`good-first-issue`](https://github.com/yourusername/localmind/issues?q=label%3Agood-first-issue) are perfect for beginners!
+Issues labeled [`good-first-issue`](https://github.com/imDarshanGK/localmind/issues?q=label%3Agood-first-issue) are perfect for beginners!
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide.
 
@@ -498,7 +498,7 @@ If LocalMind helped you, please star the repo. ⭐✨🚀
 Built something cool with LocalMind? We'd love to see it! Open a Pull Request to add your project, tutorial, or integration to this list.
 
 ### 🛠️ Projects & Integrations
-- **[Community projects will appear here.]** - A brief 1-2 sentence description of what your integration does. (By [@yourusername](https://github.com/yourusername))
+- **[Community projects will appear here.]** - A brief 1-2 sentence description of what your integration does. (By @yourusername)
 - *Contributions welcome! Add your tool here.*
 
 ### 📚 Community Articles & Tutorials
