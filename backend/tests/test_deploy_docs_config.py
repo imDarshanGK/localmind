@@ -18,12 +18,29 @@ def test_build_deploy_docs_include_config_validation_checklist():
     assert "python -m json.tool vercel.json" in readme
     assert "cd frontend" in readme
     assert "npm run build" in readme
+    assert "python warmup.py" in readme
 
     for snippet in ["OLLAMA_HOST", "DEFAULT_MODEL", "CORS_ORIGINS", "VITE_API_BASE_URL", "/api"]:
         assert snippet in readme
 
     for snippet in ["render.yaml", "healthCheckPath", "/health", "frontend/dist"]:
         assert snippet in readme
+
+
+def test_build_deploy_docs_include_embeddings_cache_guidelines():
+    readme = read_repo_file("README.md")
+    model_cache_docs = read_repo_file("docs/model-cache.md")
+
+    assert "### Embeddings Cache Deployment" in readme
+    assert "all-MiniLM-L6-v2" in readme
+    assert "python warmup.py" in readme
+    assert "HF_HOME" in readme
+    assert "Embeddings Cache: pre-warm sentence-transformers weights cache" in readme
+
+    assert "# Embeddings Cache Warmup & Deployment" in model_cache_docs
+    assert "sentence-transformers" in model_cache_docs
+    assert "python warmup.py" in model_cache_docs
+    assert "HF_HOME" in model_cache_docs
 
 
 def test_render_config_matches_documented_build_and_health_checks():

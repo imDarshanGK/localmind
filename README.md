@@ -136,9 +136,21 @@ VITE_API_BASE_URL=https://<your-backend>.onrender.com/api
 
 The included `render.yaml` defines a backend web service and a frontend static site for the same repo.
 
+### Embeddings Cache Deployment
+
+To prevent cold-start latency when users upload documents for the first time after a build or deployment, pre-download and warm up the SentenceTransformer inference weights (`all-MiniLM-L6-v2`) in your build pipeline or deployment environment.
+
+```bash
+# Pre-warm sentence-transformers weights cache before starting backend server
+cd backend
+python warmup.py
+```
+
+Set the `HF_HOME` environment variable if storing model cache in persistent volumes across container builds or cloud deployments (defaulting to `~/.cache/huggingface`).
+
 #### Build and deploy config validation
 
-Before opening a deployment PR or triggering a hosted build, validate the config that the docs and deploy files depend on:
+Before opening a deployment PR or triggering a hosted build, validate the config and cache state that the docs and deploy files depend on:
 
 ```bash
 # Validate local Docker Compose syntax and service wiring
@@ -151,11 +163,16 @@ python -m json.tool vercel.json > /dev/null
 cd frontend
 npm install
 npm run build
+
+# Pre-warm and validate the backend embeddings cache
+cd ../backend
+python warmup.py
 ```
 
 Check these environment values before deploy:
 
 - Backend: `OLLAMA_HOST` must point at a reachable Ollama server, `DEFAULT_MODEL` must be pulled on that server, and `CORS_ORIGINS` must list the exact frontend origin without a path.
+- Embeddings Cache: pre-warm sentence-transformers weights cache with `python warmup.py` in the backend directory to prevent first-request cold-boot latency.
 - Frontend: `VITE_API_BASE_URL` must point at the deployed backend API and include `/api`.
 - Render: keep `render.yaml` aligned with the documented backend `healthCheckPath` (`/health`) and frontend build command (`npm install && npm run build`).
 - Vercel: keep `vercel.json` aligned with the documented frontend output directory (`frontend/dist`) and build command (`cd frontend && npm run build`).
