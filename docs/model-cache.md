@@ -41,7 +41,7 @@ Unit tests covering cache hits, misses, expiration, and API fallbacks are locate
 
 ---
 
-# Embeddings Cache Warmup & Deployment
+## Embeddings Cache Warmup & Deployment
 
 In addition to LLM model metadata caching, LocalMind utilizes `sentence-transformers` (`all-MiniLM-L6-v2`) for local RAG vector embeddings.
 

@@ -37,7 +37,7 @@ def test_build_deploy_docs_include_embeddings_cache_guidelines():
     assert "HF_HOME" in readme
     assert "Embeddings Cache: pre-warm sentence-transformers weights cache" in readme
 
-    assert "# Embeddings Cache Warmup & Deployment" in model_cache_docs
+    assert "## Embeddings Cache Warmup & Deployment" in model_cache_docs
     assert "sentence-transformers" in model_cache_docs
     assert "python warmup.py" in model_cache_docs
     assert "HF_HOME" in model_cache_docs
