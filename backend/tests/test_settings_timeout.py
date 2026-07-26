@@ -1,15 +1,14 @@
 """Timeout regression tests for settings routes."""
 
+import sys
 import tempfile
 import time
 import types
-import sys
 
 import pytest
-from fastapi.testclient import TestClient
-
 import services.db_service as db
 from app import app
+from fastapi.testclient import TestClient
 
 _tmp = tempfile.mktemp(suffix=".db")
 db.DB_PATH = _tmp

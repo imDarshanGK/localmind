@@ -214,6 +214,21 @@ export default function ChatWindow({ messages = [], loading = false, onSend, onD
     }
   }
 
+  function handleSuggestionKeyDown(e, index) {
+    const pills = document.querySelectorAll('[data-testid="suggestion-pill"]');
+    if (!pills.length) return;
+
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+      e.preventDefault();
+      const nextIndex = (index + 1) % pills.length;
+      pills[nextIndex]?.focus();
+    } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+      e.preventDefault();
+      const prevIndex = (index - 1 + pills.length) % pills.length;
+      pills[prevIndex]?.focus();
+    }
+  }
+
   const SUGGESTIONS = [
     "Summarize the uploaded document",
     "What are the key points?",
@@ -227,7 +242,7 @@ export default function ChatWindow({ messages = [], loading = false, onSend, onD
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden bg-gray-950 text-gray-100">
-      {/* Export bar */}
+      {/* Export bar - wraps gracefully on mobile viewports */}
       {messages.length > 0 && (
         <div className="flex justify-end gap-1.5 sm:gap-2 px-3 sm:px-5 pt-2 flex-wrap">
           {["markdown", "json", "txt"].map(f => (
@@ -258,7 +273,7 @@ export default function ChatWindow({ messages = [], loading = false, onSend, onD
       )}
 
       {/* Messages Viewport */}
-      <div className="flex-1 overflow-y-auto px-3 sm:px-4 py-4 space-y-4 sm:space-y-5">
+      <div className="flex-1 overflow-y-auto px-3 sm:px-4 py-4 space-y-4 sm:space-y-5" data-testid="messages-viewport">
         {/* Empty-State Guidance (#543) */}
         {messages.length === 0 && (
           <div 
@@ -286,9 +301,14 @@ export default function ChatWindow({ messages = [], loading = false, onSend, onD
 
             {!minimalMode && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2 sm:mt-4 max-w-lg w-full" role="group" aria-label="Prompt suggestions">
-                {SUGGESTIONS.map(s => (
-                  <button key={s} onClick={() => handleSuggestionClick(s)}
-                    className="text-xs text-left border border-gray-800 rounded-xl px-3 py-2.5 text-gray-400 hover:border-purple-600 hover:text-purple-300 hover:bg-purple-900/20 transition min-h-[40px] sm:min-h-0">
+                {SUGGESTIONS.map((s, index) => (
+                  <button
+                    key={s}
+                    data-testid="suggestion-pill"
+                    onClick={() => handleSuggestionClick(s)}
+                    onKeyDown={(e) => handleSuggestionKeyDown(e, index)}
+                    className="text-xs text-left border border-gray-800 rounded-xl px-3 py-2.5 text-gray-400 hover:border-purple-600 hover:text-purple-300 hover:bg-purple-900/20 focus:outline-none focus:ring-2 focus:ring-purple-500 transition min-h-[40px] sm:min-h-0"
+                  >
                     {s}
                   </button>
                 ))}

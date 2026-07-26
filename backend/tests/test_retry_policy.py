@@ -1,8 +1,9 @@
-import pytest
-import httpx
 from unittest.mock import AsyncMock, patch
 
+import httpx
+import pytest
 from services.ollama_service import chat, chat_stream
+
 
 @pytest.mark.asyncio
 async def test_chat_retry_success():
@@ -91,14 +92,16 @@ async def test_chat_stream_retry_success():
             return MockStreamContext(should_fail=True)
         return MockStreamContext(should_fail=False)
 
-    with patch('httpx.AsyncClient.stream', side_effect=mock_stream):
-        with patch('asyncio.sleep', new_callable=AsyncMock) as mock_sleep:
-            generator = chat_stream("Hello")
-            
-            tokens = []
-            async for token in generator:
-                tokens.append(token)
-                
-            assert tokens == ["token ", "done!"]
-            assert call_count == 2
-            assert mock_sleep.call_count == 1
+    with (
+        patch("httpx.AsyncClient.stream", side_effect=mock_stream),
+        patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep,
+    ):
+        generator = chat_stream("Hello")
+        tokens = []
+        async for token in generator:
+            tokens.append(token)
+
+        assert tokens == ["token ", "done!"]
+        assert call_count == 2
+        assert mock_sleep.call_count == 1
+

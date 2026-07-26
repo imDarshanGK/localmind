@@ -1,8 +1,10 @@
-import pytest
 import time
 from unittest.mock import patch
-from utils.cache import TTLCache
+
+import pytest
 from services.ollama_service import get_model_info, model_metadata_cache
+from utils.cache import TTLCache
+
 
 def test_ttl_cache_hit_and_miss():
     cache = TTLCache(ttl_seconds=2)

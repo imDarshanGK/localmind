@@ -2,29 +2,29 @@
 
 import json
 import re
-from datetime import datetime
-from typing import List
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response
-from pydantic import BaseModel, field_validator
 from models.schemas import ExportFormat
+from pydantic import BaseModel, field_validator
 from services import db_service
 
 router = APIRouter()
 
 
 class ExportMessagesRequest(BaseModel):
-    message_ids: List[str]
+    message_ids: list[str]
     format: ExportFormat
 
 
 class BulkSessionExportRequest(BaseModel):
-    session_ids: List[str]
+    session_ids: list[str]
     format: str
 
     @field_validator("session_ids")
     @classmethod
-    def validate_session_ids(cls, v: List[str]) -> List[str]:
+    def validate_session_ids(cls, v: list[str]) -> list[str]:
         if not v:
             raise ValueError("session_ids list cannot be empty")
         return v
@@ -98,7 +98,7 @@ async def export_session(session_id: str, fmt: ExportFormat):
 
     messages = db_service.get_messages_full(session_id)
     title = session.get("title", "LocalMind Chat")
-    ts = datetime.now().strftime("%Y-%m-%d %H:%M")
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M")
 
     # FIXED (#83): Clean the title to make it safe for a filename
     safe_title = re.sub(r'[^\w\s-]', '', title).strip().lower()
@@ -144,7 +144,7 @@ async def export_sessions(req: BulkSessionExportRequest):
             detail="No valid sessions found for the given IDs"
         )
 
-    ts = datetime.now().strftime("%Y-%m-%d %H:%M")
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M")
 
     if req.format == "json":
         sessions_data = []
@@ -189,7 +189,7 @@ async def export_messages(req: ExportMessagesRequest):
         raise HTTPException(404, "No messages found for the given IDs")
 
     messages.sort(key=lambda m: m.get("timestamp", ""))
-    ts = datetime.now().strftime("%Y-%m-%d %H:%M")
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M")
 
     # FIXED (#83): Use a shared default title format for custom standalone message groups
     safe_title = f"localmind_messages_{ts.replace(' ', '_').replace(':', '-')}"
