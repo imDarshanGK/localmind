@@ -138,6 +138,38 @@ def process_document_task(file_path: str, session_id: str, doc_id: int):
         db_service.update_document_status(doc_id, "failed")
 
 
+@router.get("/preview")
+async def preview_document(filename: str = Query(...), session_id: str = Query(...)):
+    logger.info("preview_request route=/upload/preview session=%s file=%s", session_id, filename)
+    file_path = UPLOAD_DIR / f"{session_id}_{filename}"
+    if not file_path.exists():
+        logger.warning("preview_failed reason=file_not_found path=%s", file_path)
+        raise HTTPException(status_code=404, detail="Document file not found.")
+    
+    try:
+        TEXT_FORMATS = {
+            ".txt", ".md", ".html", ".htm", ".csv", ".json", 
+            ".xml", ".log", ".tsv", ".ini", ".cfg", ".yaml", 
+            ".yml", ".srt", ".vtt"
+        }
+        ext = Path(file_path).suffix.lower()
+        if ext in TEXT_FORMATS:
+            content = file_path.read_text(encoding="utf-8", errors="ignore")
+        else:
+            from services.rag_service import LOADERS
+            loader_cls = LOADERS.get(ext)
+            if not loader_cls:
+                content = file_path.read_text(encoding="utf-8", errors="ignore")
+            else:
+                docs = loader_cls(str(file_path)).load()
+                content = "\n".join([doc.page_content for doc in docs])
+        
+        return {"content": content}
+    except Exception as e:
+        logger.error("preview_failed path=%s error=%s", file_path, e)
+        raise HTTPException(status_code=500, detail=f"Failed to read document preview: {str(e)}")
+
+
 @router.get("/", response_model=list)
 async def list_documents(session_id: str = Query(...)):
     return db_service.get_documents(session_id)
