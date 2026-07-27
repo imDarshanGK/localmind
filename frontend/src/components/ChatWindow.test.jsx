@@ -182,8 +182,8 @@ describe("ChatWindow Regression Suite (#751)", () => {
       const mockMessages = [{ id: "m1", role: "user", content: "Persist me" }];
       render(<ChatWindow messages={mockMessages} loading={false} onSend={vi.fn()} sessionId="session-abc" />);
       
-      const markdownBtn = screen.getByText("↓ .markdown");
-      fireEvent.click(markdownBtn);
+      expect(screen.getByText("↓ .markdown")).toBeInTheDocument();
+      fireEvent.click(screen.getByText("↓ .markdown"));
       
       expect(exportSession).toHaveBeenCalledWith("session-abc", "markdown");
     });
@@ -205,7 +205,7 @@ describe("ChatWindow Skeleton Loading Tests (#542)", () => {
   });
 });
 
-// --- SUITE 3: COPY FEEDBACK SUITE (#750) ---
+// --- SUITE 3: COPY FEEDBACK SUITE (#550 / #750) ---
 describe('ChatWindow Copy Feedback', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -216,7 +216,7 @@ describe('ChatWindow Copy Feedback', () => {
     vi.useRealTimers();
   });
 
-  test('should show checkmark icon / "Copy" state change on click and revert after 1.5 seconds', async () => {
+  test('should invoke navigator.clipboard.writeText and temporarily update copy feedback state', async () => {
     const mockMessages = [
       { id: 'msg-1', role: 'assistant', content: 'Hello from LocalMind!', streaming: false }
     ];
