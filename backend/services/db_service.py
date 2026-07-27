@@ -23,17 +23,17 @@ def _get_deleted_counter(conn) -> int:
     ).fetchone()
     return int(row["value"]) if row else 0
 
-def _increment_deleted_counter(conn,count:int) -> int:
+def _increment_deleted_counter(conn, count: int) -> int:
     new_value = _get_deleted_counter(conn) + count
     conn.execute(
-        "INSERT OR REPLACE INTO app_settings (key,value,updated_at) VALUES (?,?, datetime('now'))",
+        "INSERT OR REPLACE INTO app_settings (key, value, updated_at) VALUES (?, ?, datetime('now'))",
         ("rows_deleted_since_vacuum", str(new_value)),
     )
     return new_value
 
 def run_vacuum():
     """ Run VACUUM outside any transaction to reclaim disk space."""
-    conn = sqlite3.connect(DB_PATH, timeout=5, isolation_level = None)
+    conn = sqlite3.connect(DB_PATH, timeout=5, isolation_level=None)
     try:
         conn.execute("VACUUM")
         conn.execute(
@@ -58,7 +58,7 @@ def backup_db(dest_path: str) -> None:
     """Create a consistent backup of the live database at *dest_path*.
 
     Uses SQLite's native online-backup API (``sqlite3.Connection.backup``) so
-    the copy is safe to make while the database is open.  The destination
+    the copy is safe to make while the database is open. The destination
     directory is created automatically when it does not exist.
 
     Raises:
@@ -114,7 +114,6 @@ def restore_db(src_path: str) -> None:
         ) from exc
 
 
-
 DB_PATH = os.getenv("DB_PATH", "./data/localmind.db")
 os.makedirs(os.path.dirname(DB_PATH) if os.path.dirname(DB_PATH) else ".", exist_ok=True)
 logger = logging.getLogger(__name__)
@@ -136,16 +135,15 @@ def get_db():
             break
 
         except OperationalError as e:
-             if "locked" in str(e).lower() and attempt < retries - 1:
-                    logger.warning(
-                        "Database locked (attempt %d/%d). Retrying...",
-                        attempt + 1,
-                        retries,
-                    )
-                    time.sleep(delay)
-                    continue
-             raise
-
+            if "locked" in str(e).lower() and attempt < retries - 1:
+                logger.warning(
+                    "Database locked (attempt %d/%d). Retrying...",
+                    attempt + 1,
+                    retries,
+                )
+                time.sleep(delay)
+                continue
+            raise
 
     try:
         yield conn
@@ -167,6 +165,7 @@ def get_db():
     finally:
         if conn:
             conn.close()
+
 
 def init_db():
     """Create all tables on startup."""
@@ -192,7 +191,7 @@ def init_db():
                 benchmarks TEXT DEFAULT '{}',
                 FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
             );
-                           
+
             CREATE TABLE IF NOT EXISTS message_reactions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 message_id INTEGER NOT NULL,
@@ -229,7 +228,7 @@ def init_db():
                 success INTEGER DEFAULT 1,
                 created_at TEXT DEFAULT (datetime('now'))
             );
-                            
+
             CREATE TABLE IF NOT EXISTS shared_sessions (
                 id TEXT PRIMARY KEY,
                 session_id TEXT NOT NULL,
@@ -253,9 +252,7 @@ def init_db():
                 ('max_history_turns', '10'),
                 ('rag_top_k', '4'),
                 ('theme', '"dark"'),
-                ('rows_deleted_since_vacuum','0');         
-                           
-
+                ('rows_deleted_since_vacuum','0');
         """)
         try:
             conn.execute("ALTER TABLE documents ADD COLUMN status TEXT DEFAULT 'completed'")
@@ -269,6 +266,8 @@ def init_db():
         cols_sessions = [row[1] for row in conn.execute("PRAGMA table_info(sessions)").fetchall()]
         if "language" not in cols_sessions:
             conn.execute("ALTER TABLE sessions ADD COLUMN language TEXT DEFAULT 'en'")
+
+
 # ─── Sessions ────────────────────────────────────────────────
 def create_session(session_id: str, title: str = "New Chat", model: str = "llama3", language: str = "en") -> dict:
     with get_db() as conn:
@@ -394,8 +393,11 @@ def get_session_reactions_map(session_id: str) -> dict[int, list[str]]:
                 reactions_map[msg_id] = []
             reactions_map[msg_id].append(r["emoji"])
         return reactions_map
+
+
 def save_message(session_id: str, role: str, content: str, sources: list | None = None, benchmarks: dict | None = None):
     sources = sources or []
+    benchmarks = benchmarks or {}
     with get_db() as conn:
         conn.execute(
             "INSERT INTO messages (session_id, role, content, sources, benchmarks) VALUES (?,?,?,?,?)",
@@ -405,16 +407,21 @@ def save_message(session_id: str, role: str, content: str, sources: list | None 
             "UPDATE sessions SET updated_at=datetime('now'), message_count=message_count+1 WHERE id=?",
             (session_id,),
         )
-        # Auto-title session from first user message
+        # Auto-title session from first user message with clean character threshold
         if role == "user":
             row = conn.execute(
                 "SELECT title FROM sessions WHERE id=?", (session_id,)
             ).fetchone()
+
+            MAX_TITLE_LENGTH = 50
             if row and row["title"] == "New Chat":
-                if grapheme.length(content) > 40:
-                    title = grapheme.slice(content, start=0, end=40) + "..."
+                clean_content = content.strip()
+                if len(clean_content) > MAX_TITLE_LENGTH:
+                    # Truncate at whole word boundary if possible
+                    truncated = clean_content[:MAX_TITLE_LENGTH].rsplit(" ", 1)[0]
+                    title = (truncated if truncated else clean_content[:MAX_TITLE_LENGTH]) + "..."
                 else:
-                    title = content
+                    title = clean_content
                 conn.execute("UPDATE sessions SET title=? WHERE id=?", (title, session_id))
 
 
@@ -440,7 +447,7 @@ def get_messages_full(session_id: str) -> list[dict]:
                 "content": r["content"],
                 "sources": json.loads(r["sources"] or "[]"),
                 "created_at": r["created_at"],
-                "benchmarks": json.loads(r["benchmarks"] or {})
+                "benchmarks": json.loads(r["benchmarks"] or "{}")
             }
             for r in rows
         ]
@@ -484,6 +491,7 @@ def save_document(session_id: str, filename: str, file_path: str, chunks: int, s
         )
         return cursor.lastrowid
 
+
 def update_document_status(doc_id: int, status: str, chunks_indexed: int | None = None):
     with get_db() as conn:
         if chunks_indexed is not None:
@@ -524,6 +532,7 @@ def delete_document(doc_id: int):
         
     _maybe_vacuum(deleted)    
 
+
 # ─── Settings ────────────────────────────────────────────────
 def get_settings() -> dict:
     with get_db() as conn:
@@ -559,6 +568,7 @@ def get_plugin_logs(limit: int = 50) -> list[dict]:
             (limit,)
         ).fetchall()
         return [dict(r) for r in rows]
+
 
 def log_plugin(session_id: str, plugin: str, inp: str, out: str, success: bool = True):
     with get_db() as conn:
@@ -622,6 +632,8 @@ def get_shared_session(share_id: str) -> dict | None:
         "messages": json.loads(row["snapshot_json"]),  # Turn string array back into live json dicts
         "created_at": row["created_at"]
     }
+
+
 # ─── Prompt Templates (Updated Signatures) ───────────────────
 
 def create_prompt_template(prompt_title: str, prompt: str) -> dict:
