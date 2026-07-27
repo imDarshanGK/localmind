@@ -37,6 +37,39 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+// --- SUITE: TOOLTIP HELP (#549) ---
+describe("ChatWindow Tooltip Help (#549)", () => {
+  test("renders descriptive title tooltips on interactive and informative elements", () => {
+    const mockMessages = [
+      { id: "m1", role: "user", content: "Test query" },
+      { id: "m2", role: "assistant", content: "Test response", sources: ["doc.pdf"] }
+    ];
+
+    render(<ChatWindow messages={mockMessages} loading={false} onSend={vi.fn()} sessionId="s1" />);
+
+    // Export format buttons
+    expect(screen.getByTitle("Export full conversation as .markdown")).toBeInTheDocument();
+    expect(screen.getByTitle("Export full conversation as .json")).toBeInTheDocument();
+    expect(screen.getByTitle("Export full conversation as .txt")).toBeInTheDocument();
+
+    // Source badges
+    expect(screen.getByTitle("Referenced document source: doc.pdf")).toBeInTheDocument();
+
+    // Textarea input and send button
+    expect(screen.getByTitle("Chat input area (Enter to send, Shift+Enter for new line)")).toBeInTheDocument();
+    expect(screen.getByTitle("Send message (Enter)")).toBeInTheDocument();
+
+    // Privacy notice
+    expect(screen.getByTitle("Privacy notice: All data is processed locally on your device")).toBeInTheDocument();
+  });
+
+  test("renders prompt suggestion tooltips when message log is empty", () => {
+    render(<ChatWindow messages={[]} loading={false} onSend={vi.fn()} sessionId="s1" />);
+
+    expect(screen.getByTitle('Insert prompt: "Summarize the uploaded document"')).toBeInTheDocument();
+  });
+});
+
 // --- SUITE: MOBILE LAYOUT & RESPONSIVENESS (#546) ---
 describe("ChatWindow Mobile Layout (#546)", () => {
   test("renders prompt suggestion grid with responsive single/double column classes", () => {
@@ -200,7 +233,7 @@ describe('ChatWindow Copy Feedback', () => {
       />
     );
 
-    const copyButton = screen.getByTitle('Copy response');
+    const copyButton = screen.getByTitle('Copy response to clipboard');
     fireEvent.click(copyButton);
 
     await act(async () => {
@@ -213,6 +246,6 @@ describe('ChatWindow Copy Feedback', () => {
       vi.advanceTimersByTime(1500);
     });
 
-    expect(screen.getByTitle('Copy response')).toBeInTheDocument();
+    expect(screen.getByTitle('Copy response to clipboard')).toBeInTheDocument();
   });
 });
