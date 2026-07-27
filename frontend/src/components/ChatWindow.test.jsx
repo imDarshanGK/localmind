@@ -23,13 +23,13 @@ vi.mock('./Icons', () => ({
   TemplateIcon: () => <span data-testid="template-icon" />,
 }));
 
+// Mock clipboard API functionality using Vitest utilities
+Object.assign(navigator, {
+  clipboard: { writeText: vi.fn().mockImplementation(() => Promise.resolve()) },
+});
+
 beforeEach(() => {
   window.HTMLElement.prototype.scrollIntoView = vi.fn();
-  Object.assign(navigator, {
-    clipboard: {
-      writeText: vi.fn().mockImplementation(() => Promise.resolve()),
-    },
-  });
 });
 
 afterEach(() => {
@@ -37,70 +37,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-// --- SUITE 1: KEYBOARD NAVIGATION & INPUT CONTROLS (#545) ---
-describe("ChatWindow Keyboard Navigation & Core Controls (#545)", () => {
-  test("allows navigating suggestion pills via Arrow keys", () => {
-    render(<ChatWindow messages={[]} loading={false} onSend={vi.fn()} sessionId="s1" />);
-
-    const pills = screen.getAllByTestId("suggestion-pill");
-    
-    // Focus the first pill
-    pills[0].focus();
-    expect(document.activeElement).toBe(pills[0]);
-
-    // Press ArrowRight -> should focus second pill
-    fireEvent.keyDown(pills[0], { key: "ArrowRight" });
-    expect(document.activeElement).toBe(pills[1]);
-
-    // Press ArrowDown -> should focus third pill
-    fireEvent.keyDown(pills[1], { key: "ArrowDown" });
-    expect(document.activeElement).toBe(pills[2]);
-
-    // Press ArrowLeft -> should return to second pill
-    fireEvent.keyDown(pills[2], { key: "ArrowLeft" });
-    expect(document.activeElement).toBe(pills[1]);
-  });
-
-  test("populates prompt input and shifts focus to textarea when suggestion pill is clicked", () => {
-    render(<ChatWindow messages={[]} loading={false} onSend={vi.fn()} sessionId="s1" />);
-
-    const suggestion = screen.getByText("Explain in simple terms");
-    fireEvent.click(suggestion);
-
-    const textarea = screen.getByPlaceholderText(/Ask anything.../i);
-    expect(textarea.value).toBe("Explain in simple terms");
-  });
-
-  test("clears input text or blurs focus when Escape key is pressed", () => {
-    render(<ChatWindow messages={[]} loading={false} onSend={vi.fn()} sessionId="s1" />);
-
-    const textarea = screen.getByPlaceholderText(/Ask anything.../i);
-    
-    // Type text and press Escape -> should clear input
-    fireEvent.change(textarea, { target: { value: "Draft message" } });
-    fireEvent.keyDown(textarea, { key: "Escape" });
-    expect(textarea.value).toBe("");
-  });
-
-  test("submits input content on Enter and bypasses on Shift+Enter", () => {
-    const onSendSpy = vi.fn();
-    render(<ChatWindow messages={[]} loading={false} onSend={onSendSpy} sessionId="s1" />);
-
-    const textarea = screen.getByPlaceholderText(/Ask anything.../i);
-
-    // Shift + Enter (should not send)
-    fireEvent.change(textarea, { target: { value: "Line 1\n" } });
-    fireEvent.keyDown(textarea, { key: "Enter", shiftKey: true });
-    expect(onSendSpy).not.toHaveBeenCalled();
-
-    // Plain Enter (triggers send and trims input)
-    fireEvent.keyDown(textarea, { key: "Enter", shiftKey: false });
-    expect(onSendSpy).toHaveBeenCalledWith("Line 1");
-    expect(textarea.value).toBe("");
-  });
-});
-
-// --- SUITE 2: FEATURE #543 - EMPTY STATE GUIDANCE ---
+// --- SUITE 1: FEATURE #543 - EMPTY STATE GUIDANCE ---
 describe("ChatWindow Empty State Guidance (#543)", () => {
   test("renders empty state guidance container and feature badges when messages are empty", () => {
     render(<ChatWindow messages={[]} loading={false} onSend={vi.fn()} sessionId="s1" />);
@@ -120,7 +57,7 @@ describe("ChatWindow Empty State Guidance (#543)", () => {
   });
 });
 
-// --- SUITE 3: MOBILE LAYOUT & RESPONSIVENESS (#546) ---
+// --- SUITE 2: MOBILE LAYOUT & RESPONSIVENESS (#546) ---
 describe("ChatWindow Mobile Layout (#546)", () => {
   test("renders prompt suggestion grid with responsive single/double column classes", () => {
     render(<ChatWindow messages={[]} loading={false} onSend={vi.fn()} sessionId="s1" />);
@@ -131,7 +68,9 @@ describe("ChatWindow Mobile Layout (#546)", () => {
   });
 
   test("applies responsive max-width classes to user and assistant messages", () => {
-    const mockMessages = [{ id: "m1", role: "user", content: "Mobile test message" }];
+    const mockMessages = [
+      { id: "m1", role: "user", content: "Mobile test message" }
+    ];
     render(<ChatWindow messages={mockMessages} loading={false} onSend={vi.fn()} sessionId="s1" />);
 
     const messageText = screen.getByText("Mobile test message");
@@ -141,7 +80,63 @@ describe("ChatWindow Mobile Layout (#546)", () => {
   });
 });
 
-// --- SUITE 4: SKELETON LOADING SUITE (#542) ---
+// --- SUITE 3: KEYBOARD NAVIGATION & INPUT CONTROLS (#545) ---
+describe("ChatWindow Keyboard Navigation & Core Controls (#545)", () => {
+  test("allows navigating suggestion pills via Arrow keys", () => {
+    render(<ChatWindow messages={[]} loading={false} onSend={vi.fn()} sessionId="s1" />);
+
+    const pills = screen.getAllByTestId("suggestion-pill");
+    
+    pills[0].focus();
+    expect(document.activeElement).toBe(pills[0]);
+
+    fireEvent.keyDown(pills[0], { key: "ArrowRight" });
+    expect(document.activeElement).toBe(pills[1]);
+
+    fireEvent.keyDown(pills[1], { key: "ArrowDown" });
+    expect(document.activeElement).toBe(pills[2]);
+
+    fireEvent.keyDown(pills[2], { key: "ArrowLeft" });
+    expect(document.activeElement).toBe(pills[1]);
+  });
+
+  test("populates prompt input and shifts focus to textarea when suggestion pill is clicked", () => {
+    render(<ChatWindow messages={[]} loading={false} onSend={vi.fn()} sessionId="s1" />);
+
+    const suggestion = screen.getByText("Explain in simple terms");
+    fireEvent.click(suggestion);
+
+    const textarea = screen.getByPlaceholderText(/Ask anything.../i);
+    expect(textarea.value).toBe("Explain in simple terms");
+  });
+
+  test("clears input text or blurs focus when Escape key is pressed", () => {
+    render(<ChatWindow messages={[]} loading={false} onSend={vi.fn()} sessionId="s1" />);
+
+    const textarea = screen.getByPlaceholderText(/Ask anything.../i);
+    
+    fireEvent.change(textarea, { target: { value: "Draft message" } });
+    fireEvent.keyDown(textarea, { key: "Escape" });
+    expect(textarea.value).toBe("");
+  });
+
+  test("submits input content on Enter and bypasses on Shift+Enter", () => {
+    const onSendSpy = vi.fn();
+    render(<ChatWindow messages={[]} loading={false} onSend={onSendSpy} sessionId="s1" />);
+
+    const textarea = screen.getByPlaceholderText(/Ask anything.../i);
+
+    fireEvent.change(textarea, { target: { value: "Line 1\n" } });
+    fireEvent.keyDown(textarea, { key: "Enter", shiftKey: true });
+    expect(onSendSpy).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(textarea, { key: "Enter", shiftKey: false });
+    expect(onSendSpy).toHaveBeenCalledWith("Line 1");
+    expect(textarea.value).toBe("");
+  });
+});
+
+// --- SUITE 4: SKELETON LOADING (#542) ---
 describe("ChatWindow Skeleton Loading Tests (#542)", () => {
   test("renders loading skeleton when loading is true and no message is streaming", () => {
     render(<ChatWindow messages={[]} loading={true} onSend={vi.fn()} sessionId="test-1" />);
@@ -194,7 +189,7 @@ describe("ChatWindow Core Regressions (#751)", () => {
 });
 
 // --- SUITE 6: COPY FEEDBACK SUITE (#750) ---
-describe("ChatWindow Copy Feedback (#750)", () => {
+describe('ChatWindow Copy Feedback (#750)', () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });

@@ -16,20 +16,18 @@ import sqlite3
 import uuid
 
 import pytest
-
-import services.db_service as db_service
+from services import db_service
 from services.db_service import (
     backup_db,
     create_session,
     get_messages_full,
     get_session,
+    get_settings,
     init_db,
     restore_db,
     save_message,
     save_setting,
-    get_settings,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixture: isolated temporary database

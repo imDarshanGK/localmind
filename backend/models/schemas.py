@@ -1,9 +1,9 @@
 """Pydantic v2 schemas for LocalMind API."""
 
-from pydantic import BaseModel, Field, field_validator
-from typing import Optional, List
 from datetime import datetime
 from enum import Enum
+
+from pydantic import BaseModel, Field, field_validator
 
 
 class SourceChunk(BaseModel):
@@ -28,9 +28,9 @@ class MessageRole(str, Enum):
 class ChatMessage(BaseModel):
     role: MessageRole
     content: str
-    timestamp: Optional[datetime] = None
-    sources: List[SourceChunk] = []
-    benchmarks: Optional[dict] = None
+    timestamp: datetime | None = None
+    sources: list[SourceChunk] = []
+    benchmarks: dict | None = None
 
     @field_validator("sources", mode="before")
     @classmethod
@@ -61,15 +61,15 @@ class ChatRequest(BaseModel):
     use_documents: bool = True
     temperature: float = Field(default=0.7, ge=0.0, le=2.0)
     language: str = "en"
-    resume_offset: Optional[int] = 0
+    resume_offset: int | None = 0
 
 
 class ChatResponse(BaseModel):
     reply: str
     session_id: str
     model: str
-    sources: List[SourceChunk] = []
-    tokens_used: Optional[int] = None
+    sources: list[SourceChunk] = []
+    tokens_used: int | None = None
 
 
 class UploadResponse(BaseModel):
@@ -93,9 +93,9 @@ class SessionCreate(BaseModel):
 
 
 class SessionUpdate(BaseModel):
-    title: Optional[str] = None
-    model: Optional[str] = None
-    language: Optional[str] = None
+    title: str | None = None
+    model: str | None = None
+    language: str | None = None
 
 
 class SessionOut(BaseModel):
@@ -111,14 +111,14 @@ class SessionOut(BaseModel):
 class PluginRun(BaseModel):
     plugin: str
     input: str
-    session_id: Optional[str] = None
+    session_id: str | None = None
 
 
 class PluginResult(BaseModel):
     plugin: str
     output: str
     success: bool
-    error: Optional[str] = None
+    error: str | None = None
 
 
 class AppSettings(BaseModel):
@@ -143,12 +143,12 @@ class SessionRenameItem(BaseModel):
     new_title: str
 
 class BulkSessionRenameRequest(BaseModel):
-    sessions: List[SessionRenameItem]
+    sessions: list[SessionRenameItem]
 
 class PromptTemplateCreate(BaseModel):
     prompt_title: str = Field(..., min_length=1, max_length=200)
     prompt: str = Field(..., min_length=1)
 
 class PromptTemplateUpdate(BaseModel):
-    prompt_title: Optional[str] = None
-    prompt: Optional[str] = None
+    prompt_title: str | None = None
+    prompt: str | None = None

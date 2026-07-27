@@ -3,21 +3,23 @@ RAG Service v2 — LangChain + ChromaDB + sentence-transformers
 Supports: PDF, TXT, CSV, DOCX, MD, HTML, SRT, VTT
 """
 
-import os
 import logging
+import os
 import time
 from pathlib import Path
+
 import chromadb
 from chromadb.config import Settings
-from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import (
-        PyPDFLoader, TextLoader, UnstructuredHTMLLoader,
+    PyPDFLoader,
+    TextLoader,
+    UnstructuredHTMLLoader,
 )
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from sentence_transformers import SentenceTransformer
+from services.citation_utils import build_sources
 from services.csv_loader import CleanCSVLoader
 from services.docx_loader import DocxWithTablesLoader
-from sentence_transformers import SentenceTransformer
-
-from services.citation_utils import build_sources
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +53,7 @@ def _collection(session_id: str):
     )
 
 
-def index_document(file_path: str, session_id: str, doc_id: int = None) -> int:
+def index_document(file_path: str, session_id: str, doc_id: int | None = None) -> int:
     ext = Path(file_path).suffix.lower()
     loader_cls = LOADERS.get(ext)
     if not loader_cls:
@@ -125,8 +127,9 @@ def delete_session_index(session_id: str):
     """Remove all vectors for a session."""
     try:
         chroma_client.delete_collection(f"lm_{session_id.replace('-', '_')}")
-    except Exception:
-        pass
+    except Exception as e:  # noqa: BLE001
+        logger.warning("Could not delete ChromaDB collection for session %s: %s", session_id, e)
+
 
 
 def get_indexed_count(session_id: str) -> int:
