@@ -12,13 +12,13 @@
 [![React](https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev)
 [![Ollama](https://img.shields.io/badge/Ollama-Local_LLM-black?style=flat-square)](https://ollama.ai)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
-[![SSoC 2026](https://img.shields.io/badge/SSoC-2026-blueviolet?style=flat-square)](https://ssoc.dev)
+![SSoC 2026](https://img.shields.io/badge/SSoC-2026-blueviolet?style=flat-square)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square)](CONTRIBUTING.md)
 [![Discord](https://img.shields.io/badge/Discord-Join%20Community-5865F2?style=flat-square&logo=discord&logoColor=white)](https://discord.gg/gvTUuMXk)
 
 <br/>
 
-[Quick Start](#quick-start) · [Features](#features) · [Tech Stack](#tech-stack) · [Troubleshooting](#macos-install-troubleshooting) · [Contributing](#contributing) · [Screenshots](#screenshots)
+[Quick Start](#quick-start) · [Features](#all-features) · [Tech Stack](#tech-stack) · [Troubleshooting](#macos-install-troubleshooting) · [Contributing](#-contributing) · [Screenshots](docs/screenshots.md)
 
 ---
 
@@ -63,7 +63,7 @@
 
 ---
 
-## 🛠 Tech Stack
+## Tech Stack
 
 ```text
 ┌────────────────────────────────────────────────┐
@@ -92,7 +92,7 @@
 ollama pull llama3
 
 # 2. Clone and start
-git clone https://github.com/yourusername/localmind.git
+git clone https://github.com/imDarshanGK/localmind.git
 cd localmind && docker compose up
 
 # 3. Open browser
@@ -102,7 +102,7 @@ open http://localhost:3000
 ### Option 2 - Manual Setup
 
 ```bash
-git clone https://github.com/yourusername/localmind.git
+git clone https://github.com/imDarshanGK/localmind.git
 cd localmind
 
 # Backend
@@ -135,6 +135,47 @@ VITE_API_BASE_URL=https://<your-backend>.onrender.com/api
 ```
 
 The included `render.yaml` defines a backend web service and a frontend static site for the same repo.
+
+### Embeddings Cache Deployment
+
+To prevent cold-start latency when users upload documents for the first time after a build or deployment, pre-download and warm up the SentenceTransformer inference weights (`all-MiniLM-L6-v2`) in your build pipeline or deployment environment.
+
+```bash
+# Pre-warm sentence-transformers weights cache before starting backend server
+cd backend
+python warmup.py
+```
+
+Set the `HF_HOME` environment variable if storing model cache in persistent volumes across container builds or cloud deployments (defaulting to `~/.cache/huggingface`).
+
+#### Build and deploy config validation
+
+Before opening a deployment PR or triggering a hosted build, validate the config and cache state that the docs and deploy files depend on:
+
+```bash
+# Validate local Docker Compose syntax and service wiring
+docker compose config --quiet
+
+# Validate Vercel's JSON deploy config
+python -m json.tool vercel.json > /dev/null
+
+# Validate the frontend build used by Render and Vercel
+cd frontend
+npm install
+npm run build
+
+# Pre-warm and validate the backend embeddings cache
+cd ../backend
+python warmup.py
+```
+
+Check these environment values before deploy:
+
+- Backend: `OLLAMA_HOST` must point at a reachable Ollama server, `DEFAULT_MODEL` must be pulled on that server, and `CORS_ORIGINS` must list the exact frontend origin without a path.
+- Embeddings Cache: pre-warm sentence-transformers weights cache with `python warmup.py` in the backend directory to prevent first-request cold-boot latency.
+- Frontend: `VITE_API_BASE_URL` must point at the deployed backend API and include `/api`.
+- Render: keep `render.yaml` aligned with the documented backend `healthCheckPath` (`/health`) and frontend build command (`npm install && npm run build`).
+- Vercel: keep `vercel.json` aligned with the documented frontend output directory (`frontend/dist`) and build command (`cd frontend && npm run build`).
 
 ## macOS Install Troubleshooting
 
@@ -443,6 +484,7 @@ Run the following command within your active virtual environment inside the back
 ```bash
 cd backend
 python warmup.py
+```
 
 ## 🤝 Contributing
 
@@ -450,7 +492,7 @@ python warmup.py
 2. Make changes → Write tests → Commit (`git commit -m "feat: ..."`)
 3. Push → Open Pull Request
 
-Issues labeled [`good-first-issue`](https://github.com/yourusername/localmind/issues?q=label%3Agood-first-issue) are perfect for beginners!
+Issues labeled [`good-first-issue`](https://github.com/imDarshanGK/localmind/issues?q=label%3Agood-first-issue) are perfect for beginners!
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide.
 
@@ -473,11 +515,11 @@ If LocalMind helped you, please star the repo. ⭐✨🚀
 Built something cool with LocalMind? We'd love to see it! Open a Pull Request to add your project, tutorial, or integration to this list.
 
 ### 🛠️ Projects & Integrations
-* **[Community projects will appear here.]** - A brief 1-2 sentence description of what your integration does. (By [@yourusername](https://github.com/yourusername))
-* *Contributions welcome! Add your tool here.*
+- **[Community projects will appear here.]** - A brief 1-2 sentence description of what your integration does. (By @yourusername)
+- *Contributions welcome! Add your tool here.*
 
 ### 📚 Community Articles & Tutorials
-* *Have you written a blog post or recorded a video setup guide? Share it with the community here!*
+- *Have you written a blog post or recorded a video setup guide? Share it with the community here!*
 
 ---
 
@@ -493,4 +535,5 @@ pip install pip-audit
 
 # Run the vulnerability audit against your requirements file
 pip-audit -r requirements.txt
+```
 </div>

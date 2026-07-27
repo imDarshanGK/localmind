@@ -1,6 +1,5 @@
 import sqlite3
 
-
 from backend.services.db_service import get_db
 
 

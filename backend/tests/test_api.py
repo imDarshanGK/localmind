@@ -1,15 +1,14 @@
 """LocalMind v2 Tests — run: pytest -v"""
 
 import json
-import tempfile
+import logging
 import os
+import tempfile
 from unittest.mock import AsyncMock, patch
-
-from fastapi.testclient import TestClient
 
 import services.db_service as db
 from app import app
-
+from fastapi.testclient import TestClient
 
 _tmp = tempfile.mktemp(suffix=".db")
 db.DB_PATH = _tmp
@@ -325,13 +324,25 @@ def test_get_settings():
     r = client.get("/api/settings/")
     assert r.status_code == 200
     assert "default_model" in r.json()
+def test_save_settings(caplog):
+    with caplog.at_level(logging.INFO, logger="routes.settings"):
+        r = client.put(
+            "/api/settings/",
+            json={
+                "default_model": "mistral",
+                "default_language": "hi",
+                "temperature": 0.5,
+                "max_history_turns": 8,
+                "rag_top_k": 3,
+                "theme": "dark",
+            },
+        )
 
-def test_save_settings():
-    r = client.put("/api/settings/", json={
-        "default_model":"mistral","default_language":"hi",
-        "temperature":0.5,"max_history_turns":8,"rag_top_k":3,"theme":"dark"
-    })
     assert r.json()["default_model"] == "mistral"
+    assert any(
+        "Model switched from" in record.getMessage()
+        for record in caplog.records
+    )
 
 
 # ─── Models (mocked) ─────────────────────────────────────

@@ -1,5 +1,6 @@
 from backend.json_validator import JSONValidator, PluginResponseValidator
 
+
 def test_valid_response():
     validator = JSONValidator("plugin_response")
     data = {
@@ -21,7 +22,7 @@ def test_invalid_status():
 def test_missing_required_field():
     validator = JSONValidator("plugin_response")
     data = {"extra_field": "value"}
-    is_valid, error, _ = validator.validate(data)
+    is_valid, _error, _ = validator.validate(data)
     assert is_valid is False
 
 def test_confidence_range():
@@ -30,7 +31,7 @@ def test_confidence_range():
         "status": "success",
         "data": {"confidence": 1.5}
     }
-    is_valid, error, _ = validator.validate(data)
+    is_valid, _error, _ = validator.validate(data)
     assert is_valid is False
 
 def test_plugin_validator():

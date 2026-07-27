@@ -92,6 +92,43 @@ describe("PluginsPanel Interaction Tests (#595)", () => {
     });
   });
 
+  test("copies plugin output to clipboard and displays 'Copied!' feedback", async () => {
+    const writeTextMock = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, {
+      clipboard: {
+        writeText: writeTextMock,
+      },
+    });
+
+    api.runPlugin.mockResolvedValue({ success: true, output: "42" });
+
+    render(<PluginsPanel sessionId="test-session" onClose={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("plugin-btn-calculator")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId("plugin-btn-calculator"));
+
+    const textarea = screen.getByTestId("plugin-input-textarea");
+    fireEvent.change(textarea, { target: { value: "6 * 7" } });
+
+    const runBtn = screen.getByTestId("run-plugin-btn");
+    fireEvent.click(runBtn);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("plugin-output-display")).toHaveTextContent("42");
+    });
+
+    const copyBtn = screen.getByRole("button", { name: /Copy/i });
+    fireEvent.click(copyBtn);
+
+    expect(writeTextMock).toHaveBeenCalledWith("42");
+    await waitFor(() => {
+      expect(screen.getByText("Copied!")).toBeInTheDocument();
+    });
+  });
+
   test("handles plugin execution failure and renders error message", async () => {
     api.runPlugin.mockResolvedValueOnce({ success: false, error: "Syntax Error in formula" });
 
@@ -123,14 +160,12 @@ describe("PluginsPanel Interaction Tests (#595)", () => {
   test("renders the plugins panel header title and info tooltip icon", async () => {
     render(<PluginsPanel sessionId="test-session" onClose={vi.fn()} />);
 
-    expect(screen.getByText(/Plugins/i)).toBeInTheDocument();
+    expect(screen.getByText(/Plugins Workspace/i)).toBeInTheDocument();
 
-    // Verify info button trigger renders
     const helpButton = screen.getByLabelText(/Plugins panel information description/i);
     expect(helpButton).toBeInTheDocument();
     expect(helpButton.textContent.trim()).toBe("i");
 
-    // Verify tooltip text is rendered in DOM
     const helpText = screen.getByText(/Plugins Workspace Help:/i);
     expect(helpText).toBeInTheDocument();
   });
@@ -208,30 +243,5 @@ describe("PluginsPanel View State & Persistence Suite (#592)", () => {
 
     expect(localStorage.setItem).toHaveBeenCalledWith("plugins-panel-selected:test-session-4", "calculator");
     expect(screen.getByText("Performs math evaluation")).toBeInTheDocument();
-  });
-
-  it("executes plugin action successfully and presents output text", async () => {
-    api.runPlugin.mockResolvedValueOnce({ success: true, output: "42" });
-
-    render(<PluginsPanel sessionId="test-session-5" onClose={vi.fn()} />);
-
-    await waitFor(() => expect(screen.getByText("Calculator")).toBeInTheDocument());
-
-    fireEvent.click(screen.getByText("Calculator"));
-
-    const textarea = screen.getByPlaceholderText(/Enter input for Calculator.../i);
-    fireEvent.change(textarea, { target: { value: "6 * 7" } });
-
-    const runBtn = screen.getByRole("button", { name: "Run Calculator" });
-    fireEvent.click(runBtn);
-
-    await waitFor(() => {
-      expect(api.runPlugin).toHaveBeenCalledWith({
-        plugin: "calculator",
-        input: "6 * 7",
-        session_id: "test-session-5",
-      });
-      expect(screen.getByText("42")).toBeInTheDocument();
-    });
   });
 });
