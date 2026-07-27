@@ -1,6 +1,7 @@
 import asyncio
 import time
 
+
 class StreamBuffer:
     def __init__(self, session_id: str, prompt: str):
         self.session_id = session_id
@@ -42,7 +43,7 @@ async def background_generator(buffer):
         for listener in list(buffer.listeners):
             await listener.put({"done": True})
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"Error: {e}")
 
 async def run_tests():

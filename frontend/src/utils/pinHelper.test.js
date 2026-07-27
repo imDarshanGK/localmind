@@ -1,34 +1,49 @@
-import assert from "assert";
+import { describe, test, expect, beforeEach } from "vitest";
 import { getPinnedSessions, toggleSessionPin } from "./pinHelper.js";
 
-// Mock localStorage for the Node.js test environment
-const mockStorage = {};
+// Mock localStorage cleanly inside the test scope
+let mockStorage = {};
 global.localStorage = {
   getItem: (key) => mockStorage[key] || null,
   setItem: (key, value) => { mockStorage[key] = String(value); },
   removeItem: (key) => { delete mockStorage[key]; },
-  clear: () => { for (const k in mockStorage) delete mockStorage[k]; }
+  clear: () => { mockStorage = {}; }
 };
 
-// Test 1: getPinnedSessions returns empty array initially
-const initialPins = getPinnedSessions();
-assert.deepStrictEqual(initialPins, [], "Initial pinned sessions should be an empty array");
+describe("Pin Helper Suite", () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
 
-// Test 2: toggleSessionPin adds a new session
-const id1 = "session-1";
-const pinsAfterAdd = toggleSessionPin(id1);
-assert.deepStrictEqual(pinsAfterAdd, [id1], "Toggling an unpinned session should add it to the pinned list");
-assert.deepStrictEqual(getPinnedSessions(), [id1], "State should persist to localStorage");
+  test("returns an empty array initially when no sessions are pinned", () => {
+    expect(getPinnedSessions()).toEqual([]);
+  });
 
-// Test 3: toggleSessionPin removes an existing session
-const pinsAfterRemove = toggleSessionPin(id1);
-assert.deepStrictEqual(pinsAfterRemove, [], "Toggling a pinned session should remove it from the pinned list");
-assert.deepStrictEqual(getPinnedSessions(), [], "Removal should persist to localStorage");
+  test("adds a new session to the pinned list and persists it to storage", () => {
+    const id1 = "session-1";
+    const pinsAfterAdd = toggleSessionPin(id1);
+    
+    expect(pinsAfterAdd).toEqual([id1]);
+    expect(getPinnedSessions()).toEqual([id1]);
+  });
 
-// Test 4: Multiple pins
-toggleSessionPin("session-A");
-toggleSessionPin("session-B");
-const finalPins = getPinnedSessions();
-assert.deepStrictEqual(finalPins, ["session-A", "session-B"], "Should support multiple pinned sessions");
+  test("removes an existing pinned session when toggled again", () => {
+    const id1 = "session-1";
+    
+    // Pin it first
+    toggleSessionPin(id1);
+    
+    // Unpin it
+    const pinsAfterRemove = toggleSessionPin(id1);
+    
+    expect(pinsAfterRemove).toEqual([]);
+    expect(getPinnedSessions()).toEqual([]);
+  });
 
-console.log("All pin helper unit tests passed successfully!");
+  test("supports pinning multiple sessions independently", () => {
+    toggleSessionPin("session-A");
+    toggleSessionPin("session-B");
+    
+    expect(getPinnedSessions()).toEqual(["session-A", "session-B"]);
+  });
+});

@@ -38,3 +38,21 @@ The cache operations are logged at the `DEBUG` level. You can verify the cache b
 - `CACHE EXPIRED: {model_name}`: Indicates the TTL expired and the entry was evicted.
 
 Unit tests covering cache hits, misses, expiration, and API fallbacks are located in `backend/tests/test_model_cache.py`.
+
+---
+
+## Embeddings Cache Warmup & Deployment
+
+In addition to LLM model metadata caching, LocalMind utilizes `sentence-transformers` (`all-MiniLM-L6-v2`) for local RAG vector embeddings.
+
+To prevent cold-start latency when users upload documents for the first time, pre-warm the embeddings cache in your build and deployment environment:
+
+```bash
+cd backend
+python warmup.py
+```
+
+### Build & Deployment Guidelines
+- **Cold-Start Elimination**: Executing `python warmup.py` ensures model weights are loaded and verified prior to web server traffic.
+- **Cache Persistence**: The model weights are stored in the Hugging Face cache directory (configured via `HF_HOME`, defaulting to `~/.cache/huggingface`). Mount this directory as a persistent volume in Docker/cloud environments to preserve cached weights across container restarts.
+

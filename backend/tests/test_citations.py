@@ -12,10 +12,9 @@ Covers:
 import tempfile
 from unittest.mock import AsyncMock, patch
 
-from fastapi.testclient import TestClient
-
 import services.db_service as db
 from app import app
+from fastapi.testclient import TestClient
 from models.schemas import ChatMessage, MessageRole, SourceChunk
 
 # ─── Shared test client ──────────────────────────────────────────
@@ -28,7 +27,7 @@ client = TestClient(app)
 
 # ─── _build_sources() pure helper ───────────────────────────────
 # Import only the pure helper — no chromadb / sentence_transformers needed.
-from services.citation_utils import build_sources  # noqa: E402
+from services.citation_utils import build_sources
 
 
 class TestBuildSources:

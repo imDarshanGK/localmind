@@ -1,6 +1,14 @@
 import os
+
 from services import db_service
-from services.db_service import get_db, _maybe_vacuum, _get_deleted_counter, run_vacuum, DB_PATH
+from services.db_service import (
+    DB_PATH,
+    _get_deleted_counter,
+    _maybe_vacuum,
+    get_db,
+    run_vacuum,
+)
+
 
 def test_deleted_counter_increments():
     with get_db() as conn:

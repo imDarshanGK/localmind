@@ -2,14 +2,15 @@
 Ollama Service — Local LLM inference with streaming support
 """
 
+import asyncio
+import json
 import logging
 import os
+from collections.abc import AsyncGenerator
+
 import httpx
-import json
-import asyncio
-from typing import AsyncGenerator
-from utils.retry import with_retry
 from utils.cache import TTLCache
+from utils.retry import with_retry
 
 logger = logging.getLogger(__name__)
 
@@ -62,13 +63,17 @@ async def chat(
         "model": model,
         "messages": messages,
         "stream": False,
-        "options": {"temperature": temperature, "top_p": 0.9, "num_predict": 2048},
+        "options": {
+            "temperature": temperature,
+            "top_p": 0.9,
+            "num_predict": 2048,
+        },
     }
+
     async with httpx.AsyncClient(timeout=TIMEOUT) as client:
         response = await client.post(f"{OLLAMA_BASE_URL}/api/chat", json=payload)
         response.raise_for_status()
         return response.json()["message"]["content"]
-
 
 async def chat_stream(
     message: str,
@@ -96,10 +101,12 @@ async def chat_stream(
     while attempt <= actual_max_attempts:
         is_transient = False
         try:
-            async with httpx.AsyncClient(timeout=TIMEOUT) as client:
-                async with client.stream("POST", f"{OLLAMA_BASE_URL}/api/chat", json=payload) as resp:
-                    resp.raise_for_status()
-                    async for line in resp.aiter_lines():
+            async with (
+                httpx.AsyncClient(timeout=TIMEOUT) as client,
+                client.stream("POST", f"{OLLAMA_BASE_URL}/api/chat", json=payload) as resp,
+            ):
+                resp.raise_for_status()
+                async for line in resp.aiter_lines():
                         if line.strip():
                             try:
                                 data = json.loads(line)
@@ -154,7 +161,7 @@ async def list_models() -> list[dict]:
                     "modified_at": m.get("modified_at", ""),
                 })
             return models
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.warning(f"Could not list models: {e}")
             return []
 
@@ -199,13 +206,15 @@ async def pull_model(model_name: str) -> AsyncGenerator[str, None]:
     while attempt <= actual_max_attempts:
         is_transient = False
         try:
-            async with httpx.AsyncClient(timeout=600.0) as client:
-                async with client.stream(
+            async with (
+                httpx.AsyncClient(timeout=600.0) as client,
+                client.stream(
                     "POST", f"{OLLAMA_BASE_URL}/api/pull",
                     json={"name": model_name, "stream": True}
-                ) as resp:
-                    resp.raise_for_status()
-                    async for line in resp.aiter_lines():
+                ) as resp,
+            ):
+                resp.raise_for_status()
+                async for line in resp.aiter_lines():
                         if line.strip():
                             yield line + "\n"
             break
@@ -238,7 +247,7 @@ async def delete_model(model_name: str) -> bool:
                 json={"name": model_name}
             )
             return resp.status_code == 200
-        except Exception:
+        except Exception:  # noqa: BLE001
             return False
 
 
@@ -247,5 +256,5 @@ async def is_ollama_running() -> bool:
         try:
             resp = await client.get(f"{OLLAMA_BASE_URL}/api/tags")
             return resp.status_code == 200
-        except Exception:
+        except Exception:  # noqa: BLE001
             return False

@@ -76,8 +76,8 @@ async def clean_expired_streams():
                     ACTIVE_STREAMS.pop(session_id, None)
         except asyncio.CancelledError:
             break
-        except Exception:
-            pass
+        except Exception as e:  # noqa: BLE001
+            logger.warning("Stream cleanup error: %s", e)
 
 
 async def background_generator(buffer: StreamBuffer, req, context, history, sources, start_time: float):
@@ -138,7 +138,7 @@ async def background_generator(buffer: StreamBuffer, req, context, history, sour
                 "total_tokens": buffer.token_count
             })
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         buffer.error = str(e)
         buffer.completed_at = time.time()
         # Save partial response
@@ -201,8 +201,8 @@ async def api_toggle_reaction(payload: ReactionToggleRequest):
             "message_id": payload.message_id,
             "reactions": updated_reactions
         }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to toggle reaction: {str(e)}")
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"Failed to toggle reaction: {e!s}")
 
 
 @router.get("/{session_id}/messages")
@@ -216,8 +216,8 @@ async def get_session_messages(session_id: str):
             msg["reactions"] = reactions_map.get(msg["id"], [])
             
         return {"messages": messages}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch session messages: {str(e)}")
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"Failed to fetch session messages: {e!s}")
 
 
 # ─── Standard Chat Operations ───────────────────────────────────────────────
@@ -300,30 +300,26 @@ async def chat_stream(req: ChatRequest):
 
     # 2. Check completed stream in SQLite
     history = db_service.get_history(req.session_id)
-    if is_resume and history:
-        if history[-1]["role"] == "assistant" and len(history) >= 2:
-            prev_msg = history[-2]
-            if prev_msg["role"] == "user" and prev_msg["content"] == req.message:
-                async def stream_from_db():
-                    full_content = history[-1]["content"]
-                    sources = []
-                    benchmarks = None
-                    messages_full = db_service.get_messages_full(req.session_id)
-                    if messages_full:
-                        sources = messages_full[-1].get("sources", [])
-                        benchmarks = messages_full[-1].get("benchmarks", None)
-                    if resume_offset < len(full_content):
-                        yield f"data: {json.dumps({'token': full_content[resume_offset:]})}\n\n"
-                    yield f"data: {json.dumps({'done': True, 'sources': sources, 'benchmarks': benchmarks})}\n\n"
-                return StreamingResponse(stream_from_db(), media_type="text/event-stream")
+    if is_resume and history and history[-1]["role"] == "assistant" and len(history) >= 2:
+        prev_msg = history[-2]
+        if prev_msg["role"] == "user" and prev_msg["content"] == req.message:
+            async def stream_from_db():
+                full_content = history[-1]["content"]
+                sources = []
+                benchmarks = None
+                messages_full = db_service.get_messages_full(req.session_id)
+                if messages_full:
+                    sources = messages_full[-1].get("sources", [])
+                    benchmarks = messages_full[-1].get("benchmarks", None)
+                if resume_offset < len(full_content):
+                    yield f"data: {json.dumps({'token': full_content[resume_offset:]})}\n\n"
+                yield f"data: {json.dumps({'done': True, 'sources': sources, 'benchmarks': benchmarks})}\n\n"
+            return StreamingResponse(stream_from_db(), media_type="text/event-stream")
 
     # 3. Deduplicate user message
     user_msg_exists = False
-    if history:
-        if history[-1]["role"] == "user" and history[-1]["content"] == req.message:
-            user_msg_exists = True
-        elif len(history) >= 2 and history[-1]["role"] == "assistant" and history[-2]["role"] == "user" and history[-2]["content"] == req.message:
-            user_msg_exists = True
+    if history and (history[-1]["role"] == "user" and history[-1]["content"] == req.message or len(history) >= 2 and history[-1]["role"] == "assistant" and history[-2]["role"] == "user" and history[-2]["content"] == req.message):
+        user_msg_exists = True
 
     db_service.create_session(req.session_id, model=req.model, language=req.language)
     if not user_msg_exists:
@@ -385,7 +381,7 @@ async def api_delete_session(session_id: str):
                         file_path.unlink()
                         logger.info("Removed orphaned export file: %s", file_path.name)
                         deleted_files_count += 1
-                    except Exception as file_err:
+                    except Exception as file_err:  # noqa: BLE001
                         logger.error("Failed to delete file %s: %s", file_path.name, str(file_err))
 
         return {
@@ -394,9 +390,9 @@ async def api_delete_session(session_id: str):
             "orphaned_files_cleaned": deleted_files_count
         }
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.error("Failed to delete session %s: %s", session_id, str(e))
-        raise HTTPException(status_code=500, detail=f"Failed to delete session: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete session: {e!s}")
 
 
 # ─── Shareable Read-Only Session Links (Issue #270) ───────────
@@ -413,7 +409,7 @@ async def api_create_share_link(session_id: str):
         }
     except ValueError as val_err:
         raise HTTPException(status_code=404, detail=str(val_err))
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.error("Failed to generate shared snapshot: %s", str(e))
         raise HTTPException(status_code=500, detail="Internal server error")
 
