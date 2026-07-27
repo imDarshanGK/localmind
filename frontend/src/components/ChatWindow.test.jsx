@@ -42,7 +42,6 @@ describe("ChatWindow Empty State Guidance (#543)", () => {
   test("renders empty state guidance container and feature badges when messages are empty", () => {
     render(<ChatWindow messages={[]} loading={false} onSend={vi.fn()} sessionId="s1" />);
 
-    expect(screen.getByTestId("empty-state-guidance")).toBeInTheDocument();
     expect(screen.getByText("LocalMind is ready")).toBeInTheDocument();
     expect(screen.getByText("💡 Select a suggestion below")).toBeInTheDocument();
     expect(screen.getByText("📄 Upload documents to query")).toBeInTheDocument();
@@ -53,11 +52,44 @@ describe("ChatWindow Empty State Guidance (#543)", () => {
     const mockMessages = [{ id: "m1", role: "user", content: "Hello LocalMind" }];
     render(<ChatWindow messages={mockMessages} loading={false} onSend={vi.fn()} sessionId="s1" />);
 
-    expect(screen.queryByTestId("empty-state-guidance")).not.toBeInTheDocument();
+    expect(screen.queryByText("💡 Select a suggestion below")).not.toBeInTheDocument();
   });
 });
 
-// --- SUITE 2: MOBILE LAYOUT & RESPONSIVENESS (#546) ---
+// --- SUITE 2: TOOLTIP HELP (#549) ---
+describe("ChatWindow Tooltip Help (#549)", () => {
+  test("renders descriptive title tooltips on interactive and informative elements", () => {
+    const mockMessages = [
+      { id: "m1", role: "user", content: "Test query" },
+      { id: "m2", role: "assistant", content: "Test response", sources: ["doc.pdf"] }
+    ];
+
+    render(<ChatWindow messages={mockMessages} loading={false} onSend={vi.fn()} sessionId="s1" />);
+
+    // Export format buttons
+    expect(screen.getByTitle("Export full conversation as .markdown")).toBeInTheDocument();
+    expect(screen.getByTitle("Export full conversation as .json")).toBeInTheDocument();
+    expect(screen.getByTitle("Export full conversation as .txt")).toBeInTheDocument();
+
+    // Source badges
+    expect(screen.getByTitle("Referenced document source: doc.pdf")).toBeInTheDocument();
+
+    // Textarea input and send button
+    expect(screen.getByTitle("Chat input area (Enter to send, Shift+Enter for new line)")).toBeInTheDocument();
+    expect(screen.getByTitle("Send message (Enter)")).toBeInTheDocument();
+
+    // Privacy notice
+    expect(screen.getByTitle("Privacy notice: All data is processed locally on your device")).toBeInTheDocument();
+  });
+
+  test("renders prompt suggestion tooltips when message log is empty", () => {
+    render(<ChatWindow messages={[]} loading={false} onSend={vi.fn()} sessionId="s1" />);
+
+    expect(screen.getByTitle('Insert prompt: "Summarize the uploaded document"')).toBeInTheDocument();
+  });
+});
+
+// --- SUITE 3: MOBILE LAYOUT & RESPONSIVENESS (#546) ---
 describe("ChatWindow Mobile Layout (#546)", () => {
   test("renders prompt suggestion grid with responsive single/double column classes", () => {
     render(<ChatWindow messages={[]} loading={false} onSend={vi.fn()} sessionId="s1" />);
@@ -80,7 +112,7 @@ describe("ChatWindow Mobile Layout (#546)", () => {
   });
 });
 
-// --- SUITE 3: KEYBOARD NAVIGATION & INPUT CONTROLS (#545) ---
+// --- SUITE 4: KEYBOARD NAVIGATION & INPUT CONTROLS (#545) ---
 describe("ChatWindow Keyboard Navigation & Core Controls (#545)", () => {
   test("allows navigating suggestion pills via Arrow keys", () => {
     render(<ChatWindow messages={[]} loading={false} onSend={vi.fn()} sessionId="s1" />);
@@ -136,7 +168,7 @@ describe("ChatWindow Keyboard Navigation & Core Controls (#545)", () => {
   });
 });
 
-// --- SUITE 4: SKELETON LOADING (#542) ---
+// --- SUITE 5: SKELETON LOADING (#542) ---
 describe("ChatWindow Skeleton Loading Tests (#542)", () => {
   test("renders loading skeleton when loading is true and no message is streaming", () => {
     render(<ChatWindow messages={[]} loading={true} onSend={vi.fn()} sessionId="test-1" />);
@@ -151,7 +183,7 @@ describe("ChatWindow Skeleton Loading Tests (#542)", () => {
   });
 });
 
-// --- SUITE 5: CORE REGRESSIONS (#751) ---
+// --- SUITE 6: CORE REGRESSIONS (#751) ---
 describe("ChatWindow Core Regressions (#751)", () => {
   describe("Message Stream Rendering Matrix", () => {
     const mockMessages = [
@@ -180,16 +212,16 @@ describe("ChatWindow Core Regressions (#751)", () => {
       const mockMessages = [{ id: "m1", role: "user", content: "Persist me" }];
       render(<ChatWindow messages={mockMessages} loading={false} onSend={vi.fn()} sessionId="session-abc" />);
       
-      const markdownBtn = screen.getByText("↓ .markdown");
-      fireEvent.click(markdownBtn);
+      expect(screen.getByText("↓ .markdown")).toBeInTheDocument();
+      fireEvent.click(screen.getByText("↓ .markdown"));
       
       expect(exportSession).toHaveBeenCalledWith("session-abc", "markdown");
     });
   });
 });
 
-// --- SUITE 6: COPY FEEDBACK SUITE (#750) ---
-describe('ChatWindow Copy Feedback (#750)', () => {
+// --- SUITE 7: COPY FEEDBACK SUITE (#550 / #750) ---
+describe('ChatWindow Copy Feedback', () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -199,7 +231,7 @@ describe('ChatWindow Copy Feedback (#750)', () => {
     vi.useRealTimers();
   });
 
-  test('should show checkmark icon / "Copy" state change on click and revert after 1.5 seconds', async () => {
+  test('should invoke navigator.clipboard.writeText and temporarily update copy feedback state', async () => {
     const mockMessages = [
       { id: 'msg-1', role: 'assistant', content: 'Hello from LocalMind!', streaming: false }
     ];
@@ -216,7 +248,7 @@ describe('ChatWindow Copy Feedback (#750)', () => {
       />
     );
 
-    const copyButton = screen.getByTitle('Copy response');
+    const copyButton = screen.getByTitle('Copy response to clipboard');
     fireEvent.click(copyButton);
 
     await act(async () => {
@@ -229,6 +261,6 @@ describe('ChatWindow Copy Feedback (#750)', () => {
       vi.advanceTimersByTime(1500);
     });
 
-    expect(screen.getByTitle('Copy response')).toBeInTheDocument();
+    expect(screen.getByTitle('Copy response to clipboard')).toBeInTheDocument();
   });
 });
