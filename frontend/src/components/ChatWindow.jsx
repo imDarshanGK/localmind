@@ -3,9 +3,30 @@ import { exportSession } from "../utils/api";
 import { AppLogoIcon, FileIcon, LockIcon } from "./Icons";
 
 export default function ChatWindow({ messages, loading, onSend, sessionId }) {
-  const [input, setInput] = useState("");
+  // Initialize draft input from localStorage for current session
+  const [input, setInput] = useState(() => {
+    if (!sessionId) return "";
+    return localStorage.getItem(`localmind_draft_${sessionId}`) || "";
+  });
+
   const bottomRef = useRef(null);
   const textareaRef = useRef(null);
+
+  // Sync draft from localStorage whenever sessionId changes
+  useEffect(() => {
+    if (!sessionId) return;
+    setInput(localStorage.getItem(`localmind_draft_${sessionId}`) || "");
+  }, [sessionId]);
+
+  // Persist input draft to localStorage whenever user types
+  useEffect(() => {
+    if (!sessionId) return;
+    if (input) {
+      localStorage.setItem(`localmind_draft_${sessionId}`, input);
+    } else {
+      localStorage.removeItem(`localmind_draft_${sessionId}`);
+    }
+  }, [input, sessionId]);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
@@ -13,6 +34,12 @@ export default function ChatWindow({ messages, loading, onSend, sessionId }) {
     if (!input.trim() || loading) return;
     onSend(input.trim());
     setInput("");
+    
+    // Clear draft from localStorage upon successful send
+    if (sessionId) {
+      localStorage.removeItem(`localmind_draft_${sessionId}`);
+    }
+
     if (textareaRef.current) { textareaRef.current.style.height = "auto"; }
   }
 
