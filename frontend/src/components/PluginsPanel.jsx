@@ -14,7 +14,13 @@ const PLUGIN_ICONS = {
 export default function PluginsPanel({ sessionId, onClose }) {
   const [plugins,  setPlugins]  = useState([]);
   const [selected, setSelected] = useState(null);
-  const [input,    setInput]    = useState("");
+  
+  // Persistent input state initialized from localStorage
+  const [input, setInput] = useState(() => {
+    if (!sessionId) return "";
+    return localStorage.getItem(`localmind_plugin_draft_${sessionId}`) || "";
+  });
+
   const [output,   setOutput]   = useState("");
   const [running,  setRunning]  = useState(false);
   const [error,    setError]    = useState("");
@@ -23,13 +29,36 @@ export default function PluginsPanel({ sessionId, onClose }) {
     getPlugins().then(d => setPlugins(d.plugins || [])).catch(()=>{});
   }, []);
 
+  // Re-sync input draft whenever sessionId changes
+  useEffect(() => {
+    if (!sessionId) return;
+    setInput(localStorage.getItem(`localmind_plugin_draft_${sessionId}`) || "");
+  }, [sessionId]);
+
+  // Persist plugin draft input to localStorage on edit
+  useEffect(() => {
+    if (!sessionId) return;
+    if (input) {
+      localStorage.setItem(`localmind_plugin_draft_${sessionId}`, input);
+    } else {
+      localStorage.removeItem(`localmind_plugin_draft_${sessionId}`);
+    }
+  }, [input, sessionId]);
+
   async function run() {
     if (!selected || !input.trim()) return;
     setRunning(true); setOutput(""); setError("");
     try {
       const r = await runPlugin({ plugin: selected.id, input, session_id: sessionId });
-      if (r.success) setOutput(r.output);
-      else setError(r.error || "Plugin failed");
+      if (r.success) {
+        setOutput(r.output);
+        // Clear saved draft from localStorage after successful execution
+        if (sessionId) {
+          localStorage.removeItem(`localmind_plugin_draft_${sessionId}`);
+        }
+      } else {
+        setError(r.error || "Plugin failed");
+      }
     } catch(e) { setError(e.message); }
     finally { setRunning(false); }
   }
