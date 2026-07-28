@@ -185,10 +185,28 @@ describe("ChatWindow Skeleton Loading Tests (#542)", () => {
 
 // --- SUITE 6: CORE REGRESSIONS (#751) ---
 describe("ChatWindow Core Regressions (#751)", () => {
+  describe("Empty Welcome State Framework", () => {
+    test("renders baseline readiness text and suggestions when message logs are empty", () => {
+      render(<ChatWindow messages={[]} loading={false} onSend={vi.fn()} sessionId="s1" />);
+      
+      expect(screen.getByText("LocalMind is ready")).toBeInTheDocument();
+      expect(screen.getByText("Summarize the uploaded document")).toBeInTheDocument();
+    });
+  });
+
+  test("does not render skeleton when loading is false", () => {
+    render(<ChatWindow messages={[]} loading={false} onSend={vi.fn()} sessionId="test-1" />);
+
+    expect(screen.queryByTestId("message-skeleton")).not.toBeInTheDocument();
+  });
+});
+
+// --- SUITE 6: CORE REGRESSIONS (#751) ---
+describe("ChatWindow Core Regressions (#751)", () => {
   describe("Message Stream Rendering Matrix", () => {
     const mockMessages = [
       { id: "m1", role: "user", content: "Hello world" },
-      { id: "m2", role: "assistant", content: "Hello User!", streaming: true, sources: ["doc1.pdf", "doc2.txt"] }
+      { id: "m2", role: "assistant", content: "Hello User!", streaming: true, sources: [{ source: "doc1.pdf" }, { source: "doc2.txt" }] }
     ];
 
     test("accurately reflects user/assistant visual variations and maps document sources", () => {
@@ -262,5 +280,84 @@ describe('ChatWindow Copy Feedback', () => {
     });
 
     expect(screen.getByTitle('Copy response to clipboard')).toBeInTheDocument();
+  });
+});
+
+// --- SUITE 8: INTERACTION TESTS (#551) ---
+describe("ChatWindow Interaction Tests (#551)", () => {
+  test("triggers onSend when clicking the Send button with non-empty input", () => {
+    const onSendSpy = vi.fn();
+    render(
+      <ChatWindow
+        messages={[]}
+        loading={false}
+        onSend={onSendSpy}
+        sessionId="session-interaction"
+      />
+    );
+
+    const textarea = screen.getByPlaceholderText(/Ask anything.../i);
+    const sendButton = screen.getByRole("button", { name: /Send/i });
+
+    expect(sendButton).toBeDisabled();
+
+    fireEvent.change(textarea, { target: { value: "Hello from interaction test" } });
+    expect(sendButton).not.toBeDisabled();
+
+    fireEvent.click(sendButton);
+
+    expect(onSendSpy).toHaveBeenCalledWith("Hello from interaction test");
+    expect(textarea.value).toBe("");
+  });
+
+  test("triggers onStop callback when computing and Stop button is clicked", () => {
+    const onStopSpy = vi.fn();
+    render(
+      <ChatWindow
+        messages={[]}
+        loading={true}
+        onSend={vi.fn()}
+        onStop={onStopSpy}
+        sessionId="session-interaction"
+      />
+    );
+
+    const stopButton = screen.getByRole("button", { name: /Stop/i });
+    expect(stopButton).toBeInTheDocument();
+
+    fireEvent.click(stopButton);
+    expect(onStopSpy).toHaveBeenCalledTimes(1);
+  });
+
+  test("filters rendered messages in real time based on search input", () => {
+    const mockMessages = [
+      { id: "msg-1", role: "user", content: "First query about Python" },
+      { id: "msg-2", role: "assistant", content: "Here is Python explanation" },
+      { id: "msg-3", role: "user", content: "Unrelated Docker text" }
+    ];
+
+    render(
+      <ChatWindow
+        messages={mockMessages}
+        loading={false}
+        onSend={vi.fn()}
+        sessionId="session-interaction"
+      />
+    );
+
+    const searchInput = screen.getByPlaceholderText(/Search messages.../i);
+
+    expect(screen.getByText("First query about Python")).toBeInTheDocument();
+    expect(screen.getByText("Unrelated Docker text")).toBeInTheDocument();
+
+    fireEvent.change(searchInput, { target: { value: "Python" } });
+
+    expect(screen.getByText("First query about Python")).toBeInTheDocument();
+    expect(screen.queryByText("Unrelated Docker text")).not.toBeInTheDocument();
+
+    const clearBtn = screen.getByRole("button", { name: /Clear search/i });
+    fireEvent.click(clearBtn);
+
+    expect(screen.getByText("Unrelated Docker text")).toBeInTheDocument();
   });
 });

@@ -287,7 +287,7 @@ export default function ChatWindow({ messages = [], loading = false, onSend, onD
 
   return (
     <main className="flex flex-col flex-1 overflow-hidden bg-gray-950 text-gray-100" aria-label="Chat Workspace">
-      {/* Export bar - wraps gracefully on mobile viewports */}
+      {/* Export bar */}
       {messages.length > 0 && (
         <header className="flex justify-end gap-1.5 sm:gap-2 px-3 sm:px-5 pt-2 flex-wrap" aria-label="Export options">
           {["markdown", "json", "txt"].map((f) => (
