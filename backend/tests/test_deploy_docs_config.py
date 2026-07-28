@@ -60,8 +60,6 @@ def test_build_deploy_docs_include_citation_merging_guidelines():
     assert "PREVIEW_MAX_CHARS" in citation_docs
     assert "ChatMessage.sources" in citation_docs
     assert "pytest tests/test_citations.py" in citation_docs
-
-
 def test_render_config_matches_documented_build_and_health_checks():
     readme = read_repo_file("README.md")
     render_config = read_repo_file("render.yaml")
