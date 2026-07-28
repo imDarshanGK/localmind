@@ -29,6 +29,18 @@ async def status():
     return {"ollama_running": running}
 
 
+@router.get("/{model_name}/info")
+async def get_model_info(model_name: str):
+    """Get detailed model metadata."""
+    if not await ollama_service.is_ollama_running():
+        raise HTTPException(503, "Ollama not running")
+    
+    info = await ollama_service.get_model_info(model_name)
+    if not info:
+        raise HTTPException(404, f"Model {model_name} not found")
+    return info
+
+
 @router.post("/{model_name}/pull")
 async def pull_model(model_name: str):
     """Stream model pull progress."""
