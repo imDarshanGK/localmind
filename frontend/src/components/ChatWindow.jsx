@@ -287,7 +287,7 @@ export default function ChatWindow({ messages = [], loading = false, onSend, onD
 
   return (
     <main className="flex flex-col flex-1 overflow-hidden bg-gray-950 text-gray-100" aria-label="Chat Workspace">
-      {/* Export bar - wraps gracefully on mobile viewports */}
+      {/* Export bar */}
       {messages.length > 0 && (
         <header className="flex justify-end gap-1.5 sm:gap-2 px-3 sm:px-5 pt-2 flex-wrap" aria-label="Export options">
           {["markdown", "json", "txt"].map((f) => (
@@ -345,6 +345,20 @@ export default function ChatWindow({ messages = [], loading = false, onSend, onD
               <p className="text-lg sm:text-xl font-semibold text-gray-200 mb-1">LocalMind is ready</p>
               <p className="text-xs sm:text-sm text-gray-400">100% private · runs offline · no cloud</p>
             </div>
+
+            {/* Feature Guidance Highlights */}
+            <div className="flex flex-wrap items-center justify-center gap-2 text-xs text-gray-400 max-w-md my-1">
+              <span className="bg-gray-900 border border-gray-800 rounded-full px-3 py-1">
+                💡 Select a suggestion below
+              </span>
+              <span className="bg-gray-900 border border-gray-800 rounded-full px-3 py-1">
+                📄 Upload documents to query
+              </span>
+              <span className="bg-gray-900 border border-gray-800 rounded-full px-3 py-1">
+                🔒 Encrypted & Local
+              </span>
+            </div>
+
             {!minimalMode && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2 sm:mt-4 max-w-lg w-full" role="group" aria-label="Prompt suggestions">
                 {SUGGESTIONS.map((s, index) => (
