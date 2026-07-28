@@ -19,6 +19,7 @@ def test_build_deploy_docs_include_config_validation_checklist():
     assert "cd frontend" in readme
     assert "npm run build" in readme
     assert "python warmup.py" in readme
+    assert "pytest tests/test_citations.py" in readme
 
     for snippet in ["OLLAMA_HOST", "DEFAULT_MODEL", "CORS_ORIGINS", "VITE_API_BASE_URL", "/api"]:
         assert snippet in readme
@@ -41,6 +42,24 @@ def test_build_deploy_docs_include_embeddings_cache_guidelines():
     assert "sentence-transformers" in model_cache_docs
     assert "python warmup.py" in model_cache_docs
     assert "HF_HOME" in model_cache_docs
+
+
+def test_build_deploy_docs_include_citation_merging_guidelines():
+    readme = read_repo_file("README.md")
+    citation_docs = read_repo_file("docs/citation-merging.md")
+
+    assert "### Citation Merging in RAG Deployment" in readme
+    assert "build_sources()" in readme
+    assert "backend/services/citation_utils.py" in readme
+    assert "docs/citation-merging.md" in readme
+    assert "pytest tests/test_citations.py" in readme
+    assert "Citation Merging: run backend citation unit tests" in readme
+
+    assert "# Citation Merging & RAG Deployment Guidelines" in citation_docs
+    assert "build_sources" in citation_docs
+    assert "PREVIEW_MAX_CHARS" in citation_docs
+    assert "ChatMessage.sources" in citation_docs
+    assert "pytest tests/test_citations.py" in citation_docs
 
 
 def test_render_config_matches_documented_build_and_health_checks():
