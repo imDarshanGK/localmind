@@ -34,8 +34,21 @@ from urllib.parse import urlparse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
+from prometheus_client import Counter
 
 logger = logging.getLogger(__name__)
+
+# Prometheus Metrics
+CSRF_REQUESTS = Counter(
+    "csrf_requests_total",
+    "Total number of requests processed by CSRF middleware",
+    ["status"]
+)
+CSRF_REJECTIONS = Counter(
+    "csrf_rejections_total",
+    "Total number of requests rejected by CSRF middleware",
+    ["method", "reason"]
+)
 
 # HTTP methods that do NOT change server state — always allowed.
 _SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
@@ -86,12 +99,14 @@ class OriginValidationMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next):
         if request.method in _SAFE_METHODS:
+            CSRF_REQUESTS.labels(status="skipped_safe_method").inc()
             return await call_next(request)
 
         origin = _origin_from_header(request)
 
         if origin is None:
             # No Origin / Referer — allow (same-origin or non-browser client).
+            CSRF_REQUESTS.labels(status="allowed").inc()
             return await call_next(request)
 
         if origin not in self._allowed:
@@ -101,9 +116,12 @@ class OriginValidationMiddleware(BaseHTTPMiddleware):
                 request.url.path,
                 origin,
             )
+            CSRF_REQUESTS.labels(status="rejected").inc()
+            CSRF_REJECTIONS.labels(method=request.method, reason="invalid_origin").inc()
             return JSONResponse(
                 {"detail": "CSRF check failed: origin not allowed"},
                 status_code=403,
             )
 
+        CSRF_REQUESTS.labels(status="allowed").inc()
         return await call_next(request)
