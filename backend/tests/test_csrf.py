@@ -204,3 +204,35 @@ def test_plugin_run_attacker_origin_blocked():
         headers={"Origin": "https://evil.com"},
     )
     assert r.status_code == 403
+
+
+# ── Prometheus metrics verification ──────────────────────────────────────────
+
+def test_prometheus_metrics():
+    from prometheus_client import REGISTRY
+    
+    # Get current values before the test
+    before_skipped = REGISTRY.get_sample_value('csrf_requests_total', {'status': 'skipped_safe_method'}) or 0.0
+    before_allowed = REGISTRY.get_sample_value('csrf_requests_total', {'status': 'allowed'}) or 0.0
+    before_rejected = REGISTRY.get_sample_value('csrf_requests_total', {'status': 'rejected'}) or 0.0
+    before_rejections = REGISTRY.get_sample_value('csrf_rejections_total', {'method': 'POST', 'reason': 'invalid_origin'}) or 0.0
+    
+    # 1. Trigger a skipped_safe_method
+    client.get("/api/sessions/")
+    after_skipped = REGISTRY.get_sample_value('csrf_requests_total', {'status': 'skipped_safe_method'}) or 0.0
+    assert after_skipped > before_skipped
+    
+    # 2. Trigger an allowed method
+    client.post("/api/sessions/", json={"title": "Metric allowed"})
+    after_allowed = REGISTRY.get_sample_value('csrf_requests_total', {'status': 'allowed'}) or 0.0
+    assert after_allowed > before_allowed
+    
+    # 3. Trigger a rejected method
+    r = client.post("/api/sessions/", json={"title": "Metric rejected"}, headers={"Origin": "https://evil.com"})
+    assert r.status_code == 403
+    
+    after_rejected = REGISTRY.get_sample_value('csrf_requests_total', {'status': 'rejected'}) or 0.0
+    assert after_rejected > before_rejected
+    
+    after_rejections = REGISTRY.get_sample_value('csrf_rejections_total', {'method': 'POST', 'reason': 'invalid_origin'}) or 0.0
+    assert after_rejections > before_rejections
