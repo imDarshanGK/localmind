@@ -407,24 +407,23 @@ def save_message(session_id: str, role: str, content: str, sources: list | None 
             "UPDATE sessions SET updated_at=datetime('now'), message_count=message_count+1 WHERE id=?",
             (session_id,),
         )
-        # Auto-title session from first user message with clean character threshold
+        # Auto-title session from first user message with grapheme and character threshold
         if role == "user":
             row = conn.execute(
                 "SELECT title FROM sessions WHERE id=?", (session_id,)
             ).fetchone()
 
-            MAX_TITLE_LENGTH = 50
             if row and row["title"] == "New Chat":
                 clean_content = content.strip()
-                if len(clean_content) > MAX_TITLE_LENGTH:
-                    # Truncate at whole word boundary if possible
-                    truncated = clean_content[:MAX_TITLE_LENGTH].rsplit(" ", 1)[0]
-                    title = (truncated if truncated else clean_content[:MAX_TITLE_LENGTH]) + "..."
+                if grapheme.length(clean_content) > 40:
+                    title = grapheme.slice(clean_content, start=0, end=40) + "..."
+                elif len(clean_content) > 50:
+                    truncated = clean_content[:50].rsplit(" ", 1)[0]
+                    title = (truncated if truncated else clean_content[:50]) + "..."
                 else:
                     title = clean_content
                 conn.execute("UPDATE sessions SET title=? WHERE id=?", (title, session_id))
-
-
+                
 def get_history(session_id: str, limit: int = 20) -> list[dict]:
     with get_db() as conn:
         rows = conn.execute(
