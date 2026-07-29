@@ -187,7 +187,7 @@ export default function PluginsPanel({ sessionId, onClose }) {
             Plugins Workspace
           </p>
 
-          {/* Interactive help tooltip */}
+          {/* Interactive help tooltip utility box (#593) */}
           <div className="group relative inline-block">
             <button
               type="button"
@@ -205,7 +205,9 @@ export default function PluginsPanel({ sessionId, onClose }) {
         </div>
 
         <button
+          type="button"
           onClick={onClose}
+          data-testid="close-panel-btn"
           className="text-gray-500 hover:text-gray-300 text-2xl md:text-lg leading-none p-1"
           aria-label="Close panel"
         >
@@ -215,13 +217,17 @@ export default function PluginsPanel({ sessionId, onClose }) {
 
       {/* Global Inline Error Banner */}
       {error && (
-        <div className="mb-3 text-xs bg-red-950/40 border border-red-900/50 text-red-400 p-2.5 rounded-xl flex items-start gap-2 shadow-sm transition-all duration-200">
+        <div
+          data-testid="plugin-error-message"
+          className="mb-3 text-xs bg-red-950/40 border border-red-900/50 text-red-400 p-2.5 rounded-xl flex items-start gap-2 shadow-sm transition-all duration-200"
+        >
           <ErrorIcon className="w-4 h-4 mt-0.5 shrink-0 text-red-400" />
           <div className="flex-1">
             <span className="font-semibold block mb-0.5">Plugin Error</span>
             <p className="text-red-300/90 leading-relaxed">{error}</p>
           </div>
           <button
+            type="button"
             onClick={() => setError("")}
             className="text-red-500 hover:text-red-300 transition font-bold text-sm leading-none px-1"
             title="Dismiss error"
@@ -235,7 +241,7 @@ export default function PluginsPanel({ sessionId, onClose }) {
       {!isCollapsed && (
         <>
           {/* Plugin selector row with action menu and changelog preview option (#603) */}
-          <div className="flex flex-wrap gap-2 mb-4 md:mb-3 shrink-0">
+          <div data-testid="plugin-selector-list" className="flex flex-wrap gap-2 mb-4 md:mb-3 shrink-0">
             {plugins.map((p) => {
               const Icon = PLUGIN_ICONS[p.icon] || PlugIcon;
               const isMenuOpen = activeMenuId === p.id;
@@ -243,6 +249,7 @@ export default function PluginsPanel({ sessionId, onClose }) {
               return (
                 <div
                   key={p.id}
+                  data-testid={`plugin-btn-${p.id}`}
                   onClick={() => handleSelectPlugin(p)}
                   className={`relative text-xs px-3 py-1.5 rounded-lg border transition font-medium cursor-pointer flex items-center gap-1.5 touch-manipulation
                     ${selected?.id === p.id ? "border-purple-500 bg-purple-900/30 text-purple-300 shadow-sm shadow-purple-500/10" : "border-gray-700 text-gray-400 hover:bg-gray-800"}`}
@@ -294,9 +301,10 @@ export default function PluginsPanel({ sessionId, onClose }) {
 
           {/* Plugin Input/Output Area OR Empty-State Guidance */}
           {selected ? (
-            <div className="space-y-3 md:space-y-2 flex-1 md:flex-initial flex flex-col justify-start shrink-0">
+            <div data-testid="plugin-workspace" className="space-y-3 md:space-y-2 flex-1 md:flex-initial flex flex-col justify-start shrink-0">
               <p className="text-xs text-gray-500">{selected.description}</p>
               <textarea
+                data-testid="plugin-input-textarea"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder={`Enter input for ${selected.name}...`}
@@ -305,6 +313,8 @@ export default function PluginsPanel({ sessionId, onClose }) {
               />
               <div className="flex items-center justify-between">
                 <button
+                  type="button"
+                  data-testid="run-plugin-btn"
                   onClick={run}
                   disabled={!input.trim() || running}
                   className="w-full md:w-auto text-sm md:text-xs bg-purple-700 hover:bg-purple-600 disabled:opacity-40 text-white px-5 py-2.5 md:py-1.5 rounded-lg transition font-medium shadow-md"
@@ -326,7 +336,7 @@ export default function PluginsPanel({ sessionId, onClose }) {
                       {copied ? "Copied!" : "Copy"}
                     </button>
                   </div>
-                  <pre className="text-xs bg-gray-800 border border-t-0 border-gray-700 rounded-b-xl px-3 py-2 text-green-300 whitespace-pre-wrap max-h-40 overflow-y-auto font-mono">
+                  <pre className="text-xs bg-gray-800 border border-t-0 border-gray-700 rounded-b-xl px-3 py-2 text-green-300 whitespace-pre-wrap max-h-40 overflow-y-auto font-mono" data-testid="plugin-output-display">
                     {output}
                   </pre>
                 </div>
@@ -379,6 +389,7 @@ export default function PluginsPanel({ sessionId, onClose }) {
           </div>
         </>
       )}
+
       {/* Changelog Modal (#603) */}
       {changelogPlugin && (
         <div
