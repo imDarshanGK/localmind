@@ -37,6 +37,42 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+// --- SUITE: ACCESSIBILITY LANDMARKS (#547) ---
+describe("ChatWindow Accessibility Landmarks (#547)", () => {
+  test("renders main, log, search/export header, and form landmarks with appropriate aria attributes", () => {
+    const mockMessages = [{ id: "m1", role: "user", content: "Accessibility Test" }];
+    render(<ChatWindow messages={mockMessages} loading={false} onSend={vi.fn()} sessionId="s1" />);
+
+    // Main workspace landmark
+    expect(screen.getByRole("main", { name: "Chat Workspace" })).toBeInTheDocument();
+
+    // Export header landmark
+    expect(screen.getByRole("banner", { name: "Export options" })).toBeInTheDocument();
+
+    // Messages log landmark
+    expect(screen.getByRole("log", { name: "Chat messages history" })).toBeInTheDocument();
+
+    // Message article item
+    expect(screen.getByRole("article", { name: "User message" })).toBeInTheDocument();
+
+    // Message input form landmark
+    expect(screen.getByRole("form", { name: "Message composer" })).toBeInTheDocument();
+  });
+
+  test("triggers message send when composer form is submitted", () => {
+    const onSendSpy = vi.fn();
+    render(<ChatWindow messages={[]} loading={false} onSend={onSendSpy} sessionId="s1" />);
+
+    const textarea = screen.getByRole("textbox", { name: "Type your message" });
+    fireEvent.change(textarea, { target: { value: "Hello LocalMind" } });
+
+    const sendButton = screen.getByRole("button", { name: "Send message" });
+    fireEvent.click(sendButton);
+
+    expect(onSendSpy).toHaveBeenCalledWith("Hello LocalMind");
+  });
+});
+
 // --- SUITE 1: FEATURE #543 - EMPTY STATE GUIDANCE ---
 describe("ChatWindow Empty State Guidance (#543)", () => {
   test("renders empty state guidance container and feature badges when messages are empty", () => {
