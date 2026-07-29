@@ -12,16 +12,42 @@ const PLUGIN_ICONS = {
 };
 
 export default function PluginsPanel({ sessionId, onClose }) {
-  const [plugins,  setPlugins]  = useState([]);
+  const [plugins, setPlugins] = useState([]);
   const [selected, setSelected] = useState(null);
-  const [input,    setInput]    = useState("");
-  const [output,   setOutput]   = useState("");
-  const [running,  setRunning]  = useState(false);
-  const [error,    setError]    = useState("");
+  const [input, setInput] = useState("");
+  const [output, setOutput] = useState("");
+  const [running, setRunning] = useState(false);
+  const [error, setError] = useState("");
+
+  // Persistent Pinned / Favorite Plugin IDs (#601)
+  const [pinnedIds, setPinnedIds] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`plugins-panel-pinned:${sessionId}`);
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+
+  // Sync pinned plugin state to localStorage (#601)
+  useEffect(() => {
+    try {
+      localStorage.setItem(`plugins-panel-pinned:${sessionId}`, JSON.stringify(pinnedIds));
+    } catch (e) {
+      console.warn("localStorage write blocked:", e);
+    }
+  }, [pinnedIds, sessionId]);
 
   useEffect(() => {
-    getPlugins().then(d => setPlugins(d.plugins || [])).catch(()=>{});
+    getPlugins().then(d => setPlugins(d.plugins || [])).catch(() => {});
   }, []);
+
+  function togglePin(e, pluginId) {
+    e.stopPropagation();
+    setPinnedIds((prev) =>
+      prev.includes(pluginId) ? prev.filter((id) => id !== pluginId) : [...prev, pluginId]
+    );
+  }
 
   async function run() {
     if (!selected || !input.trim()) return;
@@ -34,6 +60,15 @@ export default function PluginsPanel({ sessionId, onClose }) {
     finally { setRunning(false); }
   }
 
+  // Sort plugins with pinned/favorites at the top (#601)
+  const sortedPlugins = [...plugins].sort((a, b) => {
+    const isAPinned = pinnedIds.includes(a.id);
+    const isBPinned = pinnedIds.includes(b.id);
+    if (isAPinned && !isBPinned) return -1;
+    if (!isAPinned && isBPinned) return 1;
+    return 0;
+  });
+
   return (
     <div className="border-b border-gray-800 bg-gray-900 px-5 py-4 shrink-0">
       <div className="flex items-center justify-between mb-3">
@@ -41,23 +76,31 @@ export default function PluginsPanel({ sessionId, onClose }) {
         <button onClick={onClose} className="text-gray-500 hover:text-gray-300 text-lg leading-none">×</button>
       </div>
 
-      {/* Plugin selector */}
+      {/* Plugin selector with favorite & pin toggles (#601) */}
       <div className="flex flex-wrap gap-2 mb-3">
-        {plugins.map(p => (
-          <button key={p.id} onClick={() => { setSelected(p); setOutput(""); setError(""); }}
-            className={`text-xs px-3 py-1.5 rounded-lg border transition font-medium
-              ${selected?.id === p.id ? "border-purple-500 bg-purple-900/30 text-purple-300" : "border-gray-700 text-gray-400 hover:bg-gray-800"}`}>
-            {(() => {
-              const Icon = PLUGIN_ICONS[p.icon] || PlugIcon;
-              return (
-                <span className="inline-flex items-center gap-1">
-                  <Icon className="w-3.5 h-3.5" />
-                  <span>{p.name}</span>
-                </span>
-              );
-            })()}
-          </button>
-        ))}
+        {sortedPlugins.map(p => {
+          const isPinned = pinnedIds.includes(p.id);
+          const Icon = PLUGIN_ICONS[p.icon] || PlugIcon;
+          return (
+            <div
+              key={p.id}
+              onClick={() => { setSelected(p); setOutput(""); setError(""); }}
+              className={`text-xs px-3 py-1.5 rounded-lg border transition font-medium cursor-pointer flex items-center gap-1.5
+                ${selected?.id === p.id ? "border-purple-500 bg-purple-900/30 text-purple-300" : "border-gray-700 text-gray-400 hover:bg-gray-800"}`}
+            >
+              <Icon className="w-3.5 h-3.5" />
+              <span>{p.name}</span>
+              <button
+                type="button"
+                onClick={(e) => togglePin(e, p.id)}
+                aria-label={isPinned ? `Unpin ${p.name}` : `Pin ${p.name}`}
+                className={`ml-1 hover:text-amber-300 transition ${isPinned ? "text-amber-400" : "text-gray-600"}`}
+              >
+                {isPinned ? "★" : "☆"}
+              </button>
+            </div>
+          );
+        })}
       </div>
 
       {selected && (
