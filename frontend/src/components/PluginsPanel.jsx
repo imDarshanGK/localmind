@@ -12,15 +12,16 @@ const PLUGIN_ICONS = {
 };
 
 export default function PluginsPanel({ sessionId, onClose }) {
-  const [plugins,  setPlugins]  = useState([]);
+  const [plugins, setPlugins] = useState([]);
+  const [searchQuery, setSearchQuery] = useState("");
   const [selected, setSelected] = useState(null);
-  const [input,    setInput]    = useState("");
-  const [output,   setOutput]   = useState("");
-  const [running,  setRunning]  = useState(false);
-  const [error,    setError]    = useState("");
+  const [input, setInput] = useState("");
+  const [output, setOutput] = useState("");
+  const [running, setRunning] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    getPlugins().then(d => setPlugins(d.plugins || [])).catch(()=>{});
+    getPlugins().then(d => setPlugins(d.plugins || [])).catch(() => {});
   }, []);
 
   async function run() {
@@ -34,6 +35,15 @@ export default function PluginsPanel({ sessionId, onClose }) {
     finally { setRunning(false); }
   }
 
+  // Filter plugins in real-time by search query (#600)
+  const filteredPlugins = plugins.filter((p) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    const nameMatch = p.name?.toLowerCase().includes(q);
+    const descMatch = p.description?.toLowerCase().includes(q);
+    return nameMatch || descMatch;
+  });
+
   return (
     <div className="border-b border-gray-800 bg-gray-900 px-5 py-4 shrink-0">
       <div className="flex items-center justify-between mb-3">
@@ -41,23 +51,39 @@ export default function PluginsPanel({ sessionId, onClose }) {
         <button onClick={onClose} className="text-gray-500 hover:text-gray-300 text-lg leading-none">×</button>
       </div>
 
+      {/* Search Refinement Input (#600) */}
+      <div className="mb-3">
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search plugins..."
+          aria-label="Filter plugins"
+          className="w-full text-xs bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-gray-200 placeholder-gray-500 outline-none focus:border-purple-500 transition"
+        />
+      </div>
+
       {/* Plugin selector */}
-      <div className="flex flex-wrap gap-2 mb-3">
-        {plugins.map(p => (
-          <button key={p.id} onClick={() => { setSelected(p); setOutput(""); setError(""); }}
-            className={`text-xs px-3 py-1.5 rounded-lg border transition font-medium
-              ${selected?.id === p.id ? "border-purple-500 bg-purple-900/30 text-purple-300" : "border-gray-700 text-gray-400 hover:bg-gray-800"}`}>
-            {(() => {
-              const Icon = PLUGIN_ICONS[p.icon] || PlugIcon;
-              return (
-                <span className="inline-flex items-center gap-1">
-                  <Icon className="w-3.5 h-3.5" />
-                  <span>{p.name}</span>
-                </span>
-              );
-            })()}
-          </button>
-        ))}
+      <div className="flex flex-wrap gap-2 mb-3 min-h-[32px]">
+        {filteredPlugins.length > 0 ? (
+          filteredPlugins.map(p => (
+            <button key={p.id} onClick={() => { setSelected(p); setOutput(""); setError(""); }}
+              className={`text-xs px-3 py-1.5 rounded-lg border transition font-medium
+                ${selected?.id === p.id ? "border-purple-500 bg-purple-900/30 text-purple-300" : "border-gray-700 text-gray-400 hover:bg-gray-800"}`}>
+              {(() => {
+                const Icon = PLUGIN_ICONS[p.icon] || PlugIcon;
+                return (
+                  <span className="inline-flex items-center gap-1">
+                    <Icon className="w-3.5 h-3.5" />
+                    <span>{p.name}</span>
+                  </span>
+                );
+              })()}
+            </button>
+          ))
+        ) : (
+          <p className="text-xs text-gray-500 italic py-1">No matching plugins found.</p>
+        )}
       </div>
 
       {selected && (
