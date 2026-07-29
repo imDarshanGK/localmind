@@ -1,99 +1,271 @@
 // @vitest-environment jsdom
-import React from 'react';
-import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
-import { vi, describe, test, expect, beforeEach, afterEach } from 'vitest';
-import * as jestDomMatchers from '@testing-library/jest-dom/matchers';
-import PluginsPanel from './PluginsPanel';
-import { getPlugins } from '../utils/api';
+import React from "react";
+import { describe, it, test, expect, beforeEach, afterEach, vi } from "vitest";
+import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
+import "@testing-library/jest-dom/vitest";
+import PluginsPanel from "./PluginsPanel";
+import * as api from "../utils/api";
 
-expect.extend(jestDomMatchers);
-
-vi.mock('../utils/api', () => ({
+// Mock API module
+vi.mock("../utils/api", () => ({
   getPlugins: vi.fn(),
   runPlugin: vi.fn(),
+  getPluginLogs: vi.fn().mockResolvedValue({ logs: [] }),
 }));
 
-vi.mock('./Icons', () => ({
-  PlugIcon: () => <span data-testid="plug-icon" />,
-  CalculatorIcon: () => <span data-testid="calc-icon" />,
-  SummaryIcon: () => <span data-testid="summary-icon" />,
-  GlobeIcon: () => <span data-testid="globe-icon" />,
-  CodeIcon: () => <span data-testid="code-icon" />,
-  HashIcon: () => <span data-testid="hash-icon" />,
+// Mock icons
+vi.mock("./Icons", () => ({
   BracesIcon: () => <span data-testid="braces-icon" />,
+  CalculatorIcon: () => <span data-testid="calculator-icon" />,
+  CodeIcon: () => <span data-testid="code-icon" />,
   ErrorIcon: () => <span data-testid="error-icon" />,
+  GlobeIcon: () => <span data-testid="globe-icon" />,
+  PlugIcon: () => <span data-testid="plug-icon" />,
+  SummaryIcon: () => <span data-testid="summary-icon" />,
+  HashIcon: () => <span data-testid="hash-icon" />,
 }));
 
-const mockPlugins = [
+const mockPluginsList = [
   {
-    id: 'calculator',
-    name: 'Calculator',
-    description: 'Evaluates math expressions',
-    icon: 'calculator',
+    id: "calculator",
+    name: "Calculator",
+    icon: "calculator",
+    description: "Basic math evaluation",
     changelog: [
-      { version: 'v1.1.0', date: '2026-06-01', changes: 'Added scientific mode.' },
+      { version: "v1.1.0", date: "2026-06-01", changes: "Added scientific mode." },
     ],
   },
   {
-    id: 'summarizer',
-    name: 'Summarizer',
-    description: 'Summarizes long text',
-    icon: 'summarizer',
+    id: "summarizer",
+    name: "Summarizer",
+    icon: "summarizer",
+    description: "Summarize provided text",
   },
 ];
 
-beforeEach(() => {
-  vi.clearAllMocks();
-  getPlugins.mockResolvedValue({ plugins: mockPlugins });
-});
+describe("PluginsPanel Component Suite (#594)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    api.getPlugins.mockResolvedValue({ plugins: mockPluginsList });
+    api.getPluginLogs.mockResolvedValue({ logs: [] });
+  });
 
-afterEach(() => {
-  cleanup();
-});
+  afterEach(() => {
+    cleanup();
+  });
 
-describe('PluginsPanel Changelog Previews (#603)', () => {
-  test('renders plugin list correctly', async () => {
-    render(<PluginsPanel sessionId="session-603" onClose={vi.fn()} />);
+  test("renders the plugins panel header title and plugin options", async () => {
+    render(<PluginsPanel sessionId="test-session" onClose={vi.fn()} />);
 
     await waitFor(() => {
-      expect(screen.getByText('Calculator')).toBeInTheDocument();
-      expect(screen.getByText('Summarizer')).toBeInTheDocument();
+      expect(screen.getAllByText("Calculator").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("Summarizer").length).toBeGreaterThan(0);
     });
   });
 
-  test('opens changelog preview modal when "View Changelog" is clicked', async () => {
+  test("executes plugin action successfully when run button is clicked", async () => {
+    api.runPlugin.mockResolvedValue({ success: true, output: "42" });
+
+    render(<PluginsPanel sessionId="test-session" onClose={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText("Calculator").length).toBeGreaterThan(0);
+    });
+
+    const calcButton = screen.getAllByText("Calculator")[0];
+    fireEvent.click(calcButton);
+
+    const textarea = screen.getByPlaceholderText(/Enter input for Calculator.../i);
+    fireEvent.change(textarea, { target: { value: "6 * 7" } });
+
+    const runBtn = screen.getByRole("button", { name: /Run Calculator/i });
+    fireEvent.click(runBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText("42")).toBeInTheDocument();
+    });
+  });
+
+  test("copies plugin output to clipboard and displays 'Copied!' feedback", async () => {
+    const writeTextMock = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, {
+      clipboard: {
+        writeText: writeTextMock,
+      },
+    });
+
+    api.runPlugin.mockResolvedValue({ success: true, output: "42" });
+
+    render(<PluginsPanel sessionId="test-session" onClose={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText("Calculator").length).toBeGreaterThan(0);
+    });
+
+    const calcButton = screen.getAllByText("Calculator")[0];
+    fireEvent.click(calcButton);
+
+    const textarea = screen.getByPlaceholderText(/Enter input for Calculator.../i);
+    fireEvent.change(textarea, { target: { value: "6 * 7" } });
+
+    const runBtn = screen.getByRole("button", { name: /Run Calculator/i });
+    fireEvent.click(runBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText("42")).toBeInTheDocument();
+    });
+
+    const copyBtn = screen.getByRole("button", { name: /Copy/i });
+    fireEvent.click(copyBtn);
+
+    expect(writeTextMock).toHaveBeenCalledWith("42");
+    await waitFor(() => {
+      expect(screen.getByText("Copied!")).toBeInTheDocument();
+    });
+  });
+
+  test("renders the plugins panel header title and info tooltip icon", async () => {
+    render(<PluginsPanel sessionId="test-session" onClose={vi.fn()} />);
+
+    expect(screen.getByText(/Plugins/i)).toBeInTheDocument();
+
+    const helpButton = screen.getByLabelText(/Plugins panel information description/i);
+    expect(helpButton).toBeInTheDocument();
+    expect(helpButton.textContent.trim()).toBe("i");
+
+    const helpText = screen.getByText(/Plugins Workspace Help:/i);
+    expect(helpText).toBeInTheDocument();
+  });
+});
+
+describe("PluginsPanel Changelog Previews (#603)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    api.getPlugins.mockResolvedValue({ plugins: mockPluginsList });
+    api.getPluginLogs.mockResolvedValue({ logs: [] });
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  test("renders plugin list correctly", async () => {
     render(<PluginsPanel sessionId="session-603" onClose={vi.fn()} />);
 
     await waitFor(() => {
-      expect(screen.getByText('Calculator')).toBeInTheDocument();
+      expect(screen.getByText("Calculator")).toBeInTheDocument();
+      expect(screen.getByText("Summarizer")).toBeInTheDocument();
+    });
+  });
+
+  test("opens changelog preview modal when 'View Changelog' is clicked", async () => {
+    render(<PluginsPanel sessionId="session-603" onClose={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Calculator")).toBeInTheDocument();
     });
 
-    const optionsBtn = screen.getByLabelText('Options for Calculator');
+    const optionsBtn = screen.getByLabelText("Options for Calculator");
     fireEvent.click(optionsBtn);
 
-    const changelogBtn = screen.getByText('View Changelog');
+    const changelogBtn = screen.getByText("View Changelog");
     fireEvent.click(changelogBtn);
 
-    expect(screen.getByTestId('changelog-modal')).toBeInTheDocument();
-    expect(screen.getByText('v1.1.0')).toBeInTheDocument();
-    expect(screen.getByText('Added scientific mode.')).toBeInTheDocument();
+    expect(screen.getByTestId("changelog-modal")).toBeInTheDocument();
+    expect(screen.getByText("v1.1.0")).toBeInTheDocument();
+    expect(screen.getByText("Added scientific mode.")).toBeInTheDocument();
   });
 
-  test('displays fallback message when plugin has no changelog entries', async () => {
+  test("displays fallback message when plugin has no changelog entries", async () => {
     render(<PluginsPanel sessionId="session-603" onClose={vi.fn()} />);
 
     await waitFor(() => {
-      expect(screen.getByText('Summarizer')).toBeInTheDocument();
+      expect(screen.getByText("Summarizer")).toBeInTheDocument();
     });
 
-    const optionsBtn = screen.getByLabelText('Options for Summarizer');
+    const optionsBtn = screen.getByLabelText("Options for Summarizer");
     fireEvent.click(optionsBtn);
 
-    const changelogBtn = screen.getByText('View Changelog');
+    const changelogBtn = screen.getByText("View Changelog");
     fireEvent.click(changelogBtn);
 
     expect(
-      screen.getByText('No changelog preview available for Summarizer.')
+      screen.getByText(/No changelog preview available for Summarizer/i)
     ).toBeInTheDocument();
+  });
+});
+
+describe("PluginsPanel View State & Persistence Suite (#592)", () => {
+  let store = {};
+
+  beforeEach(() => {
+    store = {};
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation((key) => store[key] || null);
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation((key, value) => {
+      store[key] = String(value);
+    });
+    vi.spyOn(Storage.prototype, "removeItem").mockImplementation((key) => {
+      delete store[key];
+    });
+
+    api.getPlugins.mockResolvedValue({ plugins: mockPluginsList });
+    api.getPluginLogs.mockResolvedValue({ logs: [] });
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.resetAllMocks();
+  });
+
+  it("renders plugins list in default expanded state", async () => {
+    render(<PluginsPanel sessionId="test-session-1" onClose={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Calculator")).toBeInTheDocument();
+      expect(screen.getByText("Summarizer")).toBeInTheDocument();
+    });
+  });
+
+  it("toggles collapse state and persists boolean flag to localStorage", async () => {
+    render(<PluginsPanel sessionId="test-session-2" onClose={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByText("Calculator")).toBeInTheDocument());
+
+    const toggleBtn = screen.getByLabelText("Collapse plugins section");
+    fireEvent.click(toggleBtn);
+
+    expect(localStorage.setItem).toHaveBeenCalledWith("plugins-panel-collapsed:test-session-2", "true");
+    expect(screen.queryByText("Calculator")).not.toBeInTheDocument();
+
+    const expandBtn = screen.getByLabelText("Expand plugins section");
+    fireEvent.click(expandBtn);
+
+    expect(localStorage.setItem).toHaveBeenCalledWith("plugins-panel-collapsed:test-session-2", "false");
+    expect(screen.getByText("Calculator")).toBeInTheDocument();
+  });
+
+  it("loads collapsed view on mount if localStorage flag is true", async () => {
+    store["plugins-panel-collapsed:test-session-3"] = "true";
+
+    render(<PluginsPanel sessionId="test-session-3" onClose={vi.fn()} />);
+
+    expect(screen.queryByText("Calculator")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Expand plugins section")).toBeInTheDocument();
+  });
+
+  it("persists active plugin selection and restores it on mount", async () => {
+    store["plugins-panel-selected:test-session-4"] = "summarizer";
+
+    render(<PluginsPanel sessionId="test-session-4" onClose={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Summarize provided text")).toBeInTheDocument();
+    });
+
+    const calcBtn = screen.getByText("Calculator");
+    fireEvent.click(calcBtn);
+
+    expect(localStorage.setItem).toHaveBeenCalledWith("plugins-panel-selected:test-session-4", "calculator");
+    expect(screen.getByText("Basic math evaluation")).toBeInTheDocument();
   });
 });
