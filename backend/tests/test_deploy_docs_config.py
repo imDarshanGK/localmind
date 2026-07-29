@@ -20,6 +20,7 @@ def test_build_deploy_docs_include_config_validation_checklist():
     assert "npm run build" in readme
     assert "python warmup.py" in readme
     assert "pytest tests/test_citations.py" in readme
+    assert "pytest tests/test_chromadb_benchmark.py" in readme
 
     for snippet in ["OLLAMA_HOST", "DEFAULT_MODEL", "CORS_ORIGINS", "VITE_API_BASE_URL", "/api"]:
         assert snippet in readme
@@ -60,6 +61,22 @@ def test_build_deploy_docs_include_citation_merging_guidelines():
     assert "PREVIEW_MAX_CHARS" in citation_docs
     assert "ChatMessage.sources" in citation_docs
     assert "pytest tests/test_citations.py" in citation_docs
+
+
+def test_build_deploy_docs_include_benchmark_harness_guidelines():
+    readme = read_repo_file("README.md")
+    benchmark_docs = read_repo_file("docs/benchmark-harness.md")
+
+    assert "### Vector Retrieval Benchmark Harness" in readme
+    assert "backend/tests/test_chromadb_benchmark.py" in readme
+    assert "docs/benchmark-harness.md" in readme
+    assert "pytest tests/test_chromadb_benchmark.py" in readme
+    assert "Benchmark Harness: run ChromaDB retrieval benchmark tests" in readme
+
+    assert "# Vector Retrieval Benchmark Harness & Deployment Guidelines" in benchmark_docs
+    assert "TestChromaDBRetrievalLatency" in benchmark_docs
+    assert "all-MiniLM-L6-v2" in benchmark_docs
+    assert "pytest tests/test_chromadb_benchmark.py" in benchmark_docs
 def test_render_config_matches_documented_build_and_health_checks():
     readme = read_repo_file("README.md")
     render_config = read_repo_file("render.yaml")
