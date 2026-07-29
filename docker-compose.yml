@@ -30,7 +30,12 @@ services:
       backend:
         condition: service_healthy
     restart: unless-stopped
-
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:80/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
 volumes:
   localmind-data:
     name: localmind-data
