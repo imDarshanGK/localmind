@@ -8,7 +8,7 @@ import { exportSession } from '../utils/api';
 
 expect.extend(jestDomMatchers);
 
-// Mock Icons and API dependencies
+// Mock API and Icon dependencies
 vi.mock('../utils/api', () => ({
   exportSession: vi.fn(),
 }));
@@ -37,6 +37,42 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+});
+
+// --- SUITE: ACCESSIBILITY LANDMARKS (#547) ---
+describe("ChatWindow Accessibility Landmarks (#547)", () => {
+  test("renders main, log, search/export header, and form landmarks with appropriate aria attributes", () => {
+    const mockMessages = [{ id: "m1", role: "user", content: "Accessibility Test" }];
+    render(<ChatWindow messages={mockMessages} loading={false} onSend={vi.fn()} sessionId="s1" />);
+
+    // Main workspace landmark
+    expect(screen.getByRole("main", { name: "Chat Workspace" })).toBeInTheDocument();
+
+    // Export header landmark
+    expect(screen.getByRole("banner", { name: "Export options" })).toBeInTheDocument();
+
+    // Messages log landmark
+    expect(screen.getByRole("log", { name: "Chat messages history" })).toBeInTheDocument();
+
+    // Message article item
+    expect(screen.getByRole("article", { name: "User message" })).toBeInTheDocument();
+
+    // Message input form landmark
+    expect(screen.getByRole("form", { name: "Message composer" })).toBeInTheDocument();
+  });
+
+  test("triggers message send when composer form is submitted", () => {
+    const onSendSpy = vi.fn();
+    render(<ChatWindow messages={[]} loading={false} onSend={onSendSpy} sessionId="s1" />);
+
+    const textarea = screen.getByRole("textbox", { name: "Type your message" });
+    fireEvent.change(textarea, { target: { value: "Hello LocalMind" } });
+
+    const sendButton = screen.getByRole("button", { name: "Send message" });
+    fireEvent.click(sendButton);
+
+    expect(onSendSpy).toHaveBeenCalledWith("Hello LocalMind");
+  });
 });
 
 // --- SUITE 1: FEATURE #543 - EMPTY STATE GUIDANCE ---
@@ -196,6 +232,15 @@ describe("ChatWindow Core Regressions (#751)", () => {
     });
   });
 
+  test("does not render skeleton when loading is false", () => {
+    render(<ChatWindow messages={[]} loading={false} onSend={vi.fn()} sessionId="test-1" />);
+
+    expect(screen.queryByTestId("message-skeleton")).not.toBeInTheDocument();
+  });
+});
+
+// --- SUITE 6: CORE REGRESSIONS (#751) ---
+describe("ChatWindow Core Regressions (#751)", () => {
   describe("Message Stream Rendering Matrix", () => {
     const mockMessages = [
       { id: "m1", role: "user", content: "Hello world" },
@@ -210,6 +255,11 @@ describe("ChatWindow Core Regressions (#751)", () => {
       expect(screen.getByText("typing...")).toBeInTheDocument();
       expect(screen.getByText("doc1.pdf")).toBeInTheDocument();
       expect(screen.getByText("doc2.txt")).toBeInTheDocument();
+    });
+
+    test("displays baseline indicators when thread is computing", () => {
+      render(<ChatWindow messages={[]} loading={true} onSend={vi.fn()} sessionId="s1" />);
+      expect(screen.getAllByText("LocalMind").length).toBeGreaterThan(0);
     });
   });
 
