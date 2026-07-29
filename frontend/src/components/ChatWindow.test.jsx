@@ -7,7 +7,7 @@ import { exportSession } from '../utils/api';
 
 expect.extend(jestDomMatchers);
 
-// Mock Icons and API dependencies
+// Mock API and Icon dependencies
 vi.mock('../utils/api', () => ({
   exportSession: vi.fn(),
 }));
@@ -194,6 +194,15 @@ describe("ChatWindow Core Regressions (#751)", () => {
     });
   });
 
+  test("does not render skeleton when loading is false", () => {
+    render(<ChatWindow messages={[]} loading={false} onSend={vi.fn()} sessionId="test-1" />);
+
+    expect(screen.queryByTestId("message-skeleton")).not.toBeInTheDocument();
+  });
+});
+
+// --- SUITE 6: CORE REGRESSIONS (#751) ---
+describe("ChatWindow Core Regressions (#751)", () => {
   describe("Message Stream Rendering Matrix", () => {
     const mockMessages = [
       { id: "m1", role: "user", content: "Hello world" },
@@ -208,6 +217,11 @@ describe("ChatWindow Core Regressions (#751)", () => {
       expect(screen.getByText("typing...")).toBeInTheDocument();
       expect(screen.getByText("doc1.pdf")).toBeInTheDocument();
       expect(screen.getByText("doc2.txt")).toBeInTheDocument();
+    });
+
+    test("displays baseline indicators when thread is computing", () => {
+      render(<ChatWindow messages={[]} loading={true} onSend={vi.fn()} sessionId="s1" />);
+      expect(screen.getAllByText("LocalMind").length).toBeGreaterThan(0);
     });
   });
 
