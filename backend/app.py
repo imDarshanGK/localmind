@@ -17,7 +17,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from middleware.csrf import OriginValidationMiddleware
+
+from middleware.csrf import SecurityMiddleware
 from routes.chat import router as chat_router
 from routes.export import router as export_router
 from routes.models import router as models_router
@@ -26,7 +27,7 @@ from routes.prompt_templates import router as prompt_templates_router
 from routes.sessions import router as sessions_router
 from routes.settings import router as settings_router
 from routes.upload import router as upload_router
-from services.db_service import get_db, init_db
+from services.db_service import dedupe_clear_orphaned_processing, get_db, init_db
 
 
 # --- Issue #284 Engine Stability: Contextual Thread-Safe Log Formatter ---
@@ -37,10 +38,13 @@ class CorrelationIdFormatter(logging.Formatter):
             record.correlation_id = "GLOBAL"
         return super().format(record)
 
+
 # Initialize a standard console stream log handler
 stream_handler = logging.StreamHandler()
 stream_handler.setFormatter(
-    CorrelationIdFormatter("%(asctime)s | %(levelname)s | [%(correlation_id)s] | %(name)s | %(message)s")
+    CorrelationIdFormatter(
+        "%(asctime)s | %(levelname)s | [%(correlation_id)s] | %(name)s | %(message)s"
+    )
 )
 
 # Apply our stream configuration directly onto the base application root logger scope
@@ -94,15 +98,21 @@ def run_preflight_checks():
 async def lifespan(app: FastAPI):
     logger.info("Starting LocalMind v2.0...")
     run_preflight_checks()
-    
+
+    # Clear any 'processing' deduplication sentinels left over from a prior
+    # server run. They will never be resolved to 'done', so leaving them
+    # would produce false-409 responses for legitimate first retries.
+    dedupe_clear_orphaned_processing()
+
     # Start stream cleanup task
     from routes.chat import clean_expired_streams
+
     cleanup_task = asyncio.create_task(clean_expired_streams())
-    
+
     logger.info("LocalMind v2.0 ready!")
     yield
     logger.info("👋 Shutting down...")
-    
+
     # Cancel stream cleanup task
     cleanup_task.cancel()
     await asyncio.gather(cleanup_task, return_exceptions=True)
@@ -115,23 +125,24 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+
 # --- Issue #284: Custom Correlation Tracking Middleware Interceptor ---
 @app.middleware("http")
 async def add_request_correlation_id(request: Request, call_next):
     correlation_id = request.headers.get("X-Correlation-ID", f"gen-{uuid.uuid4()}")
-    
+
     # Safely attach tracking state directly onto the request state context loop
     request.state.correlation_id = correlation_id
-    
+
     extra = {"correlation_id": correlation_id}
     logger.info(f"Incoming Request: {request.method} {request.url.path}", extra=extra)
-    
+
     response = await call_next(request)
     response.headers["X-Correlation-ID"] = correlation_id
     return response
 
 
-default_cors_origins = "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://localhost:8000" 
+default_cors_origins = "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://localhost:8000"
 cors_origins = [
     origin.strip()
     for origin in os.getenv("CORS_ORIGINS", default_cors_origins).split(",")
@@ -139,7 +150,7 @@ cors_origins = [
 ]
 
 app.add_middleware(GZipMiddleware, minimum_size=1000)
-app.add_middleware(OriginValidationMiddleware, allowed_origins=cors_origins)
+app.add_middleware(SecurityMiddleware, allowed_origins=cors_origins)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
@@ -153,37 +164,49 @@ RATE_LIMIT = 100
 RATE_LIMIT_WINDOW = 60
 rate_limits = {}
 
+
 @app.middleware("http")
 async def rate_limit_middleware(request: Request, call_next):
     client_ip = request.client.host if request.client else "127.0.0.1"
     current_time = time.time()
-    
-    if client_ip not in rate_limits or current_time > rate_limits[client_ip]["reset_at"]:
-        rate_limits[client_ip] = {"count": 0, "reset_at": current_time + RATE_LIMIT_WINDOW}
-        
+
+    if (
+        client_ip not in rate_limits
+        or current_time > rate_limits[client_ip]["reset_at"]
+    ):
+        rate_limits[client_ip] = {
+            "count": 0,
+            "reset_at": current_time + RATE_LIMIT_WINDOW,
+        }
+
     rate_limits[client_ip]["count"] += 1
     remaining = max(0, RATE_LIMIT - rate_limits[client_ip]["count"])
     reset_time = int(rate_limits[client_ip]["reset_at"])
-    
+
     response = await call_next(request)
-    
+
     response.headers["X-RateLimit-Limit"] = str(RATE_LIMIT)
     response.headers["X-RateLimit-Remaining"] = str(remaining)
     response.headers["X-RateLimit-Reset"] = str(reset_time)
-    
+
     return response
 
-app.include_router(chat_router,     prefix="/api/chat",     tags=["Chat"])
-app.include_router(upload_router,   prefix="/api/upload",   tags=["Upload"])
-app.include_router(models_router,   prefix="/api/models",   tags=["Models"])
+
+app.include_router(chat_router, prefix="/api/chat", tags=["Chat"])
+app.include_router(upload_router, prefix="/api/upload", tags=["Upload"])
+app.include_router(models_router, prefix="/api/models", tags=["Models"])
 app.include_router(sessions_router, prefix="/api/sessions", tags=["Sessions"])
-app.include_router(plugins_router,  prefix="/api/plugins",  tags=["Plugins"])
-app.include_router(export_router,   prefix="/api/export",   tags=["Export"])
+app.include_router(plugins_router, prefix="/api/plugins", tags=["Plugins"])
+app.include_router(export_router, prefix="/api/export", tags=["Export"])
 app.include_router(settings_router, prefix="/api/settings", tags=["Settings"])
-app.include_router(prompt_templates_router, prefix="/api/prompt-templates", tags=["Prompt Templates"])
+app.include_router(
+    prompt_templates_router, prefix="/api/prompt-templates", tags=["Prompt Templates"]
+)
 
 if (FRONTEND_DIST / "assets").exists():
-    app.mount("/assets", StaticFiles(directory=str(FRONTEND_DIST / "assets")), name="assets")
+    app.mount(
+        "/assets", StaticFiles(directory=str(FRONTEND_DIST / "assets")), name="assets"
+    )
 
 
 @app.get("/", tags=["Health"])

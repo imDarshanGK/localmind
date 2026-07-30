@@ -28,30 +28,43 @@ References:
     #verifying-origin-with-standard-headers
 """
 
+import hashlib
 import logging
+import time
 from urllib.parse import urlparse
 
+from prometheus_client import Counter
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
-from starlette.responses import JSONResponse
-from prometheus_client import Counter
+from starlette.responses import JSONResponse, Response
+
+from services.db_service import (
+    dedupe_delete,
+    dedupe_get,
+    dedupe_purge_expired,
+    dedupe_set_done,
+    dedupe_set_processing,
+)
 
 logger = logging.getLogger(__name__)
 
 # Prometheus Metrics
 CSRF_REQUESTS = Counter(
     "csrf_requests_total",
-    "Total number of requests processed by CSRF middleware",
-    ["status"]
+    "Total number of requests processed by security middleware",
+    ["status"],
 )
 CSRF_REJECTIONS = Counter(
     "csrf_rejections_total",
-    "Total number of requests rejected by CSRF middleware",
-    ["method", "reason"]
+    "Total number of requests rejected by security middleware",
+    ["method", "reason"],
 )
 
 # HTTP methods that do NOT change server state — always allowed.
 _SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
+
+# How long (seconds) a completed response is cached for deduplication.
+_DEDUPE_WINDOW_SECONDS = 5.0
 
 
 def _origin_from_header(request: Request) -> str | None:
@@ -78,16 +91,24 @@ def _origin_from_header(request: Request) -> str | None:
     return None  # absent — treat as same-origin
 
 
-class OriginValidationMiddleware(BaseHTTPMiddleware):
+class SecurityMiddleware(BaseHTTPMiddleware):
     """
-    Reject state-changing requests whose Origin header is present but not in
-    the configured allowlist.
+    Combines Origin/Referer CSRF validation and SQLite-backed Request
+    Deduplication.
 
-    Args:
-        allowed_origins: Sequence of allowed origin strings, e.g.
-            ["http://localhost:3000", "http://localhost:5173"].
-            Typically sourced from the CORS_ORIGINS environment variable so
-            that the same list governs both CORS and CSRF checks.
+    Rejects state-changing requests whose Origin header is present but not in
+    the configured allowlist.  Also persists in-flight and completed request
+    signatures to ``dedupe_cache`` (SQLite) so that duplicate submissions
+    within ``_DEDUPE_WINDOW_SECONDS`` are served from cache rather than
+    re-executing the handler.
+
+    **Known Limitations:**
+    - Error responses (4xx/5xx) are NOT cached. This ensures clients can retry
+      immediately without receiving a replayed failure.
+    - Multi-worker deployments (e.g. Gunicorn with multiple workers) are not fully
+      supported by the deduplication logic. SQLite WAL is shared, but concurrent
+      writes use last-write-wins. This is acceptable for LocalMind's single-user,
+      single-worker architecture.
     """
 
     def __init__(self, app, allowed_origins: list[str]) -> None:
@@ -102,14 +123,9 @@ class OriginValidationMiddleware(BaseHTTPMiddleware):
             CSRF_REQUESTS.labels(status="skipped_safe_method").inc()
             return await call_next(request)
 
+        # 1. CSRF Origin Validation
         origin = _origin_from_header(request)
-
-        if origin is None:
-            # No Origin / Referer — allow (same-origin or non-browser client).
-            CSRF_REQUESTS.labels(status="allowed").inc()
-            return await call_next(request)
-
-        if origin not in self._allowed:
+        if origin is not None and origin not in self._allowed:
             logger.warning(
                 "CSRF check failed: method=%s path=%s origin=%r not in allowlist",
                 request.method,
@@ -123,5 +139,96 @@ class OriginValidationMiddleware(BaseHTTPMiddleware):
                 status_code=403,
             )
 
+        # 2. Request Deduplication (SQLite-backed)
+        # Safely read the request body to generate a deterministic signature.
+        req_body = await request.body()
+
+        # Reset the stream so route handlers can read it.
+        _body_returned = False
+
+        async def receive():
+            nonlocal _body_returned
+            if not _body_returned:
+                _body_returned = True
+                return {"type": "http.request", "body": req_body, "more_body": False}
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        request._receive = receive
+
+        client_ip = request.client.host if request.client else "127.0.0.1"
+        signature_base = (
+            f"{client_ip}|{request.method}|{request.url.path}"
+            f"|{req_body.decode('utf-8', 'ignore')}"
+        )
+        req_hash = hashlib.sha256(signature_base.encode()).hexdigest()
+
+        now = time.time()
+
+        # Remove stale rows from the DB before checking for hits.
+        dedupe_purge_expired(now)
+
+        cached = dedupe_get(req_hash, now)
+        if cached is not None:
+            if cached["status"] == "done":
+                # Return the exact cached response from a previously completed request.
+                CSRF_REQUESTS.labels(status="deduplicated").inc()
+                logger.info(
+                    "Deduplicated identical request from %s for %s",
+                    client_ip,
+                    request.url.path,
+                )
+                return Response(
+                    content=cached["response_body"],
+                    status_code=cached["status_code"],
+                    headers=cached["headers"],
+                )
+            else:
+                # A request with this exact signature is currently processing.
+                CSRF_REQUESTS.labels(status="deduplicated_in_progress").inc()
+                return JSONResponse(
+                    {"detail": "Duplicate request in progress"}, status_code=409
+                )
+
+        # Mark request as in-flight so concurrent duplicates get a 409.
+        dedupe_set_processing(req_hash, expires_at=now + _DEDUPE_WINDOW_SECONDS)
+
+        # Proceed with the actual request.
+        response = await call_next(request)
+
+        # Consume the response body so we can cache and then reconstruct it.
+        res_body = b""
+        async for chunk in response.body_iterator:
+            res_body += chunk
+
+        # Only cache successful responses.
+        # Error responses (4xx, 5xx) must NOT be persisted to the 'done' cache:
+        # replaying a transient failure to the client would hide a real bug and
+        # prevent an immediate retry from succeeding.
+        if response.status_code < 400:
+            dedupe_set_done(
+                req_hash,
+                response_body=res_body,
+                status_code=response.status_code,
+                headers=dict(response.headers),
+                expires_at=time.time() + _DEDUPE_WINDOW_SECONDS,
+            )
+        else:
+            # Remove the 'processing' sentinel so the client can retry right away.
+            dedupe_delete(req_hash)
+            logger.info(
+                "Deduplication sentinel cleared for %s %s (status %d — not cached)",
+                request.method,
+                request.url.path,
+                response.status_code,
+            )
+
+        # Reconstruct the response since we consumed its body iterator.
+        new_response = Response(
+            content=res_body,
+            status_code=response.status_code,
+            headers=dict(response.headers),
+            media_type=response.media_type,
+        )
+
         CSRF_REQUESTS.labels(status="allowed").inc()
-        return await call_next(request)
+        return new_response
