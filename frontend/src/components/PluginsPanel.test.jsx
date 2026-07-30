@@ -13,7 +13,7 @@ vi.mock("../utils/api", () => ({
   getPluginLogs: vi.fn().mockResolvedValue({ logs: [] }),
 }));
 
-// Mock icons
+// Mock icon components
 vi.mock("./Icons", () => ({
   BracesIcon: () => <span data-testid="braces-icon" />,
   CalculatorIcon: () => <span data-testid="calculator-icon" />,
@@ -168,6 +168,63 @@ describe("PluginsPanel Interaction Tests (#595)", () => {
 
     const helpText = screen.getByText(/Plugins Workspace Help:/i);
     expect(helpText).toBeInTheDocument();
+  });
+});
+
+describe("PluginsPanel Export & Share Suite (#605)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    api.getPlugins.mockResolvedValue({ plugins: mockPluginsList });
+    api.getPluginLogs.mockResolvedValue({ logs: [] });
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  test("copies shareable plugin URL to clipboard on Share action", async () => {
+    const writeTextMock = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, {
+      clipboard: { writeText: writeTextMock },
+    });
+
+    render(<PluginsPanel sessionId="session-605" onClose={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("plugin-btn-calculator")).toBeInTheDocument();
+    });
+
+    const optionsBtn = screen.getByLabelText("Options for Calculator");
+    fireEvent.click(optionsBtn);
+
+    const shareBtn = screen.getByText("Share Plugin");
+    fireEvent.click(shareBtn);
+
+    expect(writeTextMock).toHaveBeenCalledWith(expect.stringContaining("plugin=calculator"));
+    await waitFor(() => {
+      expect(screen.getByTestId("action-notification")).toHaveTextContent("Copied share link for Calculator!");
+    });
+  });
+
+  test("triggers JSON export download on Export Config action", async () => {
+    const createElementSpy = vi.spyOn(document, "createElement");
+
+    render(<PluginsPanel sessionId="session-605-export" onClose={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("plugin-btn-calculator")).toBeInTheDocument();
+    });
+
+    const optionsBtn = screen.getByLabelText("Options for Calculator");
+    fireEvent.click(optionsBtn);
+
+    const exportBtn = screen.getByText("Export Config");
+    fireEvent.click(exportBtn);
+
+    expect(createElementSpy).toHaveBeenCalledWith("a");
+    await waitFor(() => {
+      expect(screen.getByTestId("action-notification")).toHaveTextContent("Exported Calculator configuration.");
+    });
   });
 });
 
