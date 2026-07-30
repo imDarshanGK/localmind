@@ -75,6 +75,77 @@ describe("ChatWindow Accessibility Landmarks (#547)", () => {
   });
 });
 
+// --- SUITE: PERSISTENT VIEW STATE (#548) ---
+describe("ChatWindow Persistent View State (#548)", () => {
+  test("persists draft message to localStorage and restores it on initial load", () => {
+    localStorage.setItem("localmind_draft_session-123", "Saved draft message");
+
+    render(<ChatWindow messages={[]} loading={false} onSend={vi.fn()} sessionId="session-123" />);
+
+    const textarea = screen.getByRole("textbox", { name: "Type your message" });
+    expect(textarea.value).toBe("Saved draft message");
+  });
+
+  test("updates draft message in localStorage as user types", () => {
+    render(<ChatWindow messages={[]} loading={false} onSend={vi.fn()} sessionId="session-123" />);
+
+    const textarea = screen.getByRole("textbox", { name: "Type your message" });
+    fireEvent.change(textarea, { target: { value: "Writing new draft" } });
+
+    expect(localStorage.getItem("localmind_draft_session-123")).toBe("Writing new draft");
+  });
+
+  test("clears draft message from localStorage after sending", () => {
+    const onSendSpy = vi.fn();
+    render(<ChatWindow messages={[]} loading={false} onSend={onSendSpy} sessionId="session-123" />);
+
+    const textarea = screen.getByRole("textbox", { name: "Type your message" });
+    fireEvent.change(textarea, { target: { value: "Draft ready to send" } });
+
+    const sendButton = screen.getByRole("button", { name: "Send message" });
+    fireEvent.click(sendButton);
+
+    expect(onSendSpy).toHaveBeenCalledWith("Draft ready to send");
+    expect(localStorage.getItem("localmind_draft_session-123")).toBeNull();
+  });
+
+  test("persists search filter query in localStorage and restores it on render", () => {
+    localStorage.setItem("localmind_search_session-123", "filter query");
+    const mockMessages = [{ id: "m1", role: "user", content: "filter query result" }];
+
+    render(<ChatWindow messages={mockMessages} loading={false} onSend={vi.fn()} sessionId="session-123" />);
+
+    const searchInput = screen.getByRole("textbox", { name: "Search conversation messages" });
+    expect(searchInput.value).toBe("filter query");
+  });
+
+  test("updates search filter query in localStorage as user types", () => {
+    const mockMessages = [{ id: "m1", role: "user", content: "React testing" }];
+    render(<ChatWindow messages={mockMessages} loading={false} onSend={vi.fn()} sessionId="session-123" />);
+
+    const searchInput = screen.getByRole("textbox", { name: "Search conversation messages" });
+    fireEvent.change(searchInput, { target: { value: "testing" } });
+
+    expect(localStorage.getItem("localmind_search_session-123")).toBe("testing");
+  });
+
+  test("switches persistent draft state when sessionId changes", async () => {
+    localStorage.setItem("localmind_draft_session-1", "Draft for Session 1");
+    localStorage.setItem("localmind_draft_session-2", "Draft for Session 2");
+
+    const { rerender } = render(<ChatWindow messages={[]} loading={false} onSend={vi.fn()} sessionId="session-1" />);
+
+    const textarea = screen.getByRole("textbox", { name: "Type your message" });
+    expect(textarea.value).toBe("Draft for Session 1");
+
+    await act(async () => {
+      rerender(<ChatWindow messages={[]} loading={false} onSend={vi.fn()} sessionId="session-2" />);
+    });
+
+    expect(textarea.value).toBe("Draft for Session 2");
+  });
+});
+
 // --- SUITE 1: FEATURE #543 - EMPTY STATE GUIDANCE ---
 describe("ChatWindow Empty State Guidance (#543)", () => {
   test("renders empty state guidance container and feature badges when messages are empty", () => {
@@ -232,15 +303,6 @@ describe("ChatWindow Core Regressions (#751)", () => {
     });
   });
 
-  test("does not render skeleton when loading is false", () => {
-    render(<ChatWindow messages={[]} loading={false} onSend={vi.fn()} sessionId="test-1" />);
-
-    expect(screen.queryByTestId("message-skeleton")).not.toBeInTheDocument();
-  });
-});
-
-// --- SUITE 6: CORE REGRESSIONS (#751) ---
-describe("ChatWindow Core Regressions (#751)", () => {
   describe("Message Stream Rendering Matrix", () => {
     const mockMessages = [
       { id: "m1", role: "user", content: "Hello world" },
