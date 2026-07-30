@@ -61,14 +61,15 @@ def index_document(file_path: str, session_id: str, doc_id: int | None = None) -
 
     docs = loader_cls(file_path).load()
     
-    # Fetch live chunk overlap bounds configuration directly from database cache settings
+    # Fetch live chunk size and overlap bounds configuration directly from database cache settings
     from services.db_service import get_settings
     current_settings = get_settings()
+    chunk_size_val = current_settings.get("rag_chunk_size", 600)
     overlap_val = current_settings.get("rag_chunk_overlap", 50)
 
     # Initialize a clean dynamic splitter configured to the user's current settings preference
     dynamic_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=600,
+        chunk_size=int(chunk_size_val),
         chunk_overlap=int(overlap_val),
         separators=["\n\n", "\n", ". ", " "],
     )
