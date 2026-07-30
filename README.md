@@ -148,9 +148,21 @@ python warmup.py
 
 Set the `HF_HOME` environment variable if storing model cache in persistent volumes across container builds or cloud deployments (defaulting to `~/.cache/huggingface`).
 
+### Citation Merging in RAG Deployment
+
+LocalMind uses `build_sources()` in `backend/services/citation_utils.py` to merge duplicate `(source, chunk)` tuples into structured source chunks with 300-character text previews. This reduces payload sizes and memory overhead during streaming RAG responses.
+
+For detailed architecture, schema, and deployment guidelines, see [docs/citation-merging.md](docs/citation-merging.md).
+
+### Vector Retrieval Benchmark Harness
+
+LocalMind includes a retrieval performance benchmark suite in `backend/tests/test_chromadb_benchmark.py` to evaluate vector embedding (`all-MiniLM-L6-v2`) and ChromaDB query latency across varying chunk volumes and `top_k` configurations prior to deployment.
+
+For detailed benchmark specifications, metrics, and pre-deployment guidelines, see [docs/benchmark-harness.md](docs/benchmark-harness.md).
+
 #### Build and deploy config validation
 
-Before opening a deployment PR or triggering a hosted build, validate the config and cache state that the docs and deploy files depend on:
+Before opening a deployment PR or triggering a hosted build, validate the config, citation merging, cache state, and benchmark harness that the docs and deploy files depend on:
 
 ```bash
 # Validate local Docker Compose syntax and service wiring
@@ -167,12 +179,20 @@ npm run build
 # Pre-warm and validate the backend embeddings cache
 cd ../backend
 python warmup.py
+
+# Validate citation merging and source chunk formatting
+pytest tests/test_citations.py
+
+# Validate vector retrieval latency and benchmark harness
+pytest tests/test_chromadb_benchmark.py
 ```
 
 Check these environment values before deploy:
 
 - Backend: `OLLAMA_HOST` must point at a reachable Ollama server, `DEFAULT_MODEL` must be pulled on that server, and `CORS_ORIGINS` must list the exact frontend origin without a path.
 - Embeddings Cache: pre-warm sentence-transformers weights cache with `python warmup.py` in the backend directory to prevent first-request cold-boot latency.
+- Citation Merging: run backend citation unit tests (`pytest tests/test_citations.py`) to verify source deduplication and inline preview formatting prior to deployment.
+- Benchmark Harness: run ChromaDB retrieval benchmark tests (`pytest tests/test_chromadb_benchmark.py`) to verify vector search response times and embedding latency before deployment.
 - Frontend: `VITE_API_BASE_URL` must point at the deployed backend API and include `/api`.
 - Render: keep `render.yaml` aligned with the documented backend `healthCheckPath` (`/health`) and frontend build command (`npm install && npm run build`).
 - Vercel: keep `vercel.json` aligned with the documented frontend output directory (`frontend/dist`) and build command (`cd frontend && npm run build`).
