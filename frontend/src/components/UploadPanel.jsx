@@ -234,183 +234,160 @@ export default function UploadPanel({ sessionId, documents, isLoading = false, o
         </button>
       </div>
 
-      {/* Drop zone */}
-      <div
-        onDragEnter={e => e.preventDefault()}
-        onDragOver={e => { e.preventDefault(); setDragging(true) }}
-        onDragLeave={() => setDragging(false)}
-        onDrop={onDrop}
-        onClick={() => fileRef.current.click()}
-        className={`border-2 border-dashed rounded-xl px-4 py-5 text-center cursor-pointer transition mb-3
-          ${dragging ? "border-purple-500 bg-purple-900/20" : "border-gray-700 hover:border-purple-600 hover:bg-gray-800/50"}`}
-      >
-        {/* Updated accept attribute to include .srt and .vtt transcript options */}
-        <input ref={fileRef} type="file" accept=".pdf,.txt,.csv,.docx,.md,.html,.srt,.vtt" className="hidden" multiple
-          onChange={e => handleFiles(e.target.files)} />
-
-        <p className="text-2xl mb-1 flex justify-center">
-          {uploading ? <SpinnerIcon className="w-7 h-7 text-purple-400" /> : <UploadIcon className="w-7 h-7 text-gray-300" />}
-        </p>
-        <p className="text-sm text-gray-400">{uploading ? "Indexing documents..." : "Drop files here or click to browse"}</p>
-
-        {/* Updated visual footer labels to explicitly display audio transcript support */}
-        <p className="text-xs text-gray-600 mt-1">PDF · TXT · CSV · DOCX · MD · HTML · SRT · VTT · max 50MB</p>
-      </div>
-
-      {uploadResults.length > 0 && (
-        <div className="mb-2">
-          {uploadResults.map((r, i) => (
-            <p key={i} className={`text-xs mb-1 inline-flex items-center gap-1 ${r.status === "success" ? "text-green-400" : "text-red-400"}`}>
-              {r.status === "success" ? <CheckIcon className="w-3.5 h-3.5" /> : <ErrorIcon className="w-3.5 h-3.5" />}
-              <span className="truncate">{r.filename}{r.status === "error" ? `: ${r.message}` : ""}</span>
-            </p>
-          ))}
+      {error && (
+        <div data-testid="upload-error-banner" className="mb-3 text-xs bg-red-950/40 border border-red-900/60 text-red-400 p-2.5 rounded-lg flex items-start gap-2">
+          <ErrorIcon className="w-4 h-4 text-red-400 shrink-0 mt-0.5" aria-hidden="true" />
+          <div className="flex-1">
+            <p className="font-semibold text-red-300">Upload Failure</p>
+            <p className="text-red-400/90 leading-relaxed mt-0.5">{error}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setError("")}
+            className="text-red-400/60 hover:text-red-300 text-base font-bold leading-none px-1 rounded focus:outline-none focus:ring-1 focus:ring-red-500"
+            aria-label="Dismiss failure banner"
+          >
+            ×
+          </button>
         </div>
       )}
-
-      {/* Uploaded docs list */}
-      {documents.length > 0 && (
-        { error && (
-          <div data-testid="upload-error-banner" className="mb-3 text-xs bg-red-950/40 border border-red-900/60 text-red-400 p-2.5 rounded-lg flex items-start gap-2">
-            <ErrorIcon className="w-4 h-4 text-red-400 shrink-0 mt-0.5" aria-hidden="true" />
-            <div className="flex-1">
-              <p className="font-semibold text-red-300">Upload Failure</p>
-              <p className="text-red-400/90 leading-relaxed mt-0.5">{error}</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setError("")}
-              className="text-red-400/60 hover:text-red-300 text-base font-bold leading-none px-1 rounded focus:outline-none focus:ring-1 focus:ring-red-500"
-              aria-label="Dismiss failure banner"
-            >
-              ×
-            </button>
-          </div>
-        )}
 
       {/* Expanded Workspace Content Panel */}
       {!isCollapsed && (
         <div>
-          {/* Drop zone */}
-          <div
-            tabIndex={0}
-            role="button"
-            aria-label="File upload drop zone. Press Enter or Space to browse."
-            onDragOver={e => { e.preventDefault(); setDragging(true); }}
-            onDragLeave={() => setDragging(false)}
-            onDrop={onDrop}
-            onClick={() => fileRef.current.click()}
-            onKeyDown={handleDropzoneKeyDown}
-            className={`border-2 border-dashed rounded-xl px-3 py-4 sm:px-4 sm:py-5 text-center cursor-pointer transition mb-3 outline-none focus:ring-2 focus:ring-purple-500
-              ${dragging ? "border-purple-500 bg-purple-900/20" : "border-gray-700 hover:border-purple-600 hover:bg-gray-800/50"}`}
-          >
-            <input ref={fileRef} type="file" accept=".pdf,.txt,.csv,.docx,.md,.html,.srt,.vtt" className="hidden" multiple
-              aria-label="Upload document input"
-              onChange={e => handleFiles(e.target.files)} />
-
-            <p className="text-2xl mb-1 flex justify-center">
-              {uploading ? <SpinnerIcon className="w-7 h-7 text-purple-400 animate-spin" /> : <UploadIcon className="w-7 h-7 text-gray-300" />}
-            </p>
-            <p className="text-xs sm:text-sm text-gray-400">{uploading ? "Indexing documents..." : "Drop files here or click to browse"}</p>
-            <p className="text-[10px] sm:text-xs text-gray-600 mt-1">PDF · TXT · CSV · DOCX · MD · HTML · SRT · VTT · max 50MB</p>
-          </div>
-
-          {/* Inline Document Skeleton during uploading (#564) */}
-          {uploading && (
-            <div data-testid="document-uploading-skeleton" className="animate-pulse flex items-center justify-between text-xs bg-gray-800/70 border border-purple-500/30 rounded-lg px-3 py-2 mb-2">
-              <div className="flex items-center gap-2">
-                <SpinnerIcon className="w-3.5 h-3.5 text-purple-400 animate-spin" />
-                <div className="h-3 bg-purple-900/50 rounded w-28"></div>
+          {isLoading ? (
+            <div data-testid="upload-panel-skeleton" className="animate-pulse space-y-3 my-2">
+              <div className="h-28 bg-gray-800/70 border border-dashed border-gray-700 rounded-xl flex flex-col items-center justify-center p-5">
+                <div className="w-8 h-8 bg-gray-700/60 rounded-full mb-2"></div>
+                <div className="h-3 bg-gray-700/60 rounded w-40 mb-2"></div>
+                <div className="h-2 bg-gray-700/60 rounded w-24"></div>
               </div>
-              <div className="h-3 bg-gray-700/50 rounded w-16"></div>
-            </div>
-          )}
-
-          {/* Staged draft workspace block rendering (#574) */}
-          {draftFile && (
-            <div className="bg-purple-950/20 border border-purple-900/40 rounded-xl p-3 mb-3 flex flex-col gap-2">
-              <div className="flex items-center justify-between text-xs text-gray-300">
-                <span className="inline-flex items-center gap-1.5 font-medium truncate max-w-[80%]">
-                  <FileIcon className="w-3.5 h-3.5 text-purple-400" aria-hidden="true" />
-                  {draftFile.name} <span className="text-[10px] text-purple-400/80 bg-purple-950 px-1.5 py-0.5 rounded border border-purple-800/30">Draft</span>
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setDraftFile(null)}
-                  className="text-gray-500 hover:text-gray-300 text-sm leading-none p-1"
-                  title="Cancel draft"
-                >
-                  ×
-                </button>
-              </div>
-              <button
-                type="button"
-                disabled={uploading}
-                onClick={commitDraftUpload}
-                className="w-full bg-purple-600 hover:bg-purple-500 disabled:bg-gray-800 text-white font-medium text-xs py-1.5 rounded-lg transition"
-              >
-                {uploading ? "Uploading Draft..." : "Upload Draft"}
-              </button>
-            </div>
-          )}
-
-          {uploadResults.length > 0 && (
-            <div className="mb-2">
-              {uploadResults.map((r, i) => (
-                <p key={i} className={`text-xs mb-1 inline-flex items-center gap-1 ${r.status === "success" ? "text-green-400" : "text-red-400"}`}>
-                  {r.status === "success" ? <CheckIcon className="w-3.5 h-3.5" /> : <ErrorIcon className="w-3.5 h-3.5" />}
-                  <span className="truncate">{r.filename}{r.status === "error" ? `: ${r.message}` : ""}</span>
-                </p>
-              ))}
-            </div>
-          )}
-
-          {result && <p className="text-xs text-green-400 mb-2 inline-flex items-center gap-1"><CheckIcon className="w-3.5 h-3.5" />{result.message}</p>}
-
-          {/* Uploaded docs list OR Empty-state guidance (#565) inside the expanded panel */}
-          {documents && documents.length > 0 ? (
-            <div aria-label="Indexed documents collection">
-              <p className="text-xs text-gray-500 mb-1">Indexed documents:</p>
-              <ul className="space-y-1">
-                {documents.map((d, i) => {
-                  const currentFilename = d.filename || d;
-                  return (
-                    <li key={i} className="flex items-center justify-between text-xs bg-gray-800 rounded-lg px-3 py-2 sm:py-1.5 mb-1 hover:bg-gray-750 transition min-h-[36px]">
-                      <span className="text-gray-300 truncate inline-flex items-center gap-1 max-w-[65%]">
-                        <FileIcon className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-                        <span className="truncate">{currentFilename}</span>
-                      </span>
-                      <div className="flex items-center gap-2 shrink-0">
-                        {d.chunks_indexed && <span className="text-gray-500 text-[11px] sm:text-xs">{d.chunks_indexed} chunks</span>}
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); handleTriggerPreview(currentFilename); }}
-                          className="p-2 sm:p-1 text-gray-400 hover:text-purple-400 rounded transition min-w-[32px] min-h-[32px] sm:min-w-0 sm:min-h-0 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-purple-500"
-                          title="Preview Document Content"
-                          disabled={loadingPreview}
-                        >
-                          {loadingPreview && previewFilename === currentFilename ? (
-                            <SpinnerIcon className="w-3.5 h-3.5 animate-spin" />
-                          ) : (
-                            "👁️"
-                          )}
-                        </button>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
+              <div className="h-10 bg-gray-800/70 border border-gray-850 rounded-lg"></div>
             </div>
           ) : (
-            <div
-              data-testid="upload-empty-state"
-              className="bg-gray-950/40 border border-gray-800/80 rounded-xl p-4 text-center my-2"
-            >
-              <p className="text-xs font-medium text-gray-400 mb-1">No documents added yet</p>
-              <p className="text-[11px] text-gray-500 leading-relaxed">
-                Upload files above to index context for your session workspace. Supported formats include PDF, TXT, CSV, DOCX, MD, and HTML.
-              </p>
-            </div>
+            <>
+              {/* Drop zone */}
+              <div
+                tabIndex={0}
+                role="button"
+                aria-label="File upload drop zone. Press Enter or Space to browse."
+                onDragOver={e => { e.preventDefault(); setDragging(true); }}
+                onDragLeave={() => setDragging(false)}
+                onDrop={onDrop}
+                onClick={() => fileRef.current.click()}
+                onKeyDown={handleDropzoneKeyDown}
+                className={`border-2 border-dashed rounded-xl px-3 py-4 sm:px-4 sm:py-5 text-center cursor-pointer transition mb-3 outline-none focus:ring-2 focus:ring-purple-500
+                  ${dragging ? "border-purple-500 bg-purple-900/20" : "border-gray-700 hover:border-purple-600 hover:bg-gray-800/50"}`}
+              >
+                <input ref={fileRef} type="file" accept=".pdf,.txt,.csv,.docx,.md,.html,.srt,.vtt" className="hidden" multiple
+                  aria-label="Upload document input"
+                  onChange={e => handleFiles(e.target.files)} />
+
+                <p className="text-2xl mb-1 flex justify-center">
+                  {uploading ? <SpinnerIcon className="w-7 h-7 text-purple-400 animate-spin" /> : <UploadIcon className="w-7 h-7 text-gray-300" />}
+                </p>
+                <p className="text-xs sm:text-sm text-gray-400">{uploading ? "Indexing documents..." : "Drop files here or click to browse"}</p>
+                <p className="text-[10px] sm:text-xs text-gray-600 mt-1">PDF · TXT · CSV · DOCX · MD · HTML · SRT · VTT · max 50MB</p>
+              </div>
+
+              {/* Inline Document Skeleton during uploading (#564) */}
+              {uploading && (
+                <div data-testid="document-uploading-skeleton" className="animate-pulse flex items-center justify-between text-xs bg-gray-800/70 border border-purple-500/30 rounded-lg px-3 py-2 mb-2">
+                  <div className="flex items-center gap-2">
+                    <SpinnerIcon className="w-3.5 h-3.5 text-purple-400 animate-spin" />
+                    <div className="h-3 bg-purple-900/50 rounded w-28"></div>
+                  </div>
+                  <div className="h-3 bg-gray-700/50 rounded w-16"></div>
+                </div>
+              )}
+
+              {/* Staged draft workspace block rendering (#574) */}
+              {draftFile && (
+                <div className="bg-purple-950/20 border border-purple-900/40 rounded-xl p-3 mb-3 flex flex-col gap-2">
+                  <div className="flex items-center justify-between text-xs text-gray-300">
+                    <span className="inline-flex items-center gap-1.5 font-medium truncate max-w-[80%]">
+                      <FileIcon className="w-3.5 h-3.5 text-purple-400" aria-hidden="true" />
+                      {draftFile.name} <span className="text-[10px] text-purple-400/80 bg-purple-950 px-1.5 py-0.5 rounded border border-purple-800/30">Draft</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setDraftFile(null)}
+                      className="text-gray-500 hover:text-gray-300 text-sm leading-none p-1"
+                      title="Cancel draft"
+                    >
+                      ×
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={uploading}
+                    onClick={commitDraftUpload}
+                    className="w-full bg-purple-600 hover:bg-purple-500 disabled:bg-gray-800 text-white font-medium text-xs py-1.5 rounded-lg transition"
+                  >
+                    {uploading ? "Uploading Draft..." : "Upload Draft"}
+                  </button>
+                </div>
+              )}
+
+              {uploadResults.length > 0 && (
+                <div className="mb-2">
+                  {uploadResults.map((r, i) => (
+                    <p key={i} className={`text-xs mb-1 inline-flex items-center gap-1 ${r.status === "success" ? "text-green-400" : "text-red-400"}`}>
+                      {r.status === "success" ? <CheckIcon className="w-3.5 h-3.5" /> : <ErrorIcon className="w-3.5 h-3.5" />}
+                      <span className="truncate">{r.filename}{r.status === "error" ? `: ${r.message}` : ""}</span>
+                    </p>
+                  ))}
+                </div>
+              )}
+
+              {result && <p className="text-xs text-green-400 mb-2 inline-flex items-center gap-1"><CheckIcon className="w-3.5 h-3.5" />{result.message}</p>}
+
+              {/* Uploaded docs list OR Empty-state guidance (#565) inside the expanded panel */}
+              {documents && documents.length > 0 ? (
+                <div aria-label="Indexed documents collection">
+                  <p className="text-xs text-gray-500 mb-1">Indexed documents:</p>
+                  <ul className="space-y-1">
+                    {documents.map((d, i) => {
+                      const currentFilename = d.filename || d;
+                      return (
+                        <li key={i} className="flex items-center justify-between text-xs bg-gray-800 rounded-lg px-3 py-2 sm:py-1.5 mb-1 hover:bg-gray-750 transition min-h-[36px]">
+                          <span className="text-gray-300 truncate inline-flex items-center gap-1 max-w-[65%]">
+                            <FileIcon className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                            <span className="truncate">{currentFilename}</span>
+                          </span>
+                          <div className="flex items-center gap-2 shrink-0">
+                            {d.chunks_indexed && <span className="text-gray-500 text-[11px] sm:text-xs">{d.chunks_indexed} chunks</span>}
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); handleTriggerPreview(currentFilename); }}
+                              className="p-2 sm:p-1 text-gray-400 hover:text-purple-400 rounded transition min-w-[32px] min-h-[32px] sm:min-w-0 sm:min-h-0 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-purple-500"
+                              title="Preview Document Content"
+                              disabled={loadingPreview}
+                            >
+                              {loadingPreview && previewFilename === currentFilename ? (
+                                <SpinnerIcon className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                "👁️"
+                              )}
+                            </button>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              ) : (
+                <div
+                  data-testid="upload-empty-state"
+                  className="bg-gray-950/40 border border-gray-800/80 rounded-xl p-4 text-center my-2"
+                >
+                  <p className="text-xs font-medium text-gray-400 mb-1">No documents added yet</p>
+                  <p className="text-[11px] text-gray-500 leading-relaxed">
+                    Upload files above to index context for your session workspace. Supported formats include PDF, TXT, CSV, DOCX, MD, and HTML.
+                  </p>
+                </div>
+              )}
+            </>
           )}
         </div>
       )}
