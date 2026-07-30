@@ -27,7 +27,7 @@ This significantly reduces the CSRF surface, but a residual risk exists:
 
 `SecurityMiddleware` wraps every request, executing the following phases:
 
-**Phase 1: CSRF Validation**
+#### Phase 1: CSRF Validation
 1. **Safe methods** (`GET`, `HEAD`, `OPTIONS`) — always passed through.
 2. **Mutating methods** (`POST`, `PUT`, `PATCH`, `DELETE`):
    - If **no `Origin` header** is present → request is allowed.
@@ -40,7 +40,7 @@ This significantly reduces the CSRF surface, but a residual risk exists:
    the header is normalised to `scheme://host` and checked against the same
    list.
 
-**Phase 2: Request Deduplication**
+#### Phase 2: Request Deduplication
 For allowed mutating requests, the middleware hashes the request (IP, method, path, and body) to prevent duplicate executions:
 - **First Request**: Stores a `'processing'` sentinel in `dedupe_cache` (SQLite) and forwards the request.
 - **Concurrent Duplicate**: If a matching request arrives while the first is still processing, it immediately receives `HTTP 409 Conflict`.

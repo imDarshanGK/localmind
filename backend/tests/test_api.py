@@ -143,6 +143,8 @@ def test_session_title_trimming_emoji():
     assert "\ufffd" not in sess["title"]
 
     # Test case 2: normal ASCII message -> title is trimmed and has "..." (no regression)
+    with db.get_db() as conn:
+        conn.execute("DELETE FROM dedupe_cache")
     r2 = client.post("/api/sessions/", json={"title": "New Chat"})
     sid2 = r2.json()["id"]
     msg2 = "This is a very long ASCII message that will definitely exceed the limit of forty characters."
@@ -151,6 +153,8 @@ def test_session_title_trimming_emoji():
     assert sess2["title"] == "This is a very long ASCII message that w..."
 
     # Test case 3: message shorter than limit -> title unchanged
+    with db.get_db() as conn:
+        conn.execute("DELETE FROM dedupe_cache")
     r3 = client.post("/api/sessions/", json={"title": "New Chat"})
     sid3 = r3.json()["id"]
     msg3 = "Short message"

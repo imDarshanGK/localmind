@@ -196,9 +196,8 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
 
         # Consume the response body so we can cache and then reconstruct it.
-        res_body = b""
-        async for chunk in response.body_iterator:
-            res_body += chunk
+        # Use b"".join for O(N) accumulation (better than += for large payloads)
+        res_body = b"".join([chunk async for chunk in response.body_iterator])
 
         # Only cache successful responses.
         # Error responses (4xx, 5xx) must NOT be persisted to the 'done' cache:

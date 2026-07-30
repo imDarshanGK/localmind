@@ -245,6 +245,9 @@ def test_prometheus_metrics():
 
 # ── Deduplication helpers & tests ─────────────────────────────────────────────
 
+import backend.middleware.csrf as csrf_module
+csrf_module._DEDUPE_WINDOW_SECONDS = 60.0
+
 def _compute_hash(method: str, path: str, body_dict: dict) -> str:
     """Replicate the SHA-256 signature the SecurityMiddleware computes.
 
@@ -302,8 +305,8 @@ def test_in_progress_sentinel_returns_409():
     body = {"title": "In-progress sentinel test"}
     req_hash = _compute_hash("POST", "/api/sessions/", body)
 
-    # Simulate a request already mid-handler by inserting the sentinel.
-    db.dedupe_set_processing(req_hash, expires_at=time.time() + 5.0)
+    # Simulate a request already mid-handler by inserting the sentinel with a long expiry for CI.
+    db.dedupe_set_processing(req_hash, expires_at=time.time() + 60.0)
 
     r = client.post("/api/sessions/", json=body)
     assert r.status_code == 409, (
