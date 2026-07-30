@@ -22,6 +22,10 @@ export default function PluginsPanel({ sessionId, onClose }) {
   const [copied, setCopied] = useState(false);
   const [logs, setLogs] = useState([]);
 
+  // State for contextual menu and action toast feedback (#605)
+  const [activeMenuId, setActiveMenuId] = useState(null);
+  const [notification, setNotification] = useState("");
+
   // Persistence: View collapsed state (#592)
   const [isCollapsed, setIsCollapsed] = useState(() => {
     try {
@@ -102,6 +106,67 @@ export default function PluginsPanel({ sessionId, onClose }) {
     setCopied(false);
   }
 
+  // Close contextual action menu on global click or Escape key
+  useEffect(() => {
+    const handleGlobalClick = () => setActiveMenuId(null);
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") setActiveMenuId(null);
+    };
+    window.addEventListener("click", handleGlobalClick);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("click", handleGlobalClick);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
+
+  const showNotification = (msg) => {
+    setNotification(msg);
+    setTimeout(() => setNotification(""), 3000);
+  };
+
+  // Export Action (#605)
+  const handleExportPlugin = (e, plugin) => {
+    e.stopPropagation();
+    setActiveMenuId(null);
+    try {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(plugin, null, 2));
+      const downloadAnchor = document.createElement("a");
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `${plugin.id}-config.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      showNotification(`Exported ${plugin.name} configuration.`);
+    } catch (err) {
+      console.error("Export failed", err);
+      setError("Failed to export plugin config.");
+    }
+  };
+
+  // Share Action (#605)
+  const handleSharePlugin = async (e, plugin) => {
+    e.stopPropagation();
+    setActiveMenuId(null);
+    const shareUrl = `${window.location.origin}${window.location.pathname}?plugin=${plugin.id}`;
+    try {
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(shareUrl);
+        showNotification(`Copied share link for ${plugin.name}!`);
+      } else {
+        showNotification(`Share link: ${shareUrl}`);
+      }
+    } catch (err) {
+      console.error("Share failed", err);
+      showNotification(`Share link: ${shareUrl}`);
+    }
+  };
+
+  const toggleContextMenu = (e, pluginId) => {
+    e.stopPropagation();
+    setActiveMenuId((prev) => (prev === pluginId ? null : pluginId));
+  };
+
   async function run() {
     if (!selected || !input.trim() || running) return;
     setRunning(true);
@@ -135,7 +200,7 @@ export default function PluginsPanel({ sessionId, onClose }) {
   };
 
   return (
-    <div className="border-b border-gray-800 bg-gray-900 px-5 py-4 shrink-0" data-testid="plugins-panel">
+    <div className="border-b border-gray-800 bg-gray-900 px-5 py-4 shrink-0 relative" data-testid="plugins-panel">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-1.5">
           {/* Collapse/Expand toggle button */}
@@ -153,7 +218,7 @@ export default function PluginsPanel({ sessionId, onClose }) {
             Plugins Workspace
           </p>
 
-          {/* FIXED (#593): Pure CSS/Tailwind interactive help tooltip utility box */}
+          {/* Interactive help tooltip utility box (#593) */}
           <div className="group relative inline-block">
             <button
               type="button"
@@ -171,7 +236,9 @@ export default function PluginsPanel({ sessionId, onClose }) {
         </div>
 
         <button
+          type="button"
           onClick={onClose}
+          data-testid="close-panel-btn"
           className="text-gray-500 hover:text-gray-300 text-2xl md:text-lg leading-none p-1"
           aria-label="Close panel"
         >
@@ -179,15 +246,27 @@ export default function PluginsPanel({ sessionId, onClose }) {
         </button>
       </div>
 
+      {/* Action Notification Banner (#605) */}
+      {notification && (
+        <div data-testid="action-notification" className="mb-3 text-xs bg-purple-950/60 border border-purple-800 text-purple-300 p-2 rounded-lg flex items-center justify-between shadow-sm">
+          <span>{notification}</span>
+          <button onClick={() => setNotification("")} className="text-purple-400 hover:text-white font-bold ml-2">×</button>
+        </div>
+      )}
+
       {/* Global Inline Error Banner (#588) */}
       {error && (
-        <div className="mb-3 text-xs bg-red-950/40 border border-red-900/50 text-red-400 p-2.5 rounded-xl flex items-start gap-2 shadow-sm transition-all duration-200">
+        <div
+          data-testid="plugin-error-message"
+          className="mb-3 text-xs bg-red-950/40 border border-red-900/50 text-red-400 p-2.5 rounded-xl flex items-start gap-2 shadow-sm transition-all duration-200"
+        >
           <ErrorIcon className="w-4 h-4 mt-0.5 shrink-0 text-red-400" />
           <div className="flex-1">
             <span className="font-semibold block mb-0.5">Plugin Error</span>
             <p className="text-red-300/90 leading-relaxed">{error}</p>
           </div>
           <button
+            type="button"
             onClick={() => setError("")}
             className="text-red-500 hover:text-red-300 transition font-bold text-sm leading-none px-1"
             title="Dismiss error"
@@ -200,33 +279,66 @@ export default function PluginsPanel({ sessionId, onClose }) {
       {/* Collapsible Panel Section (#592) */}
       {!isCollapsed && (
         <>
-          {/* Plugin selector row */}
-          <div className="flex flex-wrap gap-2 mb-4 md:mb-3 shrink-0">
-            {plugins.map((p) => (
-              <button
-                key={p.id}
-                onClick={() => handleSelectPlugin(p)}
-                className={`text-xs px-3.5 py-2 md:py-1.5 rounded-lg border transition font-medium touch-manipulation
-                  ${selected?.id === p.id ? "border-purple-500 bg-purple-900/30 text-purple-300 shadow-sm shadow-purple-500/10" : "border-gray-700 text-gray-400 hover:bg-gray-800"}`}
-              >
-                {(() => {
-                  const Icon = PLUGIN_ICONS[p.icon] || PlugIcon;
-                  return (
-                    <span className="inline-flex items-center gap-1">
-                      <Icon className="w-3.5 h-3.5" />
-                      <span>{p.name}</span>
-                    </span>
-                  );
-                })()}
-              </button>
-            ))}
+          {/* Plugin selector row with contextual dropdown menus (#605) */}
+          <div data-testid="plugin-selector-list" className="flex flex-wrap gap-2 mb-4 md:mb-3 shrink-0">
+            {plugins.map((p) => {
+              const Icon = PLUGIN_ICONS[p.icon] || PlugIcon;
+              const isMenuOpen = activeMenuId === p.id;
+
+              return (
+                <div
+                  key={p.id}
+                  onClick={() => handleSelectPlugin(p)}
+                  data-testid={`plugin-btn-${p.id}`}
+                  className={`relative text-xs px-3.5 py-2 md:py-1.5 rounded-lg border transition font-medium flex items-center gap-1.5 cursor-pointer touch-manipulation select-none
+                    ${selected?.id === p.id ? "border-purple-500 bg-purple-900/30 text-purple-300 shadow-sm shadow-purple-500/10" : "border-gray-700 text-gray-400 hover:bg-gray-800"}`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  <span>{p.name}</span>
+
+                  {/* Context Menu Trigger Button */}
+                  <button
+                    type="button"
+                    onClick={(e) => toggleContextMenu(e, p.id)}
+                    aria-label={`Options for ${p.name}`}
+                    className="ml-1 text-gray-500 hover:text-gray-200 transition px-1 rounded hover:bg-gray-700/50 font-bold"
+                  >
+                    ⋮
+                  </button>
+
+                  {/* Context Dropdown Menu (#605) */}
+                  {isMenuOpen && (
+                    <div
+                      onClick={(e) => e.stopPropagation()}
+                      className="absolute left-0 top-full mt-1 w-36 bg-gray-950 border border-gray-800 rounded-lg shadow-xl z-50 py-1 text-xs text-gray-300 font-normal"
+                    >
+                      <button
+                        type="button"
+                        onClick={(e) => handleSharePlugin(e, p)}
+                        className="w-full text-left px-3 py-1.5 hover:bg-gray-800 hover:text-white"
+                      >
+                        Share Plugin
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => handleExportPlugin(e, p)}
+                        className="w-full text-left px-3 py-1.5 hover:bg-gray-800 hover:text-white"
+                      >
+                        Export Config
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
           {/* Plugin Input/Output Area OR Empty-State Guidance */}
           {selected ? (
-            <div className="space-y-3 md:space-y-2 flex-1 md:flex-initial flex flex-col justify-start shrink-0">
+            <div data-testid="plugin-workspace" className="space-y-3 md:space-y-2 flex-1 md:flex-initial flex flex-col justify-start shrink-0">
               <p className="text-xs text-gray-500">{selected.description}</p>
               <textarea
+                data-testid="plugin-input-textarea"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder={`Enter input for ${selected.name}...`}
@@ -235,6 +347,8 @@ export default function PluginsPanel({ sessionId, onClose }) {
               />
               <div className="flex items-center justify-between">
                 <button
+                  type="button"
+                  data-testid="run-plugin-btn"
                   onClick={run}
                   disabled={!input.trim() || running}
                   className="w-full md:w-auto text-sm md:text-xs bg-purple-700 hover:bg-purple-600 disabled:opacity-40 text-white px-5 py-2.5 md:py-1.5 rounded-lg transition font-medium shadow-md"
@@ -256,7 +370,7 @@ export default function PluginsPanel({ sessionId, onClose }) {
                       {copied ? "Copied!" : "Copy"}
                     </button>
                   </div>
-                  <pre className="text-xs bg-gray-800 border border-t-0 border-gray-700 rounded-b-xl px-3 py-2 text-green-300 whitespace-pre-wrap max-h-40 overflow-y-auto font-mono">
+                  <pre className="text-xs bg-gray-800 border border-t-0 border-gray-700 rounded-b-xl px-3 py-2 text-green-300 whitespace-pre-wrap max-h-40 overflow-y-auto font-mono" data-testid="plugin-output-display">
                     {output}
                   </pre>
                 </div>

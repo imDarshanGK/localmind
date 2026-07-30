@@ -13,7 +13,7 @@ vi.mock("../utils/api", () => ({
   getPluginLogs: vi.fn().mockResolvedValue({ logs: [] }),
 }));
 
-// Mock icons
+// Mock icon components
 vi.mock("./Icons", () => ({
   BracesIcon: () => <span data-testid="braces-icon" />,
   CalculatorIcon: () => <span data-testid="calculator-icon" />,
@@ -26,11 +26,11 @@ vi.mock("./Icons", () => ({
 }));
 
 const mockPluginsList = [
-  { id: "calculator", name: "Calculator", icon: "calculator", description: "Basic math evaluation" },
-  { id: "summarizer", name: "Summarizer", icon: "summarizer", description: "Summarize provided text" },
+  { id: "calculator", name: "Calculator", icon: "calculator", description: "Performs math evaluation" },
+  { id: "summarizer", name: "Summarizer", icon: "summarizer", description: "Summarizes provided text" },
 ];
 
-describe("PluginsPanel Component Suite (#594)", () => {
+describe("PluginsPanel Interaction Tests (#595)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     api.getPlugins.mockResolvedValue({ plugins: mockPluginsList });
@@ -41,35 +41,54 @@ describe("PluginsPanel Component Suite (#594)", () => {
     cleanup();
   });
 
-  test("renders the plugins panel header title and plugin options", async () => {
+  test("fetches and renders plugin selection options on mount", async () => {
     render(<PluginsPanel sessionId="test-session" onClose={vi.fn()} />);
 
+    expect(screen.getByTestId("plugins-panel")).toBeInTheDocument();
+
     await waitFor(() => {
-      expect(screen.getAllByText("Calculator").length).toBeGreaterThan(0);
-      expect(screen.getAllByText("Summarizer").length).toBeGreaterThan(0);
+      expect(screen.getByTestId("plugin-btn-calculator")).toBeInTheDocument();
+      expect(screen.getByTestId("plugin-btn-summarizer")).toBeInTheDocument();
     });
   });
 
-  test("executes plugin action successfully when run button is clicked", async () => {
-    api.runPlugin.mockResolvedValue({ success: true, output: "42" });
+  test("selecting a plugin displays its workspace and input area", async () => {
+    render(<PluginsPanel sessionId="test-session" onClose={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByTestId("plugin-btn-calculator")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTestId("plugin-btn-calculator"));
+
+    expect(screen.getByTestId("plugin-workspace")).toBeInTheDocument();
+    expect(screen.getByText("Performs math evaluation")).toBeInTheDocument();
+    expect(screen.getByTestId("plugin-input-textarea")).toBeInTheDocument();
+    expect(screen.getByTestId("run-plugin-btn")).toBeDisabled();
+  });
+
+  test("typing input enables the run button and handles successful execution", async () => {
+    api.runPlugin.mockResolvedValueOnce({ success: true, output: "42" });
 
     render(<PluginsPanel sessionId="test-session" onClose={vi.fn()} />);
 
-    await waitFor(() => {
-      expect(screen.getAllByText("Calculator").length).toBeGreaterThan(0);
-    });
+    await waitFor(() => expect(screen.getByTestId("plugin-btn-calculator")).toBeInTheDocument());
 
-    const calcButton = screen.getAllByText("Calculator")[0];
-    fireEvent.click(calcButton);
+    fireEvent.click(screen.getByTestId("plugin-btn-calculator"));
 
-    const textarea = screen.getByPlaceholderText(/Enter input for Calculator.../i);
+    const textarea = screen.getByTestId("plugin-input-textarea");
     fireEvent.change(textarea, { target: { value: "6 * 7" } });
 
-    const runBtn = screen.getByRole("button", { name: /Run Calculator/i });
+    const runBtn = screen.getByTestId("run-plugin-btn");
+    expect(runBtn).not.toBeDisabled();
+
     fireEvent.click(runBtn);
 
     await waitFor(() => {
-      expect(screen.getByText("42")).toBeInTheDocument();
+      expect(api.runPlugin).toHaveBeenCalledWith({
+        plugin: "calculator",
+        input: "6 * 7",
+        session_id: "test-session",
+      });
+      expect(screen.getByTestId("plugin-output-display")).toHaveTextContent("42");
     });
   });
 
@@ -86,20 +105,19 @@ describe("PluginsPanel Component Suite (#594)", () => {
     render(<PluginsPanel sessionId="test-session" onClose={vi.fn()} />);
 
     await waitFor(() => {
-      expect(screen.getAllByText("Calculator").length).toBeGreaterThan(0);
+      expect(screen.getByTestId("plugin-btn-calculator")).toBeInTheDocument();
     });
 
-    const calcButton = screen.getAllByText("Calculator")[0];
-    fireEvent.click(calcButton);
+    fireEvent.click(screen.getByTestId("plugin-btn-calculator"));
 
-    const textarea = screen.getByPlaceholderText(/Enter input for Calculator.../i);
+    const textarea = screen.getByTestId("plugin-input-textarea");
     fireEvent.change(textarea, { target: { value: "6 * 7" } });
 
-    const runBtn = screen.getByRole("button", { name: /Run Calculator/i });
+    const runBtn = screen.getByTestId("run-plugin-btn");
     fireEvent.click(runBtn);
 
     await waitFor(() => {
-      expect(screen.getByText("42")).toBeInTheDocument();
+      expect(screen.getByTestId("plugin-output-display")).toHaveTextContent("42");
     });
 
     const copyBtn = screen.getByRole("button", { name: /Copy/i });
@@ -111,19 +129,102 @@ describe("PluginsPanel Component Suite (#594)", () => {
     });
   });
 
+  test("handles plugin execution failure and renders error message", async () => {
+    api.runPlugin.mockResolvedValueOnce({ success: false, error: "Syntax Error in formula" });
+
+    render(<PluginsPanel sessionId="test-session" onClose={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByTestId("plugin-btn-calculator")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTestId("plugin-btn-calculator"));
+
+    const textarea = screen.getByTestId("plugin-input-textarea");
+    fireEvent.change(textarea, { target: { value: "invalid expression" } });
+
+    fireEvent.click(screen.getByTestId("run-plugin-btn"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("plugin-error-message")).toHaveTextContent("Syntax Error in formula");
+    });
+  });
+
+  test("triggers onClose callback when close button is clicked", async () => {
+    const handleClose = vi.fn();
+    render(<PluginsPanel sessionId="test-session" onClose={handleClose} />);
+
+    fireEvent.click(screen.getByTestId("close-panel-btn"));
+
+    expect(handleClose).toHaveBeenCalledTimes(1);
+  });
+
   test("renders the plugins panel header title and info tooltip icon", async () => {
     render(<PluginsPanel sessionId="test-session" onClose={vi.fn()} />);
 
-    expect(screen.getByText(/Plugins/i)).toBeInTheDocument();
+    expect(screen.getByText(/Plugins Workspace/i)).toBeInTheDocument();
 
-    // Verify info button trigger renders
     const helpButton = screen.getByLabelText(/Plugins panel information description/i);
     expect(helpButton).toBeInTheDocument();
     expect(helpButton.textContent.trim()).toBe("i");
 
-    // Verify tooltip text is rendered in DOM
     const helpText = screen.getByText(/Plugins Workspace Help:/i);
     expect(helpText).toBeInTheDocument();
+  });
+});
+
+describe("PluginsPanel Export & Share Suite (#605)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    api.getPlugins.mockResolvedValue({ plugins: mockPluginsList });
+    api.getPluginLogs.mockResolvedValue({ logs: [] });
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  test("copies shareable plugin URL to clipboard on Share action", async () => {
+    const writeTextMock = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, {
+      clipboard: { writeText: writeTextMock },
+    });
+
+    render(<PluginsPanel sessionId="session-605" onClose={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("plugin-btn-calculator")).toBeInTheDocument();
+    });
+
+    const optionsBtn = screen.getByLabelText("Options for Calculator");
+    fireEvent.click(optionsBtn);
+
+    const shareBtn = screen.getByText("Share Plugin");
+    fireEvent.click(shareBtn);
+
+    expect(writeTextMock).toHaveBeenCalledWith(expect.stringContaining("plugin=calculator"));
+    await waitFor(() => {
+      expect(screen.getByTestId("action-notification")).toHaveTextContent("Copied share link for Calculator!");
+    });
+  });
+
+  test("triggers JSON export download on Export Config action", async () => {
+    const createElementSpy = vi.spyOn(document, "createElement");
+
+    render(<PluginsPanel sessionId="session-605-export" onClose={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("plugin-btn-calculator")).toBeInTheDocument();
+    });
+
+    const optionsBtn = screen.getByLabelText("Options for Calculator");
+    fireEvent.click(optionsBtn);
+
+    const exportBtn = screen.getByText("Export Config");
+    fireEvent.click(exportBtn);
+
+    expect(createElementSpy).toHaveBeenCalledWith("a");
+    await waitFor(() => {
+      expect(screen.getByTestId("action-notification")).toHaveTextContent("Exported Calculator configuration.");
+    });
   });
 });
 
@@ -132,6 +233,7 @@ describe("PluginsPanel View State & Persistence Suite (#592)", () => {
 
   beforeEach(() => {
     store = {};
+    vi.restoreAllMocks();
     vi.spyOn(Storage.prototype, "getItem").mockImplementation((key) => store[key] || null);
     vi.spyOn(Storage.prototype, "setItem").mockImplementation((key, value) => {
       store[key] = String(value);
@@ -146,7 +248,6 @@ describe("PluginsPanel View State & Persistence Suite (#592)", () => {
 
   afterEach(() => {
     cleanup();
-    vi.resetAllMocks();
   });
 
   it("renders plugins list in default expanded state", async () => {
@@ -191,13 +292,13 @@ describe("PluginsPanel View State & Persistence Suite (#592)", () => {
     render(<PluginsPanel sessionId="test-session-4" onClose={vi.fn()} />);
 
     await waitFor(() => {
-      expect(screen.getByText("Summarize provided text")).toBeInTheDocument();
+      expect(screen.getByText("Summarizes provided text")).toBeInTheDocument();
     });
 
     const calcBtn = screen.getByText("Calculator");
     fireEvent.click(calcBtn);
 
     expect(localStorage.setItem).toHaveBeenCalledWith("plugins-panel-selected:test-session-4", "calculator");
-    expect(screen.getByText("Basic math evaluation")).toBeInTheDocument();
+    expect(screen.getByText("Performs math evaluation")).toBeInTheDocument();
   });
 });
