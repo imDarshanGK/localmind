@@ -22,15 +22,21 @@ export default function ChatWindow({ messages = [], loading = false, onSend, onD
   const [showPlusMenu, setShowPlusMenu] = useState(false);
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
+  const [localReactions, setLocalReactions] = useState({});
+  const [hoveredStatsId, setHoveredStatsId] = useState(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+
   const bottomRef = useRef(null);
   const textareaRef = useRef(null);
   const plusMenuRef = useRef(null);
+
+  const REACTION_EMOJIS = ["👍", "❤️", "🔥", "👏", "💡"];
 
   // Re-sync input and search state whenever sessionId changes
   useEffect(() => {
     if (!sessionId) return;
     setInput(localStorage.getItem(`localmind_draft_${sessionId}`) || "");
-    setSearchTerm(localStorage.getItem(`localmind_search_${sessionId}`) || "");
+    SearchTerm(localStorage.getItem(`localmind_search_${sessionId}`) || "");
   }, [sessionId]);
 
   // Sync draft message input to localStorage on edit
@@ -60,11 +66,24 @@ export default function ChatWindow({ messages = [], loading = false, onSend, onD
     }
   }, [messages]);
 
-  const [localReactions, setLocalReactions] = useState({});
-  const [hoveredStatsId, setHoveredStatsId] = useState(null);
-  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    textarea.style.height = "auto";
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 160)}px`;
+  }, [input]);
 
-  const REACTION_EMOJIS = ["👍", "❤️", "🔥", "👏", "💡"];
+  useEffect(() => { setLocalReactions({}); }, [sessionId]);
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (plusMenuRef.current && !plusMenuRef.current.contains(e.target)) {
+        setShowPlusMenu(false);
+      }
+    }
+    if (showPlusMenu) document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showPlusMenu]);
 
   async function handleReactionToggle(messageId, emoji) {
     if (!messageId || typeof messageId === "string") {
@@ -158,25 +177,6 @@ export default function ChatWindow({ messages = [], loading = false, onSend, onD
         <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 6h18M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
       </button>
     );
-
-  useEffect(() => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-    textarea.style.height = "auto";
-    textarea.style.height = `${Math.min(textarea.scrollHeight, 160)}px`;
-  }, [input]);
-
-  useEffect(() => { setLocalReactions({}); }, [sessionId]);
-
-  useEffect(() => {
-    function handleClickOutside(e) {
-      if (plusMenuRef.current && !plusMenuRef.current.contains(e.target)) {
-        setShowPlusMenu(false);
-      }
-    }
-    if (showPlusMenu) document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [showPlusMenu]);
 
   function handleSelectTemplate(template) {
     setSelectedTemplate(template);

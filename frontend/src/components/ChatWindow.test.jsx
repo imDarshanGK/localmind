@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import React from 'react';
 import { render, screen, fireEvent, act, cleanup } from '@testing-library/react';
 import { vi, describe, test, expect, beforeEach, afterEach } from 'vitest';
 import * as jestDomMatchers from "@testing-library/jest-dom/matchers";
@@ -30,6 +31,7 @@ Object.assign(navigator, {
 
 beforeEach(() => {
   window.HTMLElement.prototype.scrollIntoView = vi.fn();
+  localStorage.clear();
 });
 
 afterEach(() => {
