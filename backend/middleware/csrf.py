@@ -102,13 +102,11 @@ class OriginValidationMiddleware(BaseHTTPMiddleware):
                     {"detail": "CSRF check failed: origin not allowed"},
                     status_code=403,
                 )
-        except Exception as exc:
-            logger.error(
-                "Failure recovery triggered in security middleware: method=%s path=%s error=%s",
+        except Exception:
+            logger.exception(
+                "Failure recovery triggered in security middleware: method=%s path=%s",
                 request.method,
                 request.url.path,
-                exc,
-                exc_info=True,
             )
             return JSONResponse(
                 {"detail": "Security verification error: middleware failure recovery triggered"},
