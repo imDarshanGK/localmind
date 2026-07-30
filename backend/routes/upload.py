@@ -165,9 +165,9 @@ async def preview_document(filename: str = Query(...), session_id: str = Query(.
                 content = "\n".join([doc.page_content for doc in docs])
         
         return {"content": content}
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.error("preview_failed path=%s error=%s", file_path, e)
-        raise HTTPException(status_code=500, detail=f"Failed to read document preview: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to read document preview: {e!s}")
 
 
 @router.get("/", response_model=list)
