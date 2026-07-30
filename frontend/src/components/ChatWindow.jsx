@@ -36,7 +36,7 @@ export default function ChatWindow({ messages = [], loading = false, onSend, onD
   useEffect(() => {
     if (!sessionId) return;
     setInput(localStorage.getItem(`localmind_draft_${sessionId}`) || "");
-    setSearchTerm(localStorage.getItem(`localmind_search_${sessionId}`) || "");
+    SearchTerm(localStorage.getItem(`localmind_search_${sessionId}`) || "");
   }, [sessionId]);
 
   // Sync draft message input to localStorage on edit
