@@ -196,6 +196,8 @@ export default function ChatWindow({ messages = [], loading = false, onSend, onD
 
     setInput("");
     setSelectedTemplate(null);
+    
+    // Clear draft from localStorage upon successful send
     if (sessionId) {
       localStorage.removeItem(`localmind_draft_${sessionId}`);
     }
