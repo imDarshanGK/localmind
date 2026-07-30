@@ -18,9 +18,10 @@ import tempfile
 import time
 
 import pytest
+from fastapi.testclient import TestClient
+
 import services.db_service as db
 from app import app
-from fastapi.testclient import TestClient
 
 # ── shared test DB (same pattern as test_api.py) ─────────────────────────────
 _tmp = tempfile.mktemp(suffix="_csrf.db")
@@ -245,7 +246,8 @@ def test_prometheus_metrics():
 
 # ── Deduplication helpers & tests ─────────────────────────────────────────────
 
-import backend.middleware.csrf as csrf_module
+import middleware.csrf as csrf_module
+
 csrf_module._DEDUPE_WINDOW_SECONDS = 60.0
 
 def _compute_hash(method: str, path: str, body_dict: dict) -> str:
