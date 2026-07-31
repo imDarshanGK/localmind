@@ -14,7 +14,13 @@ const PLUGIN_ICONS = {
 export default function PluginsPanel({ sessionId, onClose }) {
   const [plugins, setPlugins] = useState([]);
   const [selected, setSelected] = useState(null);
-  const [input, setInput] = useState("");
+
+  // Persistent input state initialized from localStorage (#596)
+  const [input, setInput] = useState(() => {
+    if (!sessionId) return "";
+    return localStorage.getItem(`localmind_plugin_draft_${sessionId}`) || "";
+  });
+
   const [output, setOutput] = useState("");
   const [running, setRunning] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -96,7 +102,7 @@ export default function PluginsPanel({ sessionId, onClose }) {
       .finally(() => setLoading(false));
 
     fetchLogs();
-  }, [selectedPluginId]);
+  }, [selectedPluginId, sessionId]);
 
   function handleSelectPlugin(plugin) {
     setSelected(plugin);
@@ -106,7 +112,23 @@ export default function PluginsPanel({ sessionId, onClose }) {
     setCopied(false);
   }
 
-  // Close contextual action menu on global click or Escape key
+  // Re-sync input draft whenever sessionId changes (#596)
+  useEffect(() => {
+    if (!sessionId) return;
+    setInput(localStorage.getItem(`localmind_plugin_draft_${sessionId}`) || "");
+  }, [sessionId]);
+
+  // Persist plugin draft input to localStorage on edit (#596)
+  useEffect(() => {
+    if (!sessionId) return;
+    if (input) {
+      localStorage.setItem(`localmind_plugin_draft_${sessionId}`, input);
+    } else {
+      localStorage.removeItem(`localmind_plugin_draft_${sessionId}`);
+    }
+  }, [input, sessionId]);
+
+  // Close contextual action menu on global click or Escape key (#605)
   useEffect(() => {
     const handleGlobalClick = () => setActiveMenuId(null);
     const handleKeyDown = (e) => {
@@ -178,6 +200,10 @@ export default function PluginsPanel({ sessionId, onClose }) {
       if (r.success) {
         setOutput(r.output);
         await fetchLogs();
+        // Clear saved draft from localStorage after successful execution (#596)
+        if (sessionId) {
+          localStorage.removeItem(`localmind_plugin_draft_${sessionId}`);
+        }
       } else {
         setError(r.error || "Plugin failed");
       }
@@ -276,7 +302,7 @@ export default function PluginsPanel({ sessionId, onClose }) {
         </div>
       )}
 
-      {/* Collapsible Panel Section (#592) */}
+      {/* Collapsible Panel Section */}
       {!isCollapsed && (
         <>
           {/* Plugin selector row with contextual dropdown menus (#605) */}
@@ -357,7 +383,7 @@ export default function PluginsPanel({ sessionId, onClose }) {
                 </button>
               </div>
 
-              {/* Output block with copy feedback button (#594) */}
+              {/* Output block with copy feedback button */}
               {output && (
                 <div className="relative mt-2">
                   <div className="flex items-center justify-between bg-gray-800 border border-gray-700 rounded-t-xl px-3 py-1.5 text-xs text-gray-400">
@@ -377,7 +403,7 @@ export default function PluginsPanel({ sessionId, onClose }) {
               )}
             </div>
           ) : (
-            /* Empty State Guidance Card (#587) */
+            /* Empty State Guidance Card */
             <div className="flex-1 md:flex-initial flex flex-col items-center justify-center text-center p-6 my-2 border border-dashed border-gray-800 rounded-xl bg-gray-900/40">
               <PlugIcon className="w-8 h-8 text-gray-600 mb-2 animate-pulse" />
               <p className="text-xs font-medium text-gray-300">No Plugin Selected</p>
