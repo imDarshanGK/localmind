@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import React from 'react';
 import { render, screen, fireEvent, act, cleanup } from '@testing-library/react';
 import { vi, describe, test, expect, beforeEach, afterEach } from 'vitest';
 import * as jestDomMatchers from "@testing-library/jest-dom/matchers";
@@ -7,7 +8,7 @@ import { exportSession } from '../utils/api';
 
 expect.extend(jestDomMatchers);
 
-// Mock Icons and API dependencies
+// Mock API and Icon dependencies
 vi.mock('../utils/api', () => ({
   exportSession: vi.fn(),
 }));
@@ -30,6 +31,7 @@ Object.assign(navigator, {
 
 beforeEach(() => {
   window.HTMLElement.prototype.scrollIntoView = vi.fn();
+  localStorage.clear();
 });
 
 afterEach(() => {
@@ -37,7 +39,133 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-// --- SUITE: TOOLTIP HELP (#549) ---
+// --- SUITE: ACCESSIBILITY LANDMARKS (#547) ---
+describe("ChatWindow Accessibility Landmarks (#547)", () => {
+  test("renders main, log, search/export header, and form landmarks with appropriate aria attributes", () => {
+    const mockMessages = [{ id: "m1", role: "user", content: "Accessibility Test" }];
+    render(<ChatWindow messages={mockMessages} loading={false} onSend={vi.fn()} sessionId="s1" />);
+
+    // Main workspace landmark
+    expect(screen.getByRole("main", { name: "Chat Workspace" })).toBeInTheDocument();
+
+    // Export header landmark
+    expect(screen.getByRole("banner", { name: "Export options" })).toBeInTheDocument();
+
+    // Messages log landmark
+    expect(screen.getByRole("log", { name: "Chat messages history" })).toBeInTheDocument();
+
+    // Message article item
+    expect(screen.getByRole("article", { name: "User message" })).toBeInTheDocument();
+
+    // Message input form landmark
+    expect(screen.getByRole("form", { name: "Message composer" })).toBeInTheDocument();
+  });
+
+  test("triggers message send when composer form is submitted", () => {
+    const onSendSpy = vi.fn();
+    render(<ChatWindow messages={[]} loading={false} onSend={onSendSpy} sessionId="s1" />);
+
+    const textarea = screen.getByRole("textbox", { name: "Type your message" });
+    fireEvent.change(textarea, { target: { value: "Hello LocalMind" } });
+
+    const sendButton = screen.getByRole("button", { name: "Send message" });
+    fireEvent.click(sendButton);
+
+    expect(onSendSpy).toHaveBeenCalledWith("Hello LocalMind");
+  });
+});
+
+// --- SUITE: PERSISTENT VIEW STATE (#548) ---
+describe("ChatWindow Persistent View State (#548)", () => {
+  test("persists draft message to localStorage and restores it on initial load", () => {
+    localStorage.setItem("localmind_draft_session-123", "Saved draft message");
+
+    render(<ChatWindow messages={[]} loading={false} onSend={vi.fn()} sessionId="session-123" />);
+
+    const textarea = screen.getByRole("textbox", { name: "Type your message" });
+    expect(textarea.value).toBe("Saved draft message");
+  });
+
+  test("updates draft message in localStorage as user types", () => {
+    render(<ChatWindow messages={[]} loading={false} onSend={vi.fn()} sessionId="session-123" />);
+
+    const textarea = screen.getByRole("textbox", { name: "Type your message" });
+    fireEvent.change(textarea, { target: { value: "Writing new draft" } });
+
+    expect(localStorage.getItem("localmind_draft_session-123")).toBe("Writing new draft");
+  });
+
+  test("clears draft message from localStorage after sending", () => {
+    const onSendSpy = vi.fn();
+    render(<ChatWindow messages={[]} loading={false} onSend={onSendSpy} sessionId="session-123" />);
+
+    const textarea = screen.getByRole("textbox", { name: "Type your message" });
+    fireEvent.change(textarea, { target: { value: "Draft ready to send" } });
+
+    const sendButton = screen.getByRole("button", { name: "Send message" });
+    fireEvent.click(sendButton);
+
+    expect(onSendSpy).toHaveBeenCalledWith("Draft ready to send");
+    expect(localStorage.getItem("localmind_draft_session-123")).toBeNull();
+  });
+
+  test("persists search filter query in localStorage and restores it on render", () => {
+    localStorage.setItem("localmind_search_session-123", "filter query");
+    const mockMessages = [{ id: "m1", role: "user", content: "filter query result" }];
+
+    render(<ChatWindow messages={mockMessages} loading={false} onSend={vi.fn()} sessionId="session-123" />);
+
+    const searchInput = screen.getByRole("textbox", { name: "Search conversation messages" });
+    expect(searchInput.value).toBe("filter query");
+  });
+
+  test("updates search filter query in localStorage as user types", () => {
+    const mockMessages = [{ id: "m1", role: "user", content: "React testing" }];
+    render(<ChatWindow messages={mockMessages} loading={false} onSend={vi.fn()} sessionId="session-123" />);
+
+    const searchInput = screen.getByRole("textbox", { name: "Search conversation messages" });
+    fireEvent.change(searchInput, { target: { value: "testing" } });
+
+    expect(localStorage.getItem("localmind_search_session-123")).toBe("testing");
+  });
+
+  test("switches persistent draft state when sessionId changes", async () => {
+    localStorage.setItem("localmind_draft_session-1", "Draft for Session 1");
+    localStorage.setItem("localmind_draft_session-2", "Draft for Session 2");
+
+    const { rerender } = render(<ChatWindow messages={[]} loading={false} onSend={vi.fn()} sessionId="session-1" />);
+
+    const textarea = screen.getByRole("textbox", { name: "Type your message" });
+    expect(textarea.value).toBe("Draft for Session 1");
+
+    await act(async () => {
+      rerender(<ChatWindow messages={[]} loading={false} onSend={vi.fn()} sessionId="session-2" />);
+    });
+
+    expect(textarea.value).toBe("Draft for Session 2");
+  });
+});
+
+// --- SUITE 1: FEATURE #543 - EMPTY STATE GUIDANCE ---
+describe("ChatWindow Empty State Guidance (#543)", () => {
+  test("renders empty state guidance container and feature badges when messages are empty", () => {
+    render(<ChatWindow messages={[]} loading={false} onSend={vi.fn()} sessionId="s1" />);
+
+    expect(screen.getByText("LocalMind is ready")).toBeInTheDocument();
+    expect(screen.getByText("💡 Select a suggestion below")).toBeInTheDocument();
+    expect(screen.getByText("📄 Upload documents to query")).toBeInTheDocument();
+    expect(screen.getByText("🔒 Encrypted & Local")).toBeInTheDocument();
+  });
+
+  test("hides empty state guidance container once active messages exist", () => {
+    const mockMessages = [{ id: "m1", role: "user", content: "Hello LocalMind" }];
+    render(<ChatWindow messages={mockMessages} loading={false} onSend={vi.fn()} sessionId="s1" />);
+
+    expect(screen.queryByText("💡 Select a suggestion below")).not.toBeInTheDocument();
+  });
+});
+
+// --- SUITE 2: TOOLTIP HELP (#549) ---
 describe("ChatWindow Tooltip Help (#549)", () => {
   test("renders descriptive title tooltips on interactive and informative elements", () => {
     const mockMessages = [
@@ -70,7 +198,7 @@ describe("ChatWindow Tooltip Help (#549)", () => {
   });
 });
 
-// --- SUITE: MOBILE LAYOUT & RESPONSIVENESS (#546) ---
+// --- SUITE 3: MOBILE LAYOUT & RESPONSIVENESS (#546) ---
 describe("ChatWindow Mobile Layout (#546)", () => {
   test("renders prompt suggestion grid with responsive single/double column classes", () => {
     render(<ChatWindow messages={[]} loading={false} onSend={vi.fn()} sessionId="s1" />);
@@ -93,7 +221,7 @@ describe("ChatWindow Mobile Layout (#546)", () => {
   });
 });
 
-// --- SUITE: KEYBOARD NAVIGATION & INPUT CONTROLS (#545) ---
+// --- SUITE 4: KEYBOARD NAVIGATION & INPUT CONTROLS (#545) ---
 describe("ChatWindow Keyboard Navigation & Core Controls (#545)", () => {
   test("allows navigating suggestion pills via Arrow keys", () => {
     render(<ChatWindow messages={[]} loading={false} onSend={vi.fn()} sessionId="s1" />);
@@ -149,8 +277,23 @@ describe("ChatWindow Keyboard Navigation & Core Controls (#545)", () => {
   });
 });
 
-// --- SUITE 1: REGRESSION SUITE (#751) ---
-describe("ChatWindow Regression Suite (#751)", () => {
+// --- SUITE 5: SKELETON LOADING (#542) ---
+describe("ChatWindow Skeleton Loading Tests (#542)", () => {
+  test("renders loading skeleton when loading is true and no message is streaming", () => {
+    render(<ChatWindow messages={[]} loading={true} onSend={vi.fn()} sessionId="test-1" />);
+
+    expect(screen.getByTestId("message-skeleton")).toBeInTheDocument();
+  });
+
+  test("does not render skeleton when loading is false", () => {
+    render(<ChatWindow messages={[]} loading={false} onSend={vi.fn()} sessionId="test-1" />);
+
+    expect(screen.queryByTestId("message-skeleton")).not.toBeInTheDocument();
+  });
+});
+
+// --- SUITE 6: CORE REGRESSIONS (#751) ---
+describe("ChatWindow Core Regressions (#751)", () => {
   describe("Empty Welcome State Framework", () => {
     test("renders baseline readiness text and suggestions when message logs are empty", () => {
       render(<ChatWindow messages={[]} loading={false} onSend={vi.fn()} sessionId="s1" />);
@@ -163,7 +306,7 @@ describe("ChatWindow Regression Suite (#751)", () => {
   describe("Message Stream Rendering Matrix", () => {
     const mockMessages = [
       { id: "m1", role: "user", content: "Hello world" },
-      { id: "m2", role: "assistant", content: "Hello User!", streaming: true, sources: ["doc1.pdf", "doc2.txt"] }
+      { id: "m2", role: "assistant", content: "Hello User!", streaming: true, sources: [{ source: "doc1.pdf" }, { source: "doc2.txt" }] }
     ];
 
     test("accurately reflects user/assistant visual variations and maps document sources", () => {
@@ -174,6 +317,11 @@ describe("ChatWindow Regression Suite (#751)", () => {
       expect(screen.getByText("typing...")).toBeInTheDocument();
       expect(screen.getByText("doc1.pdf")).toBeInTheDocument();
       expect(screen.getByText("doc2.txt")).toBeInTheDocument();
+    });
+
+    test("displays baseline indicators when thread is computing", () => {
+      render(<ChatWindow messages={[]} loading={true} onSend={vi.fn()} sessionId="s1" />);
+      expect(screen.getAllByText("LocalMind").length).toBeGreaterThan(0);
     });
   });
 
@@ -190,22 +338,7 @@ describe("ChatWindow Regression Suite (#751)", () => {
   });
 });
 
-// --- SUITE 2: SKELETON LOADING SUITE (#542) ---
-describe("ChatWindow Skeleton Loading Tests (#542)", () => {
-  test("renders loading skeleton when loading is true and no message is streaming", () => {
-    render(<ChatWindow messages={[]} loading={true} onSend={vi.fn()} sessionId="test-1" />);
-
-    expect(screen.getByTestId("message-skeleton")).toBeInTheDocument();
-  });
-
-  test("does not render skeleton when loading is false", () => {
-    render(<ChatWindow messages={[]} loading={false} onSend={vi.fn()} sessionId="test-1" />);
-
-    expect(screen.queryByTestId("message-skeleton")).not.toBeInTheDocument();
-  });
-});
-
-// --- SUITE 3: COPY FEEDBACK SUITE (#550 / #750) ---
+// --- SUITE 7: COPY FEEDBACK SUITE (#550 / #750) ---
 describe('ChatWindow Copy Feedback', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -247,5 +380,170 @@ describe('ChatWindow Copy Feedback', () => {
     });
 
     expect(screen.getByTitle('Copy response to clipboard')).toBeInTheDocument();
+  });
+});
+
+// --- SUITE 8: INTERACTION TESTS (#551) ---
+describe("ChatWindow Interaction Tests (#551)", () => {
+  test("triggers onSend when clicking the Send button with non-empty input", () => {
+    const onSendSpy = vi.fn();
+    render(
+      <ChatWindow
+        messages={[]}
+        loading={false}
+        onSend={onSendSpy}
+        sessionId="session-interaction"
+      />
+    );
+
+    const textarea = screen.getByPlaceholderText(/Ask anything.../i);
+    const sendButton = screen.getByRole("button", { name: /Send/i });
+
+    expect(sendButton).toBeDisabled();
+
+    fireEvent.change(textarea, { target: { value: "Hello from interaction test" } });
+    expect(sendButton).not.toBeDisabled();
+
+    fireEvent.click(sendButton);
+
+    expect(onSendSpy).toHaveBeenCalledWith("Hello from interaction test");
+    expect(textarea.value).toBe("");
+  });
+
+  test("triggers onStop callback when computing and Stop button is clicked", () => {
+    const onStopSpy = vi.fn();
+    render(
+      <ChatWindow
+        messages={[]}
+        loading={true}
+        onSend={vi.fn()}
+        onStop={onStopSpy}
+        sessionId="session-interaction"
+      />
+    );
+
+    const stopButton = screen.getByRole("button", { name: /Stop/i });
+    expect(stopButton).toBeInTheDocument();
+
+    fireEvent.click(stopButton);
+    expect(onStopSpy).toHaveBeenCalledTimes(1);
+  });
+
+  test("filters rendered messages in real time based on search input", () => {
+    const mockMessages = [
+      { id: "msg-1", role: "user", content: "First query about Python" },
+      { id: "msg-2", role: "assistant", content: "Here is Python explanation" },
+      { id: "msg-3", role: "user", content: "Unrelated Docker text" }
+    ];
+
+    render(
+      <ChatWindow
+        messages={mockMessages}
+        loading={false}
+        onSend={vi.fn()}
+        sessionId="session-interaction"
+      />
+    );
+
+    const searchInput = screen.getByPlaceholderText(/Search messages.../i);
+
+    expect(screen.getByText("First query about Python")).toBeInTheDocument();
+    expect(screen.getByText("Unrelated Docker text")).toBeInTheDocument();
+
+    fireEvent.change(searchInput, { target: { value: "Python" } });
+
+    expect(screen.getByText("First query about Python")).toBeInTheDocument();
+    expect(screen.queryByText("Unrelated Docker text")).not.toBeInTheDocument();
+
+    const clearBtn = screen.getByRole("button", { name: /Clear search/i });
+    fireEvent.click(clearBtn);
+
+    expect(screen.getByText("Unrelated Docker text")).toBeInTheDocument();
+  });
+});
+
+// --- SUITE 9: SAVED DRAFTS (#552) ---
+describe('ChatWindow Saved Drafts (#552)', () => {
+  test('restores saved draft from localStorage on initial render', () => {
+    localStorage.setItem('localmind_draft_session-1', 'Restored draft content');
+
+    render(
+      <ChatWindow
+        messages={[]}
+        loading={false}
+        onSend={vi.fn()}
+        sessionId="session-1"
+      />
+    );
+
+    const textarea = screen.getByPlaceholderText(/Ask anything.../i);
+    expect(textarea.value).toBe('Restored draft content');
+  });
+
+  test('persists typed input to localStorage in real-time', () => {
+    render(
+      <ChatWindow
+        messages={[]}
+        loading={false}
+        onSend={vi.fn()}
+        sessionId="session-1"
+      />
+    );
+
+    const textarea = screen.getByPlaceholderText(/Ask anything.../i);
+    fireEvent.change(textarea, { target: { value: 'Drafting a new prompt' } });
+
+    expect(localStorage.getItem('localmind_draft_session-1')).toBe(
+      'Drafting a new prompt'
+    );
+  });
+
+  test('clears saved draft from localStorage after sending message', () => {
+    const onSendSpy = vi.fn();
+    render(
+      <ChatWindow
+        messages={[]}
+        loading={false}
+        onSend={onSendSpy}
+        sessionId="session-1"
+      />
+    );
+
+    const textarea = screen.getByPlaceholderText(/Ask anything.../i);
+    fireEvent.change(textarea, { target: { value: 'Ready to submit' } });
+
+    const sendButton = screen.getByRole('button', { name: /Send/i });
+    fireEvent.click(sendButton);
+
+    expect(onSendSpy).toHaveBeenCalledWith('Ready to submit');
+    expect(localStorage.getItem('localmind_draft_session-1')).toBeNull();
+  });
+
+  test('switches draft content dynamically when sessionId changes', () => {
+    localStorage.setItem('localmind_draft_session-A', 'Draft for Session A');
+    localStorage.setItem('localmind_draft_session-B', 'Draft for Session B');
+
+    const { rerender } = render(
+      <ChatWindow
+        messages={[]}
+        loading={false}
+        onSend={vi.fn()}
+        sessionId="session-A"
+      />
+    );
+
+    const textarea = screen.getByPlaceholderText(/Ask anything.../i);
+    expect(textarea.value).toBe('Draft for Session A');
+
+    rerender(
+      <ChatWindow
+        messages={[]}
+        loading={false}
+        onSend={vi.fn()}
+        sessionId="session-B"
+      />
+    );
+
+    expect(textarea.value).toBe('Draft for Session B');
   });
 });

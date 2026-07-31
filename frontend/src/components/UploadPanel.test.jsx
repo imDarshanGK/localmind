@@ -15,12 +15,13 @@ vi.mock("../utils/api", () => ({
 
 // Mock icons for testing
 vi.mock("./Icons", () => ({
-  CheckIcon: () => <span data-testid="check-icon" />,
-  DocumentsIcon: () => <span data-testid="documents-icon" />,
-  ErrorIcon: () => <span data-testid="error-icon" />,
-  SpinnerIcon: () => <span data-testid="spinner-icon" />,
-  UploadIcon: () => <span data-testid="upload-icon" />,
-  FileIcon: () => <span data-testid="file-icon" />,
+  CheckIcon: (props) => <span data-testid="check-icon" {...props} />,
+  DocumentsIcon: (props) => <span data-testid="documents-icon" {...props} />,
+  ErrorIcon: (props) => <span data-testid="error-icon" {...props} />,
+  SpinnerIcon: (props) => <span data-testid="spinner-icon" {...props} />,
+  UploadIcon: (props) => <span data-testid="upload-icon" {...props} />,
+  FileIcon: (props) => <span data-testid="file-icon" {...props} />,
+  CopyIcon: (props) => <span data-testid="copy-icon" {...props} />,
 }));
 
 afterEach(() => {
@@ -137,15 +138,15 @@ describe("UploadPanel Persistence State Interface Suite (#570)", () => {
   test("loads collapsed default parameters if flags exist inside localStorage store maps", () => {
     store["upload-panel-collapsed:session-persist-1"] = "true";
 
-    render(<UploadPanel sessionId="session-persist-1" documents={[]} onUploaded={() => {}} onClose={() => {}} show={true} />);
-    
+    render(<UploadPanel sessionId="session-persist-1" documents={[]} onUploaded={() => { }} onClose={() => { }} show={true} />);
+
     const dropzoneText = screen.queryByText(/Drop files here or click to browse/i);
-    expect(dropzoneText).toBeNull(); 
+    expect(dropzoneText).toBeNull();
   });
 
   test("toggles view metrics and updates localStorage states during click actions", () => {
-    render(<UploadPanel sessionId="session-persist-2" documents={[]} onUploaded={() => {}} onClose={() => {}} show={true} />);
-    
+    render(<UploadPanel sessionId="session-persist-2" documents={[]} onUploaded={() => { }} onClose={() => { }} show={true} />);
+
     const toggleButton = screen.getByLabelText(/Collapse upload section/i);
     fireEvent.click(toggleButton);
 
@@ -155,16 +156,16 @@ describe("UploadPanel Persistence State Interface Suite (#570)", () => {
 
 describe("UploadPanel Tooltip Help Interface Suite (#571)", () => {
   test("renders the information help button trigger icon accurately", () => {
-    render(<UploadPanel sessionId="session-tooltip" documents={[]} onUploaded={() => {}} onClose={() => {}} show={true} />);
-    
+    render(<UploadPanel sessionId="session-tooltip" documents={[]} onUploaded={() => { }} onClose={() => { }} show={true} />);
+
     const infoButton = screen.getByLabelText(/Upload limits information description/i);
     expect(infoButton).toBeDefined();
     expect(infoButton.textContent.trim()).toBe("i");
   });
 
   test("contains hidden tooltip descriptions outlining file limits parameters", () => {
-    render(<UploadPanel sessionId="session-tooltip" documents={[]} onUploaded={() => {}} onClose={() => {}} show={true} />);
-    
+    render(<UploadPanel sessionId="session-tooltip" documents={[]} onUploaded={() => { }} onClose={() => { }} show={true} />);
+
     const inlineTooltipText = screen.getByText(/Supported Upload Formats:/i);
     expect(inlineTooltipText).toBeDefined();
   });
@@ -172,15 +173,15 @@ describe("UploadPanel Tooltip Help Interface Suite (#571)", () => {
 
 describe("UploadPanel Accessibility Landmarks Suite (#569)", () => {
   test("contains accessible section landmarks and titles", () => {
-    render(<UploadPanel sessionId="session-access" documents={[]} onUploaded={() => {}} onClose={() => {}} show={true} />);
-    
+    render(<UploadPanel sessionId="session-access" documents={[]} onUploaded={() => { }} onClose={() => { }} show={true} />);
+
     const panelSection = screen.getByRole("region", { name: /documents/i });
     expect(panelSection).toBeDefined();
   });
 
   test("includes a live region wrapper with role status for operational reports", () => {
-    render(<UploadPanel sessionId="session-access" documents={[]} onUploaded={() => {}} onClose={() => {}} show={true} />);
-    
+    render(<UploadPanel sessionId="session-access" documents={[]} onUploaded={() => { }} onClose={() => { }} show={true} />);
+
     const liveRegion = screen.queryByRole("status") || screen.queryByTestId("upload-panel");
     expect(liveRegion).toBeDefined();
   });
@@ -189,7 +190,7 @@ describe("UploadPanel Accessibility Landmarks Suite (#569)", () => {
 describe("UploadPanel Mobile and Responsive Layout Layout Suite (#568)", () => {
   test("implements mobile view responsive fluid layout classes", () => {
     const { container } = render(
-      <UploadPanel sessionId="session-mobile-1" documents={[]} onUploaded={() => {}} onClose={() => {}} show={true} />
+      <UploadPanel sessionId="session-mobile-1" documents={[]} onUploaded={() => { }} onClose={() => { }} show={true} />
     );
 
     const mainPanel = container.firstChild;
@@ -201,12 +202,12 @@ describe("UploadPanel Mobile and Responsive Layout Layout Suite (#568)", () => {
   test("scales indexed list elements to accommodate mobile touch bounds targets", () => {
     const mockDocs = [{ filename: "mobile_spec.pdf", chunks_indexed: 12 }];
     render(
-      <UploadPanel sessionId="session-mobile-2" documents={mockDocs} onUploaded={() => {}} onClose={() => {}} show={true} />
+      <UploadPanel sessionId="session-mobile-2" documents={mockDocs} onUploaded={() => { }} onClose={() => { }} show={true} />
     );
 
     const docText = screen.getByText("mobile_spec.pdf");
     const containerRow = docText.closest("li") || docText.closest("div");
-    
+
     expect(containerRow.className).toContain("min-h-[36px]");
   });
 });
@@ -215,14 +216,14 @@ describe("UploadPanel Keyboard Navigation Accessibility Suite (#567)", () => {
   test("fires onClose event handler cleanly when hitting the Escape key", () => {
     const mockOnClose = vi.fn();
     render(<UploadPanel sessionId="session-key-1" documents={[]} onUploaded={vi.fn()} onClose={mockOnClose} show={true} />);
-    
+
     fireEvent.keyDown(window, { key: "Escape" });
     expect(mockOnClose).toHaveBeenCalledTimes(1);
   });
 
   test("makes drop zone interactive and focusable with keyboard event binds", () => {
     render(<UploadPanel sessionId="session-key-2" documents={[]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />);
-    
+
     const dropzone = screen.getByRole("button", { name: /File upload drop zone/i });
     expect(dropzone).toBeDefined();
     expect(dropzone.tabIndex).toBe(0);
@@ -240,12 +241,12 @@ describe("UploadPanel Global Error Banner Interface Suite (#566)", () => {
 
   test("renders full structured banner details successfully when request fails", async () => {
     api.uploadDocument.mockRejectedValueOnce(new Error("File allocation table mapping rejected context bounds."));
-    
+
     render(<UploadPanel sessionId="session-err-2" documents={[]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />);
-    
+
     const file = new File(["test data payload"], "matrix.txt", { type: "text/plain" });
     const dropzone = screen.getByText(/Drop files here or click to browse/i);
-    
+
     fireEvent.drop(dropzone, {
       dataTransfer: { files: [file] }
     });
@@ -262,12 +263,12 @@ describe("UploadPanel Global Error Banner Interface Suite (#566)", () => {
 
   test("clears current alert state wrapper when firing click events on layout close button", async () => {
     api.uploadDocument.mockRejectedValueOnce(new Error("Storage block exhausted."));
-    
+
     render(<UploadPanel sessionId="session-err-3" documents={[]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />);
-    
+
     const file = new File(["data"], "log.txt", { type: "text/plain" });
     const dropzone = screen.getByText(/Drop files here or click to browse/i);
-    
+
     fireEvent.drop(dropzone, { dataTransfer: { files: [file] } });
 
     const uploadBtn = screen.getByRole("button", { name: /Upload Draft/i });
@@ -287,7 +288,7 @@ describe("UploadPanel Global Error Banner Interface Suite (#566)", () => {
 describe("UploadPanel Saved Drafts Workflow Suite (#574)", () => {
   test("stages dropped documents as a local draft item first without launching network actions", () => {
     render(<UploadPanel sessionId="session-draft-1" documents={[]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />);
-    
+
     const dropzone = screen.getByText(/Drop files here or click to browse/i).parentElement;
     const mockFile = new File(["draft-content"], "contract_draft.pdf", { type: "application/pdf" });
 
@@ -303,7 +304,7 @@ describe("UploadPanel Saved Drafts Workflow Suite (#574)", () => {
 
   test("clears the active draft workspace when clicking the cancel button", () => {
     render(<UploadPanel sessionId="session-draft-2" documents={[]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />);
-    
+
     const dropzone = screen.getByText(/Drop files here or click to browse/i).parentElement;
     const mockFile = new File(["draft-content"], "contract_draft.pdf", { type: "application/pdf" });
 
@@ -320,9 +321,9 @@ describe("UploadPanel Saved Drafts Workflow Suite (#574)", () => {
   test("submits network upload execution stack when the user hits the commit action button", async () => {
     api.uploadDocument.mockResolvedValueOnce({ filename: "contract_draft.pdf", message: "Draft processed" });
     const onUploadedSpy = vi.fn();
-    
+
     render(<UploadPanel sessionId="session-draft-3" documents={[]} onUploaded={onUploadedSpy} onClose={vi.fn()} show={true} />);
-    
+
     const dropzone = screen.getByText(/Drop files here or click to browse/i).parentElement;
     const mockFile = new File(["draft-content"], "contract_draft.pdf", { type: "application/pdf" });
 
@@ -344,20 +345,20 @@ describe("UploadPanel Saved Drafts Workflow Suite (#574)", () => {
 describe("UploadPanel Interaction Test Suite (#573)", () => {
   test("triggers file selection window when clicking the drop zone", () => {
     render(<UploadPanel sessionId="session-int-1" documents={[]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />);
-    
+
     const dropzone = screen.getByText(/Drop files here or click to browse/i).parentElement;
     const input = dropzone.querySelector("input[type='file']");
-    
+
     const clickSpy = vi.spyOn(input, "click");
     input.addEventListener('click', (e) => e.stopPropagation(), { once: true });
-    
+
     fireEvent.click(dropzone);
     expect(clickSpy).toHaveBeenCalledTimes(1);
   });
 
   test("manages drag state styles when dragging items over and out of the viewport", () => {
     render(<UploadPanel sessionId="session-int-2" documents={[]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />);
-    
+
     const textNode = screen.getByText(/Drop files here or click to browse/i);
     const dropzone = textNode.parentElement;
 
@@ -375,10 +376,10 @@ describe("UploadPanel Interaction Test Suite (#573)", () => {
   test("executes upload handler sequence accurately when a valid file is dropped", async () => {
     const mockResponse = { filename: "resume.pdf", message: "Document parsed successfully" };
     api.uploadDocument.mockResolvedValueOnce(mockResponse);
-    
+
     const onUploadedSpy = vi.fn();
     render(<UploadPanel sessionId="session-int-3" documents={[]} onUploaded={onUploadedSpy} onClose={vi.fn()} show={true} />);
-    
+
     const dropzone = screen.getByText(/Drop files here or click to browse/i).parentElement;
     const mockFile = new File(["content"], "resume.pdf", { type: "application/pdf" });
 
@@ -455,7 +456,7 @@ describe("UploadPanel multi-select upload", () => {
 
   it("shows document preview on success", async () => {
     api.previewDocument.mockResolvedValue({ content: "This is the document content preview." });
-    
+
     render(
       <UploadPanel sessionId="session-multi-4" documents={[{ filename: "test.pdf", chunks_indexed: 5 }]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />
     );
@@ -506,5 +507,263 @@ describe("UploadPanel multi-select upload", () => {
     const clearButton2 = screen.getByText("Clear Selection");
     fireEvent.click(clearButton2);
     expect(screen.queryByText("Failed to Load Preview")).not.toBeInTheDocument();
+  });
+});
+
+describe("UploadPanel Clipboard Copy Feedback Suite", () => {
+  let originalClipboard;
+
+  beforeEach(() => {
+    originalClipboard = navigator.clipboard;
+  });
+
+  afterEach(() => {
+    if (originalClipboard !== undefined) {
+      Object.defineProperty(navigator, "clipboard", {
+        value: originalClipboard,
+        writable: true,
+        configurable: true,
+      });
+    } else {
+      delete navigator.clipboard;
+    }
+  });
+
+  test("copies filename to clipboard and handles success feedback", async () => {
+    const writeTextMock = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText: writeTextMock },
+      writable: true,
+      configurable: true,
+    });
+
+    render(
+      <UploadPanel
+        sessionId="test-session"
+        documents={[{ filename: "test_doc.pdf", chunks_indexed: 5 }]}
+        onUploaded={vi.fn()}
+        onClose={vi.fn()}
+        show={true}
+        feedbackTimeout={50}
+      />
+    );
+
+    const copyBtn = screen.getByTitle("Copy Filename");
+    expect(screen.getByTestId("copy-default-icon")).toBeInTheDocument();
+
+    fireEvent.click(copyBtn);
+
+    expect(writeTextMock).toHaveBeenCalledWith("test_doc.pdf");
+
+    await waitFor(() => {
+      expect(screen.getByTestId("copy-success-icon")).toBeInTheDocument();
+    });
+    expect(screen.getByTestId("copy-aria-feedback").textContent).toBe(
+      "Filename test_doc.pdf copied to clipboard"
+    );
+
+    // Wait for it to revert
+    await waitFor(() => {
+      expect(screen.getByTestId("copy-default-icon")).toBeInTheDocument();
+    });
+  });
+
+  test("handles filename copy failure feedback", async () => {
+    const writeTextMock = vi.fn().mockRejectedValue(new Error("Permission denied"));
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText: writeTextMock },
+      writable: true,
+      configurable: true,
+    });
+
+    render(
+      <UploadPanel
+        sessionId="test-session"
+        documents={[{ filename: "test_doc.pdf", chunks_indexed: 5 }]}
+        onUploaded={vi.fn()}
+        onClose={vi.fn()}
+        show={true}
+        feedbackTimeout={50}
+      />
+    );
+
+    const copyBtn = screen.getByTitle("Copy Filename");
+    fireEvent.click(copyBtn);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("copy-failed-icon")).toBeInTheDocument();
+    });
+    expect(screen.getByTestId("copy-aria-feedback").textContent).toBe(
+      "Failed to copy filename test_doc.pdf"
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("copy-default-icon")).toBeInTheDocument();
+    });
+  });
+
+  test("handles empty/missing filename copying gracefully", async () => {
+    const writeTextMock = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText: writeTextMock },
+      writable: true,
+      configurable: true,
+    });
+
+    // Provide empty/falsy document name
+    render(
+      <UploadPanel
+        sessionId="test-session"
+        documents={[{ filename: "", chunks_indexed: 5 }]}
+        onUploaded={vi.fn()}
+        onClose={vi.fn()}
+        show={true}
+        feedbackTimeout={50}
+      />
+    );
+
+    const copyBtn = screen.getByTitle("Copy Filename");
+    fireEvent.click(copyBtn);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("copy-failed-icon")).toBeInTheDocument();
+    });
+    expect(screen.getByTestId("copy-aria-feedback").textContent).toBe(
+      "Failed to copy filename. Filename is empty."
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("copy-default-icon")).toBeInTheDocument();
+    });
+  });
+
+  test("rapid repeated clicks reset state and do not stack timers", async () => {
+    const writeTextMock = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText: writeTextMock },
+      writable: true,
+      configurable: true,
+    });
+
+    render(
+      <UploadPanel
+        sessionId="test-session"
+        documents={[{ filename: "test_doc.pdf", chunks_indexed: 5 }]}
+        onUploaded={vi.fn()}
+        onClose={vi.fn()}
+        show={true}
+        feedbackTimeout={100}
+      />
+    );
+
+    const copyBtn = screen.getByTitle("Copy Filename");
+
+    // Click multiple times rapidly
+    fireEvent.click(copyBtn);
+    await waitFor(() => expect(screen.getByTestId("copy-success-icon")).toBeInTheDocument());
+
+    // Wait 40ms, click again (this clears/resets the timer)
+    await new Promise(r => setTimeout(r, 40));
+    fireEvent.click(copyBtn);
+    await waitFor(() => expect(screen.getByTestId("copy-success-icon")).toBeInTheDocument());
+
+    // Wait another 40ms, click again
+    await new Promise(r => setTimeout(r, 40));
+    fireEvent.click(copyBtn);
+    await waitFor(() => expect(screen.getByTestId("copy-success-icon")).toBeInTheDocument());
+
+    // Wait 60ms - still shouldn't have reverted (total 100ms from last click needed)
+    await new Promise(r => setTimeout(r, 60));
+    expect(screen.getByTestId("copy-success-icon")).toBeInTheDocument();
+
+    // Now wait another 60ms (total 120ms from last click) -> should revert!
+    await waitFor(() => expect(screen.getByTestId("copy-default-icon")).toBeInTheDocument());
+  });
+
+  test("copies preview content to clipboard and handles success/failure feedback", async () => {
+    const writeTextMock = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText: writeTextMock },
+      writable: true,
+      configurable: true,
+    });
+
+    api.previewDocument.mockResolvedValue({ content: "Sample preview text content" });
+
+    render(
+      <UploadPanel
+        sessionId="test-session"
+        documents={[{ filename: "preview_doc.pdf", chunks_indexed: 5 }]}
+        onUploaded={vi.fn()}
+        onClose={vi.fn()}
+        show={true}
+        feedbackTimeout={50}
+      />
+    );
+
+    const previewButtons = screen.getAllByTitle("Preview Document Content");
+    fireEvent.click(previewButtons[0]);
+
+    await waitFor(() => expect(screen.getByText("Sample preview text content")).toBeInTheDocument());
+
+    const copyPreviewBtn = screen.getByTitle("Copy Document Preview Content");
+    expect(screen.getByTestId("preview-copy-default-icon")).toBeInTheDocument();
+
+    fireEvent.click(copyPreviewBtn);
+
+    expect(writeTextMock).toHaveBeenCalledWith("Sample preview text content");
+    await waitFor(() => {
+      expect(screen.getByTestId("preview-copy-success-icon")).toBeInTheDocument();
+    });
+    expect(screen.getByText("Copied!")).toBeInTheDocument();
+    expect(screen.getByTestId("copy-aria-feedback").textContent).toBe(
+      "Document preview content copied to clipboard"
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("preview-copy-default-icon")).toBeInTheDocument();
+    });
+  });
+
+  test("handles preview copy failure feedback gracefully", async () => {
+    const writeTextMock = vi.fn().mockRejectedValue(new Error("Clipboard error"));
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText: writeTextMock },
+      writable: true,
+      configurable: true,
+    });
+
+    api.previewDocument.mockResolvedValue({ content: "Sample preview text content" });
+
+    render(
+      <UploadPanel
+        sessionId="test-session"
+        documents={[{ filename: "preview_doc.pdf", chunks_indexed: 5 }]}
+        onUploaded={vi.fn()}
+        onClose={vi.fn()}
+        show={true}
+        feedbackTimeout={50}
+      />
+    );
+
+    const previewButtons = screen.getAllByTitle("Preview Document Content");
+    fireEvent.click(previewButtons[0]);
+
+    await waitFor(() => expect(screen.getByText("Sample preview text content")).toBeInTheDocument());
+
+    const copyPreviewBtn = screen.getByTitle("Copy Document Preview Content");
+    fireEvent.click(copyPreviewBtn);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("preview-copy-failed-icon")).toBeInTheDocument();
+    });
+    expect(screen.getByText("Failed to copy")).toBeInTheDocument();
+    expect(screen.getByTestId("copy-aria-feedback").textContent).toBe(
+      "Failed to copy document preview content"
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("preview-copy-default-icon")).toBeInTheDocument();
+    });
   });
 });

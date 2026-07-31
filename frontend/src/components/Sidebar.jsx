@@ -33,6 +33,7 @@ export default function Sidebar({
   onRenameSession, 
   error,
   onErrorDismiss,
+  sessionsLoading = false,
 }) {
   const [search, setSearch] = useState("");
   const [activeIndex, setActiveIndex] = useState(-1);
@@ -331,6 +332,7 @@ export default function Sidebar({
           <button
             onClick={() => setDeleteConfirm({ sessionId: s.id, sessionName: s.title })}
             aria-label={`Delete chat session ${s.title || "New Chat"}`}
+            title={`Delete session "${s.title || "New Chat"}"`}
             tabIndex={-1}
             className="relative group/del opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 px-1.5 py-2 transition text-sm font-medium shrink-0"
           >
@@ -517,27 +519,58 @@ export default function Sidebar({
           aria-label="Chat Sessions History"
           className="flex-1 overflow-y-auto px-2 py-2 outline-none"
         >
-          {isExpanded && filtered.length === 0 && (
-            <p className="text-xs text-gray-600 px-2 py-1" data-testid="empty-message">
-              {sessions.length === 0 ? "No chats yet. Start one!" : "No results."}
-            </p>
-          )}
-
-          {/* Render Pinned Items Block */}
-          {pinnedSessions.length > 0 && (
-            <div className="mb-4">
-              {isExpanded && <p className="text-[10px] font-bold text-gray-500 px-2 mb-1 uppercase tracking-wider">Pinned</p>}
-              {pinnedSessions.map((s) => renderSessionRow(s))}
+          {sessionsLoading ? (
+            <div className="space-y-1.5" data-testid="sidebar-sessions-skeleton">
+              {[...Array(4)].map((_, i) => (
+                <div
+                  key={i}
+                  data-testid="session-skeleton"
+                  className={`animate-pulse flex items-center rounded-lg mb-0.5 pl-1 pr-1 bg-gray-800/40 border border-transparent min-h-[32px] ${
+                    isExpanded ? "justify-between" : "justify-center"
+                  }`}
+                >
+                  <div className={`flex items-center flex-1 ${isExpanded ? "pl-5 pr-1" : "justify-center"}`}>
+                    <div className="w-3.5 h-3.5 bg-gray-700/60 rounded shrink-0" />
+                    {isExpanded && (
+                      <>
+                        <div className="w-1.5 h-1.5 rounded-full bg-gray-700/60 shrink-0 ml-1.5" />
+                        <div className={`h-3 bg-gray-700/60 rounded ml-2 ${
+                          i % 3 === 0 ? "w-28" : i % 3 === 1 ? "w-20" : "w-24"
+                        }`} />
+                      </>
+                    )}
+                  </div>
+                  {isExpanded && (
+                    <div className="w-8 h-3 bg-gray-700/60 rounded shrink-0 ml-2" />
+                  )}
+                </div>
+              ))}
             </div>
-          )}
+          ) : (
+            <>
+              {isExpanded && filtered.length === 0 && (
+                <p className="text-xs text-gray-600 px-2 py-1" data-testid="empty-message">
+                  {sessions.length === 0 ? "No chats yet. Start one!" : "No results."}
+                </p>
+              )}
 
-          {/* Render Normal Items Block */}
-          <div>
-            {isExpanded && pinnedSessions.length > 0 && unpinnedSessions.length > 0 && (
-              <p className="text-[10px] font-bold text-gray-500 px-2 mb-1 uppercase tracking-wider">Recent</p>
-            )}
-            {unpinnedSessions.map((s) => renderSessionRow(s))}
-          </div>
+              {/* Render Pinned Items Block */}
+              {pinnedSessions.length > 0 && (
+                <div className="mb-4">
+                  {isExpanded && <p className="text-[10px] font-bold text-gray-500 px-2 mb-1 uppercase tracking-wider">Pinned</p>}
+                  {pinnedSessions.map((s) => renderSessionRow(s))}
+                </div>
+              )}
+
+              {/* Render Normal Items Block */}
+              <div>
+                {isExpanded && pinnedSessions.length > 0 && unpinnedSessions.length > 0 && (
+                  <p className="text-[10px] font-bold text-gray-500 px-2 mb-1 uppercase tracking-wider">Recent</p>
+                )}
+                {unpinnedSessions.map((s) => renderSessionRow(s))}
+              </div>
+            </>
+          )}
         </nav>
 
         {/* Source Attributions footer */}

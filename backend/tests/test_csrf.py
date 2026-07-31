@@ -204,3 +204,27 @@ def test_plugin_run_attacker_origin_blocked():
         headers={"Origin": "https://evil.com"},
     )
     assert r.status_code == 403
+
+
+# ── Failure Recovery Tests ───────────────────────────────────────────────────
+
+from unittest.mock import patch
+
+
+def test_security_middleware_failure_recovery_on_exception():
+    """When an exception occurs during origin verification, middleware returns 500 fail-closed."""
+    with patch("middleware.csrf._origin_from_header", side_effect=RuntimeError("Header extraction fault")):
+        r = client.post(
+            "/api/sessions/",
+            json={"title": "Failure recovery test"},
+        )
+        assert r.status_code == 500
+        assert "Security verification error" in r.json().get("detail", "")
+
+
+def test_security_middleware_failure_recovery_safe_methods():
+    """Safe HTTP methods bypass origin processing and succeed even during header faults."""
+    with patch("middleware.csrf._origin_from_header", side_effect=RuntimeError("Header extraction fault")):
+        r = client.get("/api/sessions/")
+        assert r.status_code == 200
+

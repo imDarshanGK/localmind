@@ -229,6 +229,28 @@ def test_upload_too_large(monkeypatch):
     assert r.status_code == 413
 
 
+def test_upload_preview_endpoint(tmp_path, monkeypatch):
+    import routes.upload as up
+    monkeypatch.setattr(up, "UPLOAD_DIR", tmp_path)
+    
+    session_id = "test_preview_session"
+    filename = "doc.txt"
+    file_path = tmp_path / f"{session_id}_{filename}"
+    file_path.write_text("Hello this is a preview document file content.")
+    
+    r = client.get(f"/api/upload/preview?filename={filename}&session_id={session_id}")
+    assert r.status_code == 200
+    assert r.json() == {"content": "Hello this is a preview document file content."}
+
+
+def test_upload_preview_not_found(tmp_path, monkeypatch):
+    import routes.upload as up
+    monkeypatch.setattr(up, "UPLOAD_DIR", tmp_path)
+    
+    r = client.get("/api/upload/preview?filename=nonexistent.txt&session_id=s1")
+    assert r.status_code == 404
+
+
 def test_upload_emits_structured_logs(caplog):
     import logging
 
