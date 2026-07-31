@@ -11,10 +11,49 @@ const PLUGIN_ICONS = {
   jsonformat: BracesIcon,
 };
 
+// Helper badge renderer for compatibility tags (#597)
+function CompatibilityBadge({ compatibility }) {
+  if (!compatibility) return null;
+
+  const badges = Array.isArray(compatibility)
+    ? compatibility
+    : typeof compatibility === "object"
+    ? Object.values(compatibility)
+    : [compatibility];
+
+  return (
+    <div className="inline-flex items-center gap-1 flex-wrap">
+      {badges.map((badge, idx) => {
+        const isLocal = String(badge).toLowerCase().includes("local") || String(badge).toLowerCase().includes("v1");
+        const badgeStyle = isLocal
+          ? "bg-emerald-950/60 text-emerald-400 border-emerald-800/60"
+          : "bg-blue-950/60 text-blue-400 border-blue-800/60";
+
+        return (
+          <span
+            key={idx}
+            data-testid="compatibility-badge"
+            className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${badgeStyle}`}
+          >
+            {badge}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function PluginsPanel({ sessionId, onClose }) {
   const [plugins, setPlugins] = useState([]);
+  const [searchQuery, setSearchQuery] = useState("");
   const [selected, setSelected] = useState(null);
-  const [input, setInput] = useState("");
+
+  // Persistent input state initialized from localStorage (#596)
+  const [input, setInput] = useState(() => {
+    if (!sessionId) return "";
+    return localStorage.getItem(`localmind_plugin_draft_${sessionId}`) || "";
+  });
+
   const [output, setOutput] = useState("");
   const [running, setRunning] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -31,6 +70,10 @@ export default function PluginsPanel({ sessionId, onClose }) {
       return [];
     }
   });
+
+  // State for contextual menu and action toast feedback (#605)
+  const [activeMenuId, setActiveMenuId] = useState(null);
+  const [notification, setNotification] = useState("");
 
   // Persistence: View collapsed state (#592)
   const [isCollapsed, setIsCollapsed] = useState(() => {
@@ -111,7 +154,7 @@ export default function PluginsPanel({ sessionId, onClose }) {
       .finally(() => setLoading(false));
 
     fetchLogs();
-  }, [selectedPluginId]);
+  }, [selectedPluginId, sessionId]);
 
   function handleSelectPlugin(plugin) {
     setSelected(plugin);
@@ -128,6 +171,83 @@ export default function PluginsPanel({ sessionId, onClose }) {
     );
   }
 
+  // Re-sync input draft whenever sessionId changes (#596)
+  useEffect(() => {
+    if (!sessionId) return;
+    setInput(localStorage.getItem(`localmind_plugin_draft_${sessionId}`) || "");
+  }, [sessionId]);
+
+  // Persist plugin draft input to localStorage on edit (#596)
+  useEffect(() => {
+    if (!sessionId) return;
+    if (input) {
+      localStorage.setItem(`localmind_plugin_draft_${sessionId}`, input);
+    } else {
+      localStorage.removeItem(`localmind_plugin_draft_${sessionId}`);
+    }
+  }, [input, sessionId]);
+
+  // Close contextual action menu on global click or Escape key (#605)
+  useEffect(() => {
+    const handleGlobalClick = () => setActiveMenuId(null);
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") setActiveMenuId(null);
+    };
+    window.addEventListener("click", handleGlobalClick);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("click", handleGlobalClick);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
+
+  const showNotification = (msg) => {
+    setNotification(msg);
+    setTimeout(() => setNotification(""), 3000);
+  };
+
+  // Export Action (#605)
+  const handleExportPlugin = (e, plugin) => {
+    e.stopPropagation();
+    setActiveMenuId(null);
+    try {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(plugin, null, 2));
+      const downloadAnchor = document.createElement("a");
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `${plugin.id}-config.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      showNotification(`Exported ${plugin.name} configuration.`);
+    } catch (err) {
+      console.error("Export failed", err);
+      setError("Failed to export plugin config.");
+    }
+  };
+
+  // Share Action (#605)
+  const handleSharePlugin = async (e, plugin) => {
+    e.stopPropagation();
+    setActiveMenuId(null);
+    const shareUrl = `${window.location.origin}${window.location.pathname}?plugin=${plugin.id}`;
+    try {
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(shareUrl);
+        showNotification(`Copied share link for ${plugin.name}!`);
+      } else {
+        showNotification(`Share link: ${shareUrl}`);
+      }
+    } catch (err) {
+      console.error("Share failed", err);
+      showNotification(`Share link: ${shareUrl}`);
+    }
+  };
+
+  const toggleContextMenu = (e, pluginId) => {
+    e.stopPropagation();
+    setActiveMenuId((prev) => (prev === pluginId ? null : pluginId));
+  };
+
   async function run() {
     if (!selected || !input.trim() || running) return;
     setRunning(true);
@@ -139,6 +259,9 @@ export default function PluginsPanel({ sessionId, onClose }) {
       if (r.success) {
         setOutput(r.output);
         await fetchLogs();
+        if (sessionId) {
+          localStorage.removeItem(`localmind_plugin_draft_${sessionId}`);
+        }
       } else {
         setError(r.error || "Plugin failed");
       }
@@ -148,6 +271,24 @@ export default function PluginsPanel({ sessionId, onClose }) {
       setRunning(false);
     }
   }
+
+  // Sort plugins with pinned/favorites at the top (#601)
+  const sortedPlugins = [...plugins].sort((a, b) => {
+    const isAPinned = pinnedIds.includes(a.id);
+    const isBPinned = pinnedIds.includes(b.id);
+    if (isAPinned && !isBPinned) return -1;
+    if (!isAPinned && isBPinned) return 1;
+    return 0;
+  });
+
+  // Filter plugins in real-time by search query (#600)
+  const filteredPlugins = sortedPlugins.filter((p) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    const nameMatch = p.name?.toLowerCase().includes(q);
+    const descMatch = p.description?.toLowerCase().includes(q);
+    return nameMatch || descMatch;
+  });
 
   const handleCopy = async () => {
     if (!output) return;
@@ -160,17 +301,8 @@ export default function PluginsPanel({ sessionId, onClose }) {
     }
   };
 
-  // Sort plugins with pinned/favorites at the top (#601)
-  const sortedPlugins = [...plugins].sort((a, b) => {
-    const isAPinned = pinnedIds.includes(a.id);
-    const isBPinned = pinnedIds.includes(b.id);
-    if (isAPinned && !isBPinned) return -1;
-    if (!isAPinned && isBPinned) return 1;
-    return 0;
-  });
-
   return (
-    <div className="border-b border-gray-800 bg-gray-900 px-5 py-4 shrink-0" data-testid="plugins-panel">
+    <div className="border-b border-gray-800 bg-gray-900 px-5 py-4 shrink-0 relative" data-testid="plugins-panel">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-1.5">
           {/* Collapse/Expand toggle button */}
@@ -216,7 +348,15 @@ export default function PluginsPanel({ sessionId, onClose }) {
         </button>
       </div>
 
-      {/* Global Inline Error Banner */}
+      {/* Action Notification Banner (#605) */}
+      {notification && (
+        <div data-testid="action-notification" className="mb-3 text-xs bg-purple-950/60 border border-purple-800 text-purple-300 p-2 rounded-lg flex items-center justify-between shadow-sm">
+          <span>{notification}</span>
+          <button onClick={() => setNotification("")} className="text-purple-400 hover:text-white font-bold ml-2">×</button>
+        </div>
+      )}
+
+      {/* Global Inline Error Banner (#588) */}
       {error && (
         <div
           data-testid="plugin-error-message"
@@ -241,38 +381,101 @@ export default function PluginsPanel({ sessionId, onClose }) {
       {/* Collapsible Panel Section */}
       {!isCollapsed && (
         <>
-          {/* Plugin selector with favorite & pin toggles (#601) */}
-          <div data-testid="plugin-selector-list" className="flex flex-wrap gap-2 mb-4 md:mb-3 shrink-0">
-            {sortedPlugins.map((p) => {
-              const isPinned = pinnedIds.includes(p.id);
-              const Icon = PLUGIN_ICONS[p.icon] || PlugIcon;
-              return (
-                <div
-                  key={p.id}
-                  data-testid={`plugin-btn-${p.id}`}
-                  onClick={() => handleSelectPlugin(p)}
-                  className={`text-xs px-3 py-1.5 rounded-lg border transition font-medium cursor-pointer flex items-center gap-1.5 touch-manipulation
-                    ${selected?.id === p.id ? "border-purple-500 bg-purple-900/30 text-purple-300 shadow-sm shadow-purple-500/10" : "border-gray-700 text-gray-400 hover:bg-gray-800"}`}
-                >
-                  <Icon className="w-3.5 h-3.5" />
-                  <span>{p.name}</span>
-                  <button
-                    type="button"
-                    onClick={(e) => togglePin(e, p.id)}
-                    aria-label={isPinned ? `Unpin ${p.name}` : `Pin ${p.name}`}
-                    className={`ml-1 hover:text-amber-300 transition ${isPinned ? "text-amber-400" : "text-gray-600"}`}
+          {/* Search Refinement Input (#600) */}
+          <div className="mb-3">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search plugins..."
+              aria-label="Filter plugins"
+              className="w-full text-xs bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-gray-200 placeholder-gray-600 outline-none focus:border-purple-500 font-sans"
+            />
+          </div>
+
+          {/* Plugin selector with favorite & pin toggles (#601), compatibility badges (#597), & contextual menus (#605) */}
+          <div data-testid="plugin-selector-list" className="flex flex-wrap gap-2 mb-4 md:mb-3 shrink-0 min-h-[32px]">
+            {filteredPlugins.length > 0 ? (
+              filteredPlugins.map((p) => {
+                const isPinned = pinnedIds.includes(p.id);
+                const Icon = PLUGIN_ICONS[p.icon] || PlugIcon;
+                const isMenuOpen = activeMenuId === p.id;
+
+                return (
+                  <div
+                    key={p.id}
+                    onClick={() => handleSelectPlugin(p)}
+                    data-testid={`plugin-btn-${p.id}`}
+                    className={`relative text-xs px-3.5 py-2 md:py-1.5 rounded-lg border transition font-medium flex items-center gap-1.5 cursor-pointer touch-manipulation select-none
+                      ${selected?.id === p.id ? "border-purple-500 bg-purple-900/30 text-purple-300 shadow-sm shadow-purple-500/10" : "border-gray-700 text-gray-400 hover:bg-gray-800"}`}
                   >
-                    {isPinned ? "★" : "☆"}
-                  </button>
-                </div>
-              );
-            })}
+                    <Icon className="w-3.5 h-3.5" />
+                    <span>{p.name}</span>
+
+                    {p.compatibility && <CompatibilityBadge compatibility={p.compatibility} />}
+
+                    {/* Pin/Favorite Toggle Button (#601) */}
+                    <button
+                      type="button"
+                      onClick={(e) => togglePin(e, p.id)}
+                      aria-label={isPinned ? `Unpin ${p.name}` : `Pin ${p.name}`}
+                      className={`ml-1 hover:text-amber-300 transition ${isPinned ? "text-amber-400" : "text-gray-600"}`}
+                    >
+                      {isPinned ? "★" : "☆"}
+                    </button>
+
+                    {/* Context Menu Trigger Button */}
+                    <button
+                      type="button"
+                      onClick={(e) => toggleContextMenu(e, p.id)}
+                      aria-label={`Options for ${p.name}`}
+                      className="ml-0.5 text-gray-500 hover:text-gray-200 transition px-1 rounded hover:bg-gray-700/50 font-bold"
+                    >
+                      ⋮
+                    </button>
+
+                    {/* Context Dropdown Menu (#605) */}
+                    {isMenuOpen && (
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        className="absolute left-0 top-full mt-1 w-36 bg-gray-950 border border-gray-800 rounded-lg shadow-xl z-50 py-1 text-xs text-gray-300 font-normal"
+                      >
+                        <button
+                          type="button"
+                          onClick={(e) => handleSharePlugin(e, p)}
+                          className="w-full text-left px-3 py-1.5 hover:bg-gray-800 hover:text-white"
+                        >
+                          Share Plugin
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => handleExportPlugin(e, p)}
+                          className="w-full text-left px-3 py-1.5 hover:bg-gray-800 hover:text-white"
+                        >
+                          Export Config
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            ) : (
+              <p className="text-xs text-gray-500 italic py-1">No matching plugins found.</p>
+            )}
           </div>
 
           {/* Plugin Input/Output Area OR Empty-State Guidance */}
           {selected ? (
             <div data-testid="plugin-workspace" className="space-y-3 md:space-y-2 flex-1 md:flex-initial flex flex-col justify-start shrink-0">
-              <p className="text-xs text-gray-500">{selected.description}</p>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs text-gray-500">{selected.description}</p>
+                {selected.compatibility && (
+                  <div className="shrink-0 flex items-center gap-1 text-[11px] text-gray-400">
+                    <span className="text-gray-500">Compatibility:</span>
+                    <CompatibilityBadge compatibility={selected.compatibility} />
+                  </div>
+                )}
+              </div>
               <textarea
                 data-testid="plugin-input-textarea"
                 value={input}
