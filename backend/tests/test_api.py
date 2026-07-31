@@ -356,15 +356,29 @@ def test_save_settings(caplog):
                 "temperature": 0.5,
                 "max_history_turns": 8,
                 "rag_top_k": 3,
+                "rag_chunk_size": 800,
+                "rag_chunk_overlap": 50,
                 "theme": "dark",
             },
         )
 
     assert r.json()["default_model"] == "mistral"
+    assert r.json()["rag_chunk_size"] == 800
     assert any(
         "Model switched from" in record.getMessage()
         for record in caplog.records
     )
+
+
+def test_rag_chunk_size_validation():
+    r = client.put(
+        "/api/settings/",
+        json={
+            "rag_chunk_size": 50,  # Below minimum threshold of 100
+        },
+    )
+    assert r.status_code == 422
+    assert "rag_chunk_size" in str(r.json())
 
 
 # ─── Models (mocked) ─────────────────────────────────────

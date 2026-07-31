@@ -19,6 +19,7 @@ export default function SettingsPanel({ settings = {}, isLoading = false, onSave
     temperature:       settings?.temperature       ?? 0.7,
     max_history_turns: settings?.max_history_turns || 10,
     rag_top_k:        settings?.rag_top_k         || 4,
+    rag_chunk_size:   settings?.rag_chunk_size    || 600,
     rag_chunk_overlap: settings?.rag_chunk_overlap ?? 50,
     theme:            settings?.theme             || "dark",
     minimal_mode:     settings?.minimal_mode      ?? false,
@@ -231,6 +232,19 @@ export default function SettingsPanel({ settings = {}, isLoading = false, onSave
                   step="1"
                   value={form.rag_top_k}
                   onChange={e => set("rag_top_k", parseInt(e.target.value))}
+                  className="w-full accent-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500 rounded"
+                />
+              </Field>
+
+              <Field label={`RAG Chunk Size: ${form.rag_chunk_size}`} htmlId="chunk-size-slider" error={errors.rag_chunk_size}>
+                <input
+                  id="chunk-size-slider"
+                  type="range"
+                  min="100"
+                  max="2000"
+                  step="50"
+                  value={form.rag_chunk_size}
+                  onChange={e => set("rag_chunk_size", parseInt(e.target.value))}
                   className="w-full accent-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500 rounded"
                 />
               </Field>
