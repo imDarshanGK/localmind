@@ -26,9 +26,62 @@ vi.mock("./Icons", () => ({
 }));
 
 const mockPluginsList = [
-  { id: "calculator", name: "Calculator", icon: "calculator", description: "Performs math evaluation" },
-  { id: "summarizer", name: "Summarizer", icon: "summarizer", description: "Summarizes provided text" },
+  { 
+    id: "calculator", 
+    name: "Calculator", 
+    icon: "calculator", 
+    description: "Performs math evaluation",
+    compatibility: ["v1.0", "Local"]
+  },
+  { 
+    id: "summarizer", 
+    name: "Summarizer", 
+    icon: "summarizer", 
+    description: "Summarizes provided text",
+    compatibility: ["v2.0", "Cloud"]
+  },
 ];
+
+describe("PluginsPanel Compatibility Badges (#597)", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    api.getPlugins.mockResolvedValue({ plugins: mockPluginsList });
+    api.getPluginLogs.mockResolvedValue({ logs: [] });
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+
+  test("renders compatibility badges for each plugin in the catalog selector", async () => {
+    render(<PluginsPanel sessionId="session-597" onClose={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText("Calculator").length).toBeGreaterThan(0);
+    });
+
+    const badges = screen.getAllByTestId("compatibility-badge");
+    expect(badges.length).toBeGreaterThanOrEqual(4);
+    expect(screen.getByText("v1.0")).toBeInTheDocument();
+    expect(screen.getByText("Local")).toBeInTheDocument();
+    expect(screen.getByText("v2.0")).toBeInTheDocument();
+    expect(screen.getByText("Cloud")).toBeInTheDocument();
+  });
+
+  test("displays plugin compatibility metadata in detailed selection view", async () => {
+    render(<PluginsPanel sessionId="session-597" onClose={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText("Calculator").length).toBeGreaterThan(0);
+    });
+
+    const calcButton = screen.getAllByText("Calculator")[0];
+    fireEvent.click(calcButton);
+
+    expect(screen.getByText("Compatibility:")).toBeInTheDocument();
+  });
+});
 
 describe("PluginsPanel Interaction Tests (#595)", () => {
   beforeEach(() => {
