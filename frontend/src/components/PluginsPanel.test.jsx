@@ -13,7 +13,7 @@ vi.mock("../utils/api", () => ({
   getPluginLogs: vi.fn().mockResolvedValue({ logs: [] }),
 }));
 
-// Mock icons
+// Mock icon components
 vi.mock("./Icons", () => ({
   BracesIcon: () => <span data-testid="braces-icon" />,
   CalculatorIcon: () => <span data-testid="calculator-icon" />,
@@ -187,8 +187,8 @@ describe("PluginsPanel Drag and Drop Suite (#604)", () => {
     render(<PluginsPanel sessionId="test-session" onClose={vi.fn()} />);
 
     await waitFor(() => {
-      expect(screen.getByTestId("plugin-item-calculator")).toBeInTheDocument();
-      expect(screen.getByTestId("plugin-item-summarizer")).toBeInTheDocument();
+      expect(screen.getByTestId("plugin-btn-calculator")).toBeInTheDocument();
+      expect(screen.getByTestId("plugin-btn-summarizer")).toBeInTheDocument();
     });
   });
 
@@ -196,12 +196,12 @@ describe("PluginsPanel Drag and Drop Suite (#604)", () => {
     render(<PluginsPanel sessionId="session-604" onClose={vi.fn()} />);
 
     await waitFor(() => {
-      expect(screen.getByTestId("plugin-item-calculator")).toBeInTheDocument();
-      expect(screen.getByTestId("plugin-item-summarizer")).toBeInTheDocument();
+      expect(screen.getByTestId("plugin-btn-calculator")).toBeInTheDocument();
+      expect(screen.getByTestId("plugin-btn-summarizer")).toBeInTheDocument();
     });
 
-    const firstPlugin = screen.getByTestId("plugin-item-calculator");
-    const secondPlugin = screen.getByTestId("plugin-item-summarizer");
+    const firstPlugin = screen.getByTestId("plugin-btn-calculator");
+    const secondPlugin = screen.getByTestId("plugin-btn-summarizer");
 
     const mockDataTransfer = {
       effectAllowed: "",
@@ -227,9 +227,66 @@ describe("PluginsPanel Drag and Drop Suite (#604)", () => {
     render(<PluginsPanel sessionId="session-604-restore" onClose={vi.fn()} />);
 
     await waitFor(() => {
-      const pluginItems = screen.getAllByTestId(/^plugin-item-/);
+      const pluginItems = screen.getAllByTestId(/^plugin-btn-/);
       expect(pluginItems[0]).toHaveTextContent("Summarizer");
       expect(pluginItems[1]).toHaveTextContent("Calculator");
+    });
+  });
+});
+
+describe("PluginsPanel Export & Share Suite (#605)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    api.getPlugins.mockResolvedValue({ plugins: mockPluginsList });
+    api.getPluginLogs.mockResolvedValue({ logs: [] });
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  test("copies shareable plugin URL to clipboard on Share action", async () => {
+    const writeTextMock = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, {
+      clipboard: { writeText: writeTextMock },
+    });
+
+    render(<PluginsPanel sessionId="session-605" onClose={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("plugin-btn-calculator")).toBeInTheDocument();
+    });
+
+    const optionsBtn = screen.getByLabelText("Options for Calculator");
+    fireEvent.click(optionsBtn);
+
+    const shareBtn = screen.getByText("Share Plugin");
+    fireEvent.click(shareBtn);
+
+    expect(writeTextMock).toHaveBeenCalledWith(expect.stringContaining("plugin=calculator"));
+    await waitFor(() => {
+      expect(screen.getByTestId("action-notification")).toHaveTextContent("Copied share link for Calculator!");
+    });
+  });
+
+  test("triggers JSON export download on Export Config action", async () => {
+    const createElementSpy = vi.spyOn(document, "createElement");
+
+    render(<PluginsPanel sessionId="session-605-export" onClose={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("plugin-btn-calculator")).toBeInTheDocument();
+    });
+
+    const optionsBtn = screen.getByLabelText("Options for Calculator");
+    fireEvent.click(optionsBtn);
+
+    const exportBtn = screen.getByText("Export Config");
+    fireEvent.click(exportBtn);
+
+    expect(createElementSpy).toHaveBeenCalledWith("a");
+    await waitFor(() => {
+      expect(screen.getByTestId("action-notification")).toHaveTextContent("Exported Calculator configuration.");
     });
   });
 });
