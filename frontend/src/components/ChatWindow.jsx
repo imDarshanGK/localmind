@@ -22,15 +22,21 @@ export default function ChatWindow({ messages = [], loading = false, onSend, onD
   const [showPlusMenu, setShowPlusMenu] = useState(false);
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
+  const [localReactions, setLocalReactions] = useState({});
+  const [hoveredStatsId, setHoveredStatsId] = useState(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+
   const bottomRef = useRef(null);
   const textareaRef = useRef(null);
   const plusMenuRef = useRef(null);
+
+  const REACTION_EMOJIS = ["👍", "❤️", "🔥", "👏", "💡"];
 
   // Re-sync input and search state whenever sessionId changes
   useEffect(() => {
     if (!sessionId) return;
     setInput(localStorage.getItem(`localmind_draft_${sessionId}`) || "");
-    setSearchTerm(localStorage.getItem(`localmind_search_${sessionId}`) || "");
+    SearchTerm(localStorage.getItem(`localmind_search_${sessionId}`) || "");
   }, [sessionId]);
 
   // Sync draft message input to localStorage on edit
@@ -60,11 +66,24 @@ export default function ChatWindow({ messages = [], loading = false, onSend, onD
     }
   }, [messages]);
 
-  const [localReactions, setLocalReactions] = useState({});
-  const [hoveredStatsId, setHoveredStatsId] = useState(null);
-  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    textarea.style.height = "auto";
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 160)}px`;
+  }, [input]);
 
-  const REACTION_EMOJIS = ["👍", "❤️", "🔥", "👏", "💡"];
+  useEffect(() => { setLocalReactions({}); }, [sessionId]);
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (plusMenuRef.current && !plusMenuRef.current.contains(e.target)) {
+        setShowPlusMenu(false);
+      }
+    }
+    if (showPlusMenu) document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showPlusMenu]);
 
   async function handleReactionToggle(messageId, emoji) {
     if (!messageId || typeof messageId === "string") {
@@ -159,25 +178,6 @@ export default function ChatWindow({ messages = [], loading = false, onSend, onD
       </button>
     );
 
-  useEffect(() => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-    textarea.style.height = "auto";
-    textarea.style.height = `${Math.min(textarea.scrollHeight, 160)}px`;
-  }, [input]);
-
-  useEffect(() => { setLocalReactions({}); }, [sessionId]);
-
-  useEffect(() => {
-    function handleClickOutside(e) {
-      if (plusMenuRef.current && !plusMenuRef.current.contains(e.target)) {
-        setShowPlusMenu(false);
-      }
-    }
-    if (showPlusMenu) document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [showPlusMenu]);
-
   function handleSelectTemplate(template) {
     setSelectedTemplate(template);
     setShowTemplateDialog(false);
@@ -196,6 +196,8 @@ export default function ChatWindow({ messages = [], loading = false, onSend, onD
 
     setInput("");
     setSelectedTemplate(null);
+    
+    // Clear draft from localStorage upon successful send
     if (sessionId) {
       localStorage.removeItem(`localmind_draft_${sessionId}`);
     }
@@ -287,7 +289,7 @@ export default function ChatWindow({ messages = [], loading = false, onSend, onD
 
   return (
     <main className="flex flex-col flex-1 overflow-hidden bg-gray-950 text-gray-100" aria-label="Chat Workspace">
-      {/* Export bar */}
+      {/* Export bar - wraps gracefully on mobile viewports */}
       {messages.length > 0 && (
         <header className="flex justify-end gap-1.5 sm:gap-2 px-3 sm:px-5 pt-2 flex-wrap" aria-label="Export options">
           {["markdown", "json", "txt"].map((f) => (
