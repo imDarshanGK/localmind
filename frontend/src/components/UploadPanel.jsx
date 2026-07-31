@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import { uploadDocument, deleteDocument, previewDocument } from "../utils/api";
-import { CheckIcon, DocumentsIcon, ErrorIcon, SpinnerIcon, UploadIcon, FileIcon } from "./Icons";
+import { CheckIcon, DocumentsIcon, ErrorIcon, SpinnerIcon, UploadIcon, FileIcon, CopyIcon } from "./Icons";
 
-export default function UploadPanel({ sessionId, documents, isLoading = false, onUploaded, onClose, show, minimalMode }) {
+export default function UploadPanel({ sessionId, documents, isLoading = false, onUploaded, onClose, show, minimalMode, feedbackTimeout = 2000 }) {
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [result, setResult] = useState(null);
@@ -19,6 +19,97 @@ export default function UploadPanel({ sessionId, documents, isLoading = false, o
 
   const [uploadResults, setUploadResults] = useState([]);
   const fileRef = useRef();
+
+  // Clipboard copy feedback states
+  const [copiedFilename, setCopiedFilename] = useState(null);
+  const [failedFilename, setFailedFilename] = useState(null);
+  const [copiedPreview, setCopiedPreview] = useState(false);
+  const [failedPreview, setFailedPreview] = useState(false);
+  const [ariaFeedback, setAriaFeedback] = useState("");
+
+  const copyTimeoutsRef = useRef({});
+
+  useEffect(() => {
+    return () => {
+      // Clean up all active clipboard timeouts on unmount
+      Object.values(copyTimeoutsRef.current).forEach(clearTimeout);
+    };
+  }, []);
+
+  const handleCopyText = async (text, type, filenameKey = null) => {
+    const timerKey = type === "preview" ? "preview" : filenameKey;
+    if (copyTimeoutsRef.current[timerKey]) {
+      clearTimeout(copyTimeoutsRef.current[timerKey]);
+    }
+
+    if (type === "preview") {
+      setCopiedPreview(false);
+      setFailedPreview(false);
+    } else {
+      setCopiedFilename(null);
+      setFailedFilename(null);
+    }
+
+    if (!text || text.trim() === "") {
+      if (type === "preview") {
+        setFailedPreview(true);
+        setAriaFeedback("Failed to copy document preview content. Content is empty.");
+      } else {
+        setFailedFilename(filenameKey);
+        setAriaFeedback(`Failed to copy filename. Filename is empty.`);
+      }
+      const timer = setTimeout(() => {
+        if (type === "preview") {
+          setFailedPreview(false);
+        } else {
+          setFailedFilename(null);
+        }
+      }, feedbackTimeout);
+      copyTimeoutsRef.current[timerKey] = timer;
+      return;
+    }
+
+    try {
+      if (!navigator.clipboard || typeof navigator.clipboard.writeText !== "function") {
+        throw new Error("Clipboard API not supported");
+      }
+      await navigator.clipboard.writeText(text);
+      if (type === "preview") {
+        setCopiedPreview(true);
+        setAriaFeedback("Document preview content copied to clipboard");
+      } else {
+        setCopiedFilename(filenameKey);
+        setAriaFeedback(`Filename ${filenameKey} copied to clipboard`);
+      }
+
+      const timer = setTimeout(() => {
+        if (type === "preview") {
+          setCopiedPreview(false);
+        } else {
+          setCopiedFilename(null);
+        }
+      }, feedbackTimeout);
+      copyTimeoutsRef.current[timerKey] = timer;
+    } catch (err) {
+      console.error("Clipboard copy failed:", err);
+      if (type === "preview") {
+        setFailedPreview(true);
+        setAriaFeedback("Failed to copy document preview content");
+      } else {
+        setFailedFilename(filenameKey);
+        setAriaFeedback(`Failed to copy filename ${filenameKey}`);
+      }
+
+      const timer = setTimeout(() => {
+        if (type === "preview") {
+          setFailedPreview(false);
+        } else {
+          setFailedFilename(null);
+        }
+      }, feedbackTimeout);
+      copyTimeoutsRef.current[timerKey] = timer;
+    }
+  };
 
   function isDuplicateFile(file) {
     return documents.some((doc) => {
@@ -252,9 +343,35 @@ export default function UploadPanel({ sessionId, documents, isLoading = false, o
         </div>
       )}
 
-      {/* Expanded Workspace Content Panel */}
-      {!isCollapsed && (
-        <div>
+      {/* Loading Skeleton Mode (#564) */}
+      {isLoading ? (
+        <div data-testid="upload-panel-skeleton" className="animate-pulse space-y-3">
+          {/* Skeleton for Drop Zone */}
+          <div className="border-2 border-dashed border-gray-800 rounded-xl px-4 py-6 flex flex-col items-center justify-center bg-gray-800/30">
+            <div className="w-8 h-8 bg-gray-700/60 rounded-full mb-2"></div>
+            <div className="h-3.5 bg-gray-700/60 rounded w-44 mb-1.5"></div>
+            <div className="h-2.5 bg-gray-800/80 rounded w-56"></div>
+          </div>
+
+          {/* Skeleton for Indexed Document Items */}
+          <div>
+            <div className="h-3 bg-gray-800 rounded w-28 mb-2"></div>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between bg-gray-800/60 rounded-lg px-3 py-2">
+                <div className="h-3 bg-gray-700/60 rounded w-36"></div>
+                <div className="h-3 bg-gray-700/40 rounded w-14"></div>
+              </div>
+              <div className="flex items-center justify-between bg-gray-800/60 rounded-lg px-3 py-2">
+                <div className="h-3 bg-gray-700/60 rounded w-48"></div>
+                <div className="h-3 bg-gray-700/40 rounded w-12"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* Enforced conditional rendering block to handle DOM tree unmounting patterns (#570) */
+        !isCollapsed && (
+          <div>
           {/* Drop zone */}
           <div
             tabIndex={0}
@@ -337,7 +454,7 @@ export default function UploadPanel({ sessionId, documents, isLoading = false, o
               <p className="text-xs text-gray-500 mb-1">Indexed documents:</p>
               <ul className="space-y-1">
                 {documents.map((d, i) => {
-                  const currentFilename = d.filename || d;
+                  const currentFilename = typeof d === "string" ? d : (d.filename || "");
                   return (
                     <li key={i} className="flex items-center justify-between text-xs bg-gray-800 rounded-lg px-3 py-2 sm:py-1.5 mb-1 hover:bg-gray-750 transition min-h-[36px]">
                       <span className="text-gray-300 truncate inline-flex items-center gap-1 max-w-[65%]">
@@ -346,6 +463,22 @@ export default function UploadPanel({ sessionId, documents, isLoading = false, o
                       </span>
                       <div className="flex items-center gap-2 shrink-0">
                         {d.chunks_indexed && <span className="text-gray-500 text-[11px] sm:text-xs">{d.chunks_indexed} chunks</span>}
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); handleCopyText(currentFilename, "filename", currentFilename); }}
+                          className={`p-2 sm:p-1 rounded transition min-w-[32px] min-h-[32px] sm:min-w-0 sm:min-h-0 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-purple-500
+                            ${copiedFilename === currentFilename ? "text-green-400" : failedFilename === currentFilename ? "text-red-400" : "text-gray-400 hover:text-purple-400"}`}
+                          title="Copy Filename"
+                          aria-label={`Copy filename ${currentFilename}`}
+                        >
+                          {copiedFilename === currentFilename ? (
+                            <CheckIcon className="w-3.5 h-3.5" data-testid="copy-success-icon" />
+                          ) : failedFilename === currentFilename ? (
+                            <ErrorIcon className="w-3.5 h-3.5 text-red-400" data-testid="copy-failed-icon" />
+                          ) : (
+                            <CopyIcon className="w-3.5 h-3.5" data-testid="copy-default-icon" />
+                          )}
+                        </button>
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); handleTriggerPreview(currentFilename); }}
@@ -376,7 +509,8 @@ export default function UploadPanel({ sessionId, documents, isLoading = false, o
               </p>
             </div>
           )}
-        </div>
+          </div>
+        )
       )}
 
       {/* Read-Only Modal Viewport Overlay */}
@@ -384,21 +518,50 @@ export default function UploadPanel({ sessionId, documents, isLoading = false, o
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-gray-900 border border-gray-800 w-full max-w-2xl rounded-2xl max-h-[80vh] flex flex-col shadow-2xl">
             <div className="p-4 border-b border-gray-800 flex items-center justify-between">
-              <div className="truncate pr-4">
+              <div className="truncate pr-4 flex-1">
                 <span className="text-[10px] text-purple-400 font-semibold uppercase tracking-wider block">Read-Only Preview</span>
                 <h3 className="text-sm font-medium text-white truncate">{previewFilename}</h3>
               </div>
-              <button 
-                type="button"
-                onClick={() => {
-                  setPreviewContent(null);
-                  setPreviewError(null);
-                  setPreviewFilename("");
-                }}
-                className="text-gray-400 hover:text-white px-3 py-1.5 sm:px-2 sm:py-1 text-sm bg-gray-800 border border-gray-700 rounded-lg transition focus:outline-none focus:ring-2 focus:ring-purple-500"
-              >
-                Close
-              </button>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  disabled={!previewContent || previewContent === "No textual content available to display."}
+                  onClick={() => handleCopyText(previewContent, "preview")}
+                  className={`px-3 py-1.5 sm:px-2 sm:py-1 text-xs border rounded-lg transition flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-40 disabled:cursor-not-allowed
+                    ${copiedPreview ? "bg-green-900/30 border-green-800 text-green-400" : failedPreview ? "bg-red-900/30 border-red-800 text-red-400" : "bg-gray-800 border-gray-700 text-gray-300 hover:bg-gray-750 hover:text-white"}`}
+                  title="Copy Document Preview Content"
+                >
+                  {copiedPreview ? (
+                    <>
+                      <CheckIcon className="w-3.5 h-3.5" data-testid="preview-copy-success-icon" />
+                      <span>Copied!</span>
+                    </>
+                  ) : failedPreview ? (
+                    <>
+                      <ErrorIcon className="w-3.5 h-3.5 text-red-400" data-testid="preview-copy-failed-icon" />
+                      <span>Failed to copy</span>
+                    </>
+                  ) : (
+                    <>
+                      <CopyIcon className="w-3.5 h-3.5" data-testid="preview-copy-default-icon" />
+                      <span>Copy</span>
+                    </>
+                  )}
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => {
+                    setPreviewContent(null);
+                    setPreviewError(null);
+                    setPreviewFilename("");
+                    setCopiedPreview(false);
+                    setFailedPreview(false);
+                  }}
+                  className="text-gray-400 hover:text-white px-3 py-1.5 sm:px-2 sm:py-1 text-sm bg-gray-800 border border-gray-700 rounded-lg transition focus:outline-none focus:ring-2 focus:ring-purple-500"
+                >
+                  Close
+                </button>
+              </div>
             </div>
             {previewError ? (
               <div className="p-8 flex flex-col items-center justify-center text-center">
@@ -434,6 +597,10 @@ export default function UploadPanel({ sessionId, documents, isLoading = false, o
           </div>
         </div>
       )}
+      {/* Accessible copy confirmation feedback helper */}
+      <span className="sr-only" aria-live="polite" data-testid="copy-aria-feedback">
+        {ariaFeedback}
+      </span>
     </section>
   );
 }
