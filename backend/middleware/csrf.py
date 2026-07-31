@@ -67,6 +67,17 @@ _SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 _DEDUPE_WINDOW_SECONDS = 5.0
 
 
+def compute_request_hash(client_ip: str, method: str, path: str, body: bytes) -> str:
+    """Compute a deterministic SHA-256 hash for request deduplication.
+
+    This function is the single source of truth for the hash used by both
+    the middleware and tests.  Keeping it public avoids the need for test
+    helpers to replicate the signature format.
+    """
+    signature_base = f"{client_ip}|{method}|{path}|{body.decode('utf-8', 'ignore')}"
+    return hashlib.sha256(signature_base.encode()).hexdigest()
+
+
 def _origin_from_header(request: Request) -> str | None:
     """
     Return the request origin as a bare scheme+host string, or None if the
@@ -156,11 +167,7 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         request._receive = receive
 
         client_ip = request.client.host if request.client else "127.0.0.1"
-        signature_base = (
-            f"{client_ip}|{request.method}|{request.url.path}"
-            f"|{req_body.decode('utf-8', 'ignore')}"
-        )
-        req_hash = hashlib.sha256(signature_base.encode()).hexdigest()
+        req_hash = compute_request_hash(client_ip, request.method, request.url.path, req_body)
 
         now = time.time()
 

@@ -247,18 +247,21 @@ def test_prometheus_metrics():
 # ── Deduplication helpers & tests ─────────────────────────────────────────────
 
 import middleware.csrf as csrf_module
+from middleware.csrf import compute_request_hash
 
 csrf_module._DEDUPE_WINDOW_SECONDS = 60.0
 
 def _compute_hash(method: str, path: str, body_dict: dict) -> str:
-    """Replicate the SHA-256 signature the SecurityMiddleware computes.
+    """Thin wrapper around the middleware's ``compute_request_hash``.
 
-    httpx encodes JSON with compact separators (no spaces), so we must use
-    ``separators=(',', ':')`` to match the exact bytes the middleware sees.
+    Uses ``httpx.Request`` to serialise *body_dict* into the exact bytes
+    the TestClient will send, then delegates to the canonical hash function.
+    This guarantees planted sentinels always match the middleware's lookup,
+    regardless of httpx version or JSON encoder differences.
     """
-    body_bytes = json.dumps(body_dict, separators=(",", ":")).encode()
-    sig = f"{_TESTCLIENT_HOST}|{method}|{path}|{body_bytes.decode('utf-8', 'ignore')}"
-    return hashlib.sha256(sig.encode()).hexdigest()
+    import httpx as _httpx
+    req = _httpx.Request(method, f"http://testserver{path}", json=body_dict)
+    return compute_request_hash(_TESTCLIENT_HOST, method, path, req.content)
 
 
 def test_request_deduplication():

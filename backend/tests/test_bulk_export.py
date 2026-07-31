@@ -11,7 +11,13 @@ db.init_db()
 
 client = TestClient(app)
 
+import pytest
 
+@pytest.fixture(autouse=True)
+def clear_db():
+    """Clear database state before each test to prevent cross-test pollution."""
+    db.clear_all_sessions()
+    
 def test_bulk_export_json_success():
     # 1. Create two test sessions
     db.create_session("sess_1", title="Session One", model="llama3", language="en")
