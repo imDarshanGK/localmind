@@ -138,15 +138,15 @@ describe("UploadPanel Persistence State Interface Suite (#570)", () => {
   test("loads collapsed default parameters if flags exist inside localStorage store maps", () => {
     store["upload-panel-collapsed:session-persist-1"] = "true";
 
-    render(<UploadPanel sessionId="session-persist-1" documents={[]} onUploaded={() => {}} onClose={() => {}} show={true} />);
-    
+    render(<UploadPanel sessionId="session-persist-1" documents={[]} onUploaded={() => { }} onClose={() => { }} show={true} />);
+
     const dropzoneText = screen.queryByText(/Drop files here or click to browse/i);
-    expect(dropzoneText).toBeNull(); 
+    expect(dropzoneText).toBeNull();
   });
 
   test("toggles view metrics and updates localStorage states during click actions", () => {
-    render(<UploadPanel sessionId="session-persist-2" documents={[]} onUploaded={() => {}} onClose={() => {}} show={true} />);
-    
+    render(<UploadPanel sessionId="session-persist-2" documents={[]} onUploaded={() => { }} onClose={() => { }} show={true} />);
+
     const toggleButton = screen.getByLabelText(/Collapse upload section/i);
     fireEvent.click(toggleButton);
 
@@ -156,16 +156,16 @@ describe("UploadPanel Persistence State Interface Suite (#570)", () => {
 
 describe("UploadPanel Tooltip Help Interface Suite (#571)", () => {
   test("renders the information help button trigger icon accurately", () => {
-    render(<UploadPanel sessionId="session-tooltip" documents={[]} onUploaded={() => {}} onClose={() => {}} show={true} />);
-    
+    render(<UploadPanel sessionId="session-tooltip" documents={[]} onUploaded={() => { }} onClose={() => { }} show={true} />);
+
     const infoButton = screen.getByLabelText(/Upload limits information description/i);
     expect(infoButton).toBeDefined();
     expect(infoButton.textContent.trim()).toBe("i");
   });
 
   test("contains hidden tooltip descriptions outlining file limits parameters", () => {
-    render(<UploadPanel sessionId="session-tooltip" documents={[]} onUploaded={() => {}} onClose={() => {}} show={true} />);
-    
+    render(<UploadPanel sessionId="session-tooltip" documents={[]} onUploaded={() => { }} onClose={() => { }} show={true} />);
+
     const inlineTooltipText = screen.getByText(/Supported Upload Formats:/i);
     expect(inlineTooltipText).toBeDefined();
   });
@@ -173,15 +173,15 @@ describe("UploadPanel Tooltip Help Interface Suite (#571)", () => {
 
 describe("UploadPanel Accessibility Landmarks Suite (#569)", () => {
   test("contains accessible section landmarks and titles", () => {
-    render(<UploadPanel sessionId="session-access" documents={[]} onUploaded={() => {}} onClose={() => {}} show={true} />);
-    
+    render(<UploadPanel sessionId="session-access" documents={[]} onUploaded={() => { }} onClose={() => { }} show={true} />);
+
     const panelSection = screen.getByRole("region", { name: /documents/i });
     expect(panelSection).toBeDefined();
   });
 
   test("includes a live region wrapper with role status for operational reports", () => {
-    render(<UploadPanel sessionId="session-access" documents={[]} onUploaded={() => {}} onClose={() => {}} show={true} />);
-    
+    render(<UploadPanel sessionId="session-access" documents={[]} onUploaded={() => { }} onClose={() => { }} show={true} />);
+
     const liveRegion = screen.queryByRole("status") || screen.queryByTestId("upload-panel");
     expect(liveRegion).toBeDefined();
   });
@@ -190,7 +190,7 @@ describe("UploadPanel Accessibility Landmarks Suite (#569)", () => {
 describe("UploadPanel Mobile and Responsive Layout Layout Suite (#568)", () => {
   test("implements mobile view responsive fluid layout classes", () => {
     const { container } = render(
-      <UploadPanel sessionId="session-mobile-1" documents={[]} onUploaded={() => {}} onClose={() => {}} show={true} />
+      <UploadPanel sessionId="session-mobile-1" documents={[]} onUploaded={() => { }} onClose={() => { }} show={true} />
     );
 
     const mainPanel = container.firstChild;
@@ -202,12 +202,12 @@ describe("UploadPanel Mobile and Responsive Layout Layout Suite (#568)", () => {
   test("scales indexed list elements to accommodate mobile touch bounds targets", () => {
     const mockDocs = [{ filename: "mobile_spec.pdf", chunks_indexed: 12 }];
     render(
-      <UploadPanel sessionId="session-mobile-2" documents={mockDocs} onUploaded={() => {}} onClose={() => {}} show={true} />
+      <UploadPanel sessionId="session-mobile-2" documents={mockDocs} onUploaded={() => { }} onClose={() => { }} show={true} />
     );
 
     const docText = screen.getByText("mobile_spec.pdf");
     const containerRow = docText.closest("li") || docText.closest("div");
-    
+
     expect(containerRow.className).toContain("min-h-[36px]");
   });
 });
@@ -216,14 +216,14 @@ describe("UploadPanel Keyboard Navigation Accessibility Suite (#567)", () => {
   test("fires onClose event handler cleanly when hitting the Escape key", () => {
     const mockOnClose = vi.fn();
     render(<UploadPanel sessionId="session-key-1" documents={[]} onUploaded={vi.fn()} onClose={mockOnClose} show={true} />);
-    
+
     fireEvent.keyDown(window, { key: "Escape" });
     expect(mockOnClose).toHaveBeenCalledTimes(1);
   });
 
   test("makes drop zone interactive and focusable with keyboard event binds", () => {
     render(<UploadPanel sessionId="session-key-2" documents={[]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />);
-    
+
     const dropzone = screen.getByRole("button", { name: /File upload drop zone/i });
     expect(dropzone).toBeDefined();
     expect(dropzone.tabIndex).toBe(0);
@@ -241,12 +241,12 @@ describe("UploadPanel Global Error Banner Interface Suite (#566)", () => {
 
   test("renders full structured banner details successfully when request fails", async () => {
     api.uploadDocument.mockRejectedValueOnce(new Error("File allocation table mapping rejected context bounds."));
-    
+
     render(<UploadPanel sessionId="session-err-2" documents={[]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />);
-    
+
     const file = new File(["test data payload"], "matrix.txt", { type: "text/plain" });
     const dropzone = screen.getByText(/Drop files here or click to browse/i);
-    
+
     fireEvent.drop(dropzone, {
       dataTransfer: { files: [file] }
     });
@@ -263,12 +263,12 @@ describe("UploadPanel Global Error Banner Interface Suite (#566)", () => {
 
   test("clears current alert state wrapper when firing click events on layout close button", async () => {
     api.uploadDocument.mockRejectedValueOnce(new Error("Storage block exhausted."));
-    
+
     render(<UploadPanel sessionId="session-err-3" documents={[]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />);
-    
+
     const file = new File(["data"], "log.txt", { type: "text/plain" });
     const dropzone = screen.getByText(/Drop files here or click to browse/i);
-    
+
     fireEvent.drop(dropzone, { dataTransfer: { files: [file] } });
 
     const uploadBtn = screen.getByRole("button", { name: /Upload Draft/i });
@@ -288,7 +288,7 @@ describe("UploadPanel Global Error Banner Interface Suite (#566)", () => {
 describe("UploadPanel Saved Drafts Workflow Suite (#574)", () => {
   test("stages dropped documents as a local draft item first without launching network actions", () => {
     render(<UploadPanel sessionId="session-draft-1" documents={[]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />);
-    
+
     const dropzone = screen.getByText(/Drop files here or click to browse/i).parentElement;
     const mockFile = new File(["draft-content"], "contract_draft.pdf", { type: "application/pdf" });
 
@@ -304,7 +304,7 @@ describe("UploadPanel Saved Drafts Workflow Suite (#574)", () => {
 
   test("clears the active draft workspace when clicking the cancel button", () => {
     render(<UploadPanel sessionId="session-draft-2" documents={[]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />);
-    
+
     const dropzone = screen.getByText(/Drop files here or click to browse/i).parentElement;
     const mockFile = new File(["draft-content"], "contract_draft.pdf", { type: "application/pdf" });
 
@@ -321,9 +321,9 @@ describe("UploadPanel Saved Drafts Workflow Suite (#574)", () => {
   test("submits network upload execution stack when the user hits the commit action button", async () => {
     api.uploadDocument.mockResolvedValueOnce({ filename: "contract_draft.pdf", message: "Draft processed" });
     const onUploadedSpy = vi.fn();
-    
+
     render(<UploadPanel sessionId="session-draft-3" documents={[]} onUploaded={onUploadedSpy} onClose={vi.fn()} show={true} />);
-    
+
     const dropzone = screen.getByText(/Drop files here or click to browse/i).parentElement;
     const mockFile = new File(["draft-content"], "contract_draft.pdf", { type: "application/pdf" });
 
@@ -345,20 +345,20 @@ describe("UploadPanel Saved Drafts Workflow Suite (#574)", () => {
 describe("UploadPanel Interaction Test Suite (#573)", () => {
   test("triggers file selection window when clicking the drop zone", () => {
     render(<UploadPanel sessionId="session-int-1" documents={[]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />);
-    
+
     const dropzone = screen.getByText(/Drop files here or click to browse/i).parentElement;
     const input = dropzone.querySelector("input[type='file']");
-    
+
     const clickSpy = vi.spyOn(input, "click");
     input.addEventListener('click', (e) => e.stopPropagation(), { once: true });
-    
+
     fireEvent.click(dropzone);
     expect(clickSpy).toHaveBeenCalledTimes(1);
   });
 
   test("manages drag state styles when dragging items over and out of the viewport", () => {
     render(<UploadPanel sessionId="session-int-2" documents={[]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />);
-    
+
     const textNode = screen.getByText(/Drop files here or click to browse/i);
     const dropzone = textNode.parentElement;
 
@@ -376,10 +376,10 @@ describe("UploadPanel Interaction Test Suite (#573)", () => {
   test("executes upload handler sequence accurately when a valid file is dropped", async () => {
     const mockResponse = { filename: "resume.pdf", message: "Document parsed successfully" };
     api.uploadDocument.mockResolvedValueOnce(mockResponse);
-    
+
     const onUploadedSpy = vi.fn();
     render(<UploadPanel sessionId="session-int-3" documents={[]} onUploaded={onUploadedSpy} onClose={vi.fn()} show={true} />);
-    
+
     const dropzone = screen.getByText(/Drop files here or click to browse/i).parentElement;
     const mockFile = new File(["content"], "resume.pdf", { type: "application/pdf" });
 
@@ -456,7 +456,7 @@ describe("UploadPanel multi-select upload", () => {
 
   it("shows document preview on success", async () => {
     api.previewDocument.mockResolvedValue({ content: "This is the document content preview." });
-    
+
     render(
       <UploadPanel sessionId="session-multi-4" documents={[{ filename: "test.pdf", chunks_indexed: 5 }]} onUploaded={vi.fn()} onClose={vi.fn()} show={true} />
     );
@@ -554,7 +554,7 @@ describe("UploadPanel Clipboard Copy Feedback Suite", () => {
     fireEvent.click(copyBtn);
 
     expect(writeTextMock).toHaveBeenCalledWith("test_doc.pdf");
-    
+
     await waitFor(() => {
       expect(screen.getByTestId("copy-success-icon")).toBeInTheDocument();
     });
