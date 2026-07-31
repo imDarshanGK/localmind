@@ -23,6 +23,10 @@ export default function PluginsPanel({ sessionId, onClose }) {
   const [copied, setCopied] = useState(false);
   const [logs, setLogs] = useState([]);
 
+  // State for contextual menu and action toast feedback (#605)
+  const [activeMenuId, setActiveMenuId] = useState(null);
+  const [notification, setNotification] = useState("");
+
   // Persistence: View collapsed state (#592)
   const [isCollapsed, setIsCollapsed] = useState(() => {
     try {
@@ -103,6 +107,67 @@ export default function PluginsPanel({ sessionId, onClose }) {
     setCopied(false);
   }
 
+  // Close contextual action menu on global click or Escape key
+  useEffect(() => {
+    const handleGlobalClick = () => setActiveMenuId(null);
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") setActiveMenuId(null);
+    };
+    window.addEventListener("click", handleGlobalClick);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("click", handleGlobalClick);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
+
+  const showNotification = (msg) => {
+    setNotification(msg);
+    setTimeout(() => setNotification(""), 3000);
+  };
+
+  // Export Action (#605)
+  const handleExportPlugin = (e, plugin) => {
+    e.stopPropagation();
+    setActiveMenuId(null);
+    try {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(plugin, null, 2));
+      const downloadAnchor = document.createElement("a");
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `${plugin.id}-config.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      showNotification(`Exported ${plugin.name} configuration.`);
+    } catch (err) {
+      console.error("Export failed", err);
+      setError("Failed to export plugin config.");
+    }
+  };
+
+  // Share Action (#605)
+  const handleSharePlugin = async (e, plugin) => {
+    e.stopPropagation();
+    setActiveMenuId(null);
+    const shareUrl = `${window.location.origin}${window.location.pathname}?plugin=${plugin.id}`;
+    try {
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(shareUrl);
+        showNotification(`Copied share link for ${plugin.name}!`);
+      } else {
+        showNotification(`Share link: ${shareUrl}`);
+      }
+    } catch (err) {
+      console.error("Share failed", err);
+      showNotification(`Share link: ${shareUrl}`);
+    }
+  };
+
+  const toggleContextMenu = (e, pluginId) => {
+    e.stopPropagation();
+    setActiveMenuId((prev) => (prev === pluginId ? null : pluginId));
+  };
+
   async function run() {
     if (!selected || !input.trim() || running) return;
     setRunning(true);
@@ -145,7 +210,7 @@ export default function PluginsPanel({ sessionId, onClose }) {
   };
 
   return (
-    <div className="border-b border-gray-800 bg-gray-900 px-5 py-4 shrink-0" data-testid="plugins-panel">
+    <div className="border-b border-gray-800 bg-gray-900 px-5 py-4 shrink-0 relative" data-testid="plugins-panel">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-1.5">
           {/* Collapse/Expand toggle button */}
@@ -191,7 +256,15 @@ export default function PluginsPanel({ sessionId, onClose }) {
         </button>
       </div>
 
-      {/* Global Inline Error Banner */}
+      {/* Action Notification Banner (#605) */}
+      {notification && (
+        <div data-testid="action-notification" className="mb-3 text-xs bg-purple-950/60 border border-purple-800 text-purple-300 p-2 rounded-lg flex items-center justify-between shadow-sm">
+          <span>{notification}</span>
+          <button onClick={() => setNotification("")} className="text-purple-400 hover:text-white font-bold ml-2">×</button>
+        </div>
+      )}
+
+      {/* Global Inline Error Banner (#588) */}
       {error && (
         <div
           data-testid="plugin-error-message"
@@ -216,44 +289,58 @@ export default function PluginsPanel({ sessionId, onClose }) {
       {/* Collapsible Panel Section */}
       {!isCollapsed && (
         <>
-          {/* Search Refinement Input (#600) */}
-          <div className="mb-3">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search plugins..."
-              aria-label="Filter plugins"
-              className="w-full text-xs bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-gray-200 placeholder-gray-500 outline-none focus:border-purple-500 transition"
-            />
-          </div>
+          {/* Plugin selector row with contextual dropdown menus (#605) */}
+          <div data-testid="plugin-selector-list" className="flex flex-wrap gap-2 mb-4 md:mb-3 shrink-0">
+            {plugins.map((p) => {
+              const Icon = PLUGIN_ICONS[p.icon] || PlugIcon;
+              const isMenuOpen = activeMenuId === p.id;
 
-          {/* Plugin selector row */}
-          <div data-testid="plugin-selector-list" className="flex flex-wrap gap-2 mb-4 md:mb-3 shrink-0 min-h-[32px]">
-            {filteredPlugins.length > 0 ? (
-              filteredPlugins.map((p) => (
-                <button
+              return (
+                <div
                   key={p.id}
-                  type="button"
-                  data-testid={`plugin-btn-${p.id}`}
                   onClick={() => handleSelectPlugin(p)}
-                  className={`text-xs px-3.5 py-2 md:py-1.5 rounded-lg border transition font-medium touch-manipulation
+                  data-testid={`plugin-btn-${p.id}`}
+                  className={`relative text-xs px-3.5 py-2 md:py-1.5 rounded-lg border transition font-medium flex items-center gap-1.5 cursor-pointer touch-manipulation select-none
                     ${selected?.id === p.id ? "border-purple-500 bg-purple-900/30 text-purple-300 shadow-sm shadow-purple-500/10" : "border-gray-700 text-gray-400 hover:bg-gray-800"}`}
                 >
-                  {(() => {
-                    const Icon = PLUGIN_ICONS[p.icon] || PlugIcon;
-                    return (
-                      <span className="inline-flex items-center gap-1">
-                        <Icon className="w-3.5 h-3.5" />
-                        <span>{p.name}</span>
-                      </span>
-                    );
-                  })()}
-                </button>
-              ))
-            ) : (
-              <p className="text-xs text-gray-500 italic py-1">No matching plugins found.</p>
-            )}
+                  <Icon className="w-3.5 h-3.5" />
+                  <span>{p.name}</span>
+
+                  {/* Context Menu Trigger Button */}
+                  <button
+                    type="button"
+                    onClick={(e) => toggleContextMenu(e, p.id)}
+                    aria-label={`Options for ${p.name}`}
+                    className="ml-1 text-gray-500 hover:text-gray-200 transition px-1 rounded hover:bg-gray-700/50 font-bold"
+                  >
+                    ⋮
+                  </button>
+
+                  {/* Context Dropdown Menu (#605) */}
+                  {isMenuOpen && (
+                    <div
+                      onClick={(e) => e.stopPropagation()}
+                      className="absolute left-0 top-full mt-1 w-36 bg-gray-950 border border-gray-800 rounded-lg shadow-xl z-50 py-1 text-xs text-gray-300 font-normal"
+                    >
+                      <button
+                        type="button"
+                        onClick={(e) => handleSharePlugin(e, p)}
+                        className="w-full text-left px-3 py-1.5 hover:bg-gray-800 hover:text-white"
+                      >
+                        Share Plugin
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => handleExportPlugin(e, p)}
+                        className="w-full text-left px-3 py-1.5 hover:bg-gray-800 hover:text-white"
+                      >
+                        Export Config
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
           {/* Plugin Input/Output Area OR Empty-State Guidance */}
