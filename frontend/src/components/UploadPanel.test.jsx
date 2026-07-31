@@ -15,12 +15,13 @@ vi.mock("../utils/api", () => ({
 
 // Mock icons for testing
 vi.mock("./Icons", () => ({
-  CheckIcon: () => <span data-testid="check-icon" />,
-  DocumentsIcon: () => <span data-testid="documents-icon" />,
-  ErrorIcon: () => <span data-testid="error-icon" />,
-  SpinnerIcon: () => <span data-testid="spinner-icon" />,
-  UploadIcon: () => <span data-testid="upload-icon" />,
-  FileIcon: () => <span data-testid="file-icon" />,
+  CheckIcon: (props) => <span data-testid="check-icon" {...props} />,
+  DocumentsIcon: (props) => <span data-testid="documents-icon" {...props} />,
+  ErrorIcon: (props) => <span data-testid="error-icon" {...props} />,
+  SpinnerIcon: (props) => <span data-testid="spinner-icon" {...props} />,
+  UploadIcon: (props) => <span data-testid="upload-icon" {...props} />,
+  FileIcon: (props) => <span data-testid="file-icon" {...props} />,
+  CopyIcon: (props) => <span data-testid="copy-icon" {...props} />,
 }));
 
 afterEach(() => {
@@ -506,5 +507,263 @@ describe("UploadPanel multi-select upload", () => {
     const clearButton2 = screen.getByText("Clear Selection");
     fireEvent.click(clearButton2);
     expect(screen.queryByText("Failed to Load Preview")).not.toBeInTheDocument();
+  });
+});
+
+describe("UploadPanel Clipboard Copy Feedback Suite", () => {
+  let originalClipboard;
+
+  beforeEach(() => {
+    originalClipboard = navigator.clipboard;
+  });
+
+  afterEach(() => {
+    if (originalClipboard !== undefined) {
+      Object.defineProperty(navigator, "clipboard", {
+        value: originalClipboard,
+        writable: true,
+        configurable: true,
+      });
+    } else {
+      delete navigator.clipboard;
+    }
+  });
+
+  test("copies filename to clipboard and handles success feedback", async () => {
+    const writeTextMock = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText: writeTextMock },
+      writable: true,
+      configurable: true,
+    });
+
+    render(
+      <UploadPanel
+        sessionId="test-session"
+        documents={[{ filename: "test_doc.pdf", chunks_indexed: 5 }]}
+        onUploaded={vi.fn()}
+        onClose={vi.fn()}
+        show={true}
+        feedbackTimeout={50}
+      />
+    );
+
+    const copyBtn = screen.getByTitle("Copy Filename");
+    expect(screen.getByTestId("copy-default-icon")).toBeInTheDocument();
+
+    fireEvent.click(copyBtn);
+
+    expect(writeTextMock).toHaveBeenCalledWith("test_doc.pdf");
+    
+    await waitFor(() => {
+      expect(screen.getByTestId("copy-success-icon")).toBeInTheDocument();
+    });
+    expect(screen.getByTestId("copy-aria-feedback").textContent).toBe(
+      "Filename test_doc.pdf copied to clipboard"
+    );
+
+    // Wait for it to revert
+    await waitFor(() => {
+      expect(screen.getByTestId("copy-default-icon")).toBeInTheDocument();
+    });
+  });
+
+  test("handles filename copy failure feedback", async () => {
+    const writeTextMock = vi.fn().mockRejectedValue(new Error("Permission denied"));
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText: writeTextMock },
+      writable: true,
+      configurable: true,
+    });
+
+    render(
+      <UploadPanel
+        sessionId="test-session"
+        documents={[{ filename: "test_doc.pdf", chunks_indexed: 5 }]}
+        onUploaded={vi.fn()}
+        onClose={vi.fn()}
+        show={true}
+        feedbackTimeout={50}
+      />
+    );
+
+    const copyBtn = screen.getByTitle("Copy Filename");
+    fireEvent.click(copyBtn);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("copy-failed-icon")).toBeInTheDocument();
+    });
+    expect(screen.getByTestId("copy-aria-feedback").textContent).toBe(
+      "Failed to copy filename test_doc.pdf"
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("copy-default-icon")).toBeInTheDocument();
+    });
+  });
+
+  test("handles empty/missing filename copying gracefully", async () => {
+    const writeTextMock = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText: writeTextMock },
+      writable: true,
+      configurable: true,
+    });
+
+    // Provide empty/falsy document name
+    render(
+      <UploadPanel
+        sessionId="test-session"
+        documents={[{ filename: "", chunks_indexed: 5 }]}
+        onUploaded={vi.fn()}
+        onClose={vi.fn()}
+        show={true}
+        feedbackTimeout={50}
+      />
+    );
+
+    const copyBtn = screen.getByTitle("Copy Filename");
+    fireEvent.click(copyBtn);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("copy-failed-icon")).toBeInTheDocument();
+    });
+    expect(screen.getByTestId("copy-aria-feedback").textContent).toBe(
+      "Failed to copy filename. Filename is empty."
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("copy-default-icon")).toBeInTheDocument();
+    });
+  });
+
+  test("rapid repeated clicks reset state and do not stack timers", async () => {
+    const writeTextMock = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText: writeTextMock },
+      writable: true,
+      configurable: true,
+    });
+
+    render(
+      <UploadPanel
+        sessionId="test-session"
+        documents={[{ filename: "test_doc.pdf", chunks_indexed: 5 }]}
+        onUploaded={vi.fn()}
+        onClose={vi.fn()}
+        show={true}
+        feedbackTimeout={100}
+      />
+    );
+
+    const copyBtn = screen.getByTitle("Copy Filename");
+
+    // Click multiple times rapidly
+    fireEvent.click(copyBtn);
+    await waitFor(() => expect(screen.getByTestId("copy-success-icon")).toBeInTheDocument());
+
+    // Wait 40ms, click again (this clears/resets the timer)
+    await new Promise(r => setTimeout(r, 40));
+    fireEvent.click(copyBtn);
+    await waitFor(() => expect(screen.getByTestId("copy-success-icon")).toBeInTheDocument());
+
+    // Wait another 40ms, click again
+    await new Promise(r => setTimeout(r, 40));
+    fireEvent.click(copyBtn);
+    await waitFor(() => expect(screen.getByTestId("copy-success-icon")).toBeInTheDocument());
+
+    // Wait 60ms - still shouldn't have reverted (total 100ms from last click needed)
+    await new Promise(r => setTimeout(r, 60));
+    expect(screen.getByTestId("copy-success-icon")).toBeInTheDocument();
+
+    // Now wait another 60ms (total 120ms from last click) -> should revert!
+    await waitFor(() => expect(screen.getByTestId("copy-default-icon")).toBeInTheDocument());
+  });
+
+  test("copies preview content to clipboard and handles success/failure feedback", async () => {
+    const writeTextMock = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText: writeTextMock },
+      writable: true,
+      configurable: true,
+    });
+
+    api.previewDocument.mockResolvedValue({ content: "Sample preview text content" });
+
+    render(
+      <UploadPanel
+        sessionId="test-session"
+        documents={[{ filename: "preview_doc.pdf", chunks_indexed: 5 }]}
+        onUploaded={vi.fn()}
+        onClose={vi.fn()}
+        show={true}
+        feedbackTimeout={50}
+      />
+    );
+
+    const previewButtons = screen.getAllByTitle("Preview Document Content");
+    fireEvent.click(previewButtons[0]);
+
+    await waitFor(() => expect(screen.getByText("Sample preview text content")).toBeInTheDocument());
+
+    const copyPreviewBtn = screen.getByTitle("Copy Document Preview Content");
+    expect(screen.getByTestId("preview-copy-default-icon")).toBeInTheDocument();
+
+    fireEvent.click(copyPreviewBtn);
+
+    expect(writeTextMock).toHaveBeenCalledWith("Sample preview text content");
+    await waitFor(() => {
+      expect(screen.getByTestId("preview-copy-success-icon")).toBeInTheDocument();
+    });
+    expect(screen.getByText("Copied!")).toBeInTheDocument();
+    expect(screen.getByTestId("copy-aria-feedback").textContent).toBe(
+      "Document preview content copied to clipboard"
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("preview-copy-default-icon")).toBeInTheDocument();
+    });
+  });
+
+  test("handles preview copy failure feedback gracefully", async () => {
+    const writeTextMock = vi.fn().mockRejectedValue(new Error("Clipboard error"));
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText: writeTextMock },
+      writable: true,
+      configurable: true,
+    });
+
+    api.previewDocument.mockResolvedValue({ content: "Sample preview text content" });
+
+    render(
+      <UploadPanel
+        sessionId="test-session"
+        documents={[{ filename: "preview_doc.pdf", chunks_indexed: 5 }]}
+        onUploaded={vi.fn()}
+        onClose={vi.fn()}
+        show={true}
+        feedbackTimeout={50}
+      />
+    );
+
+    const previewButtons = screen.getAllByTitle("Preview Document Content");
+    fireEvent.click(previewButtons[0]);
+
+    await waitFor(() => expect(screen.getByText("Sample preview text content")).toBeInTheDocument());
+
+    const copyPreviewBtn = screen.getByTitle("Copy Document Preview Content");
+    fireEvent.click(copyPreviewBtn);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("preview-copy-failed-icon")).toBeInTheDocument();
+    });
+    expect(screen.getByText("Failed to copy")).toBeInTheDocument();
+    expect(screen.getByTestId("copy-aria-feedback").textContent).toBe(
+      "Failed to copy document preview content"
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("preview-copy-default-icon")).toBeInTheDocument();
+    });
   });
 });

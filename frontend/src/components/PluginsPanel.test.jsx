@@ -13,7 +13,7 @@ vi.mock("../utils/api", () => ({
   getPluginLogs: vi.fn().mockResolvedValue({ logs: [] }),
 }));
 
-// Mock icons
+// Mock icon components
 vi.mock("./Icons", () => ({
   BracesIcon: () => <span data-testid="braces-icon" />,
   CalculatorIcon: () => <span data-testid="calculator-icon" />,
@@ -238,6 +238,101 @@ describe("PluginsPanel Changelog Previews (#603)", () => {
     expect(
       screen.getByText(/No changelog preview available for Summarizer/i)
     ).toBeInTheDocument();
+  });
+});
+
+describe("PluginsPanel Export & Share Suite (#605)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    api.getPlugins.mockResolvedValue({ plugins: mockPluginsList });
+    api.getPluginLogs.mockResolvedValue({ logs: [] });
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  test("copies shareable plugin URL to clipboard on Share action", async () => {
+    const writeTextMock = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, {
+      clipboard: { writeText: writeTextMock },
+    });
+
+    render(<PluginsPanel sessionId="session-605" onClose={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("plugin-btn-calculator")).toBeInTheDocument();
+    });
+
+    const optionsBtn = screen.getByLabelText("Options for Calculator");
+    fireEvent.click(optionsBtn);
+
+    const shareBtn = screen.getByText("Share Plugin");
+    fireEvent.click(shareBtn);
+
+    expect(writeTextMock).toHaveBeenCalledWith(expect.stringContaining("plugin=calculator"));
+    await waitFor(() => {
+      expect(screen.getByTestId("action-notification")).toHaveTextContent("Copied share link for Calculator!");
+    });
+  });
+
+  test("triggers JSON export download on Export Config action", async () => {
+    const createElementSpy = vi.spyOn(document, "createElement");
+
+    render(<PluginsPanel sessionId="session-605-export" onClose={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("plugin-btn-calculator")).toBeInTheDocument();
+    });
+
+    const optionsBtn = screen.getByLabelText("Options for Calculator");
+    fireEvent.click(optionsBtn);
+
+    const exportBtn = screen.getByText("Export Config");
+    fireEvent.click(exportBtn);
+
+    expect(createElementSpy).toHaveBeenCalledWith("a");
+    await waitFor(() => {
+      expect(screen.getByTestId("action-notification")).toHaveTextContent("Exported Calculator configuration.");
+    });
+  });
+});
+
+describe("PluginsPanel Favorite & Pin Support (#601)", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.clearAllMocks();
+    api.getPlugins.mockResolvedValue({ plugins: mockPluginsList });
+    api.getPluginLogs.mockResolvedValue({ logs: [] });
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  test("toggles pin state and saves to localStorage", async () => {
+    render(<PluginsPanel sessionId="session-601" onClose={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Summarizer")).toBeInTheDocument();
+    });
+
+    const pinBtn = screen.getByLabelText("Pin Summarizer");
+    fireEvent.click(pinBtn);
+
+    expect(screen.getByLabelText("Unpin Summarizer")).toBeInTheDocument();
+    expect(JSON.parse(localStorage.getItem("plugins-panel-pinned:session-601"))).toContain("summarizer");
+  });
+
+  test("restores pinned favorites from localStorage on mount", async () => {
+    localStorage.setItem("plugins-panel-pinned:session-601", JSON.stringify(["summarizer"]));
+
+    render(<PluginsPanel sessionId="session-601" onClose={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Unpin Summarizer")).toBeInTheDocument();
+      expect(screen.getByLabelText("Pin Calculator")).toBeInTheDocument();
+    });
   });
 });
 
