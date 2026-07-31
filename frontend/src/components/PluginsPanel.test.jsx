@@ -355,3 +355,86 @@ describe("PluginsPanel View State & Persistence Suite (#592)", () => {
     expect(screen.getByText("Performs math evaluation")).toBeInTheDocument();
   });
 });
+
+describe("PluginsPanel Saved Drafts (#596)", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    api.getPlugins.mockResolvedValue({ plugins: mockPluginsList });
+    api.getPluginLogs.mockResolvedValue({ logs: [] });
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  test("restores saved plugin draft from localStorage on render", async () => {
+    localStorage.setItem("localmind_plugin_draft_session-596", "2 + 2");
+
+    render(<PluginsPanel sessionId="session-596" onClose={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Calculator")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText("Calculator"));
+
+    const textarea = screen.getByPlaceholderText(/Enter input for Calculator.../i);
+    expect(textarea.value).toBe("2 + 2");
+  });
+
+  test("persists plugin draft to localStorage as user types", async () => {
+    render(<PluginsPanel sessionId="session-596" onClose={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Calculator")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText("Calculator"));
+
+    const textarea = screen.getByPlaceholderText(/Enter input for Calculator.../i);
+    fireEvent.change(textarea, { target: { value: "10 * 5" } });
+
+    expect(localStorage.getItem("localmind_plugin_draft_session-596")).toBe("10 * 5");
+  });
+
+  test("clears saved plugin draft from localStorage upon successful execution", async () => {
+    api.runPlugin.mockResolvedValue({ success: true, output: "50" });
+
+    render(<PluginsPanel sessionId="session-596" onClose={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Calculator")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText("Calculator"));
+
+    const textarea = screen.getByPlaceholderText(/Enter input for Calculator.../i);
+    fireEvent.change(textarea, { target: { value: "10 * 5" } });
+
+    const runBtn = screen.getByRole("button", { name: /Run Calculator/i });
+    fireEvent.click(runBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText("50")).toBeInTheDocument();
+    });
+
+    expect(localStorage.getItem("localmind_plugin_draft_session-596")).toBeNull();
+  });
+
+  test("switches plugin draft dynamically when sessionId changes", async () => {
+    localStorage.setItem("localmind_plugin_draft_session-A", "Draft A");
+    localStorage.setItem("localmind_plugin_draft_session-B", "Draft B");
+
+    const { rerender } = render(<PluginsPanel sessionId="session-A" onClose={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByText("Calculator")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("Calculator"));
+
+    const textarea = screen.getByPlaceholderText(/Enter input for Calculator.../i);
+    expect(textarea.value).toBe("Draft A");
+
+    rerender(<PluginsPanel sessionId="session-B" onClose={vi.fn()} />);
+
+    expect(textarea.value).toBe("Draft B");
+  });
+});
