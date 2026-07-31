@@ -21,6 +21,8 @@ export default function App() {
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [settingsLoading, setSettingsLoading] = useState(true);
+  const [sessionsLoading, setSessionsLoading] = useState(true);
+  const [sidebarError, setSidebarError] = useState(null);
   const [streaming, setStreaming] = useState(false);
   const [panel, setPanel] = useState(null); // "upload"|"plugins"|"settings"|null
 
@@ -105,27 +107,44 @@ export default function App() {
   }, [minimalMode]);
 
   async function bootstrap() {
+    setSessionsLoading(true);
+    setSidebarError(null);
     try {
-      const [mRes, sRes, settRes, stRes] = await Promise.allSettled([
+      // 1. Fetch settings first so we can mount the app layout quickly
+      const settRes = await api.getSettings();
+      setSettings(settRes);
+      if (settRes.default_model) setModel(settRes.default_model);
+      if (settRes.default_language) setLanguage(settRes.default_language);
+    } catch (e) {
+      console.error("Failed to load settings:", e);
+    } finally {
+      setSettingsLoading(false);
+    }
+
+    // 2. Fetch the remaining resources in background
+    try {
+      const [mRes, sRes, stRes] = await Promise.allSettled([
         api.getModels(),
         api.getSessions(),
-        api.getSettings(),
         api.getOllamaStatus(),
       ]);
-      if (mRes.status === "fulfilled") setModels(mRes.value.models || []);
-      if (sRes.status === "fulfilled")
+
+      if (mRes.status === "fulfilled") {
+        setModels(mRes.value.models || []);
+      }
+
+      if (sRes.status === "fulfilled") {
         setSessions(
           (sRes.value || []).map((s) => ({
             ...s,
             color: getSessionColor(s.id),
           })),
         );
-      if (settRes.status === "fulfilled") {
-        setSettings(settRes.value);
-        if (settRes.value.default_model) setModel(settRes.value.default_model);
-        if (settRes.value.default_language)
-          setLanguage(settRes.value.default_language);
+      } else {
+        // Handle sessions fetch failure
+        setSidebarError(sRes.reason?.message || "Failed to load chat sessions");
       }
+
       if (stRes.status === "fulfilled") {
         setOllamaOk(stRes.value.ollama_running);
       } else {
@@ -133,18 +152,22 @@ export default function App() {
       }
     } catch (error) {
       console.error(error);
+      setSidebarError("An unexpected error occurred while syncing data");
     } finally {
-      setSettingsLoading(false);
+      setSessionsLoading(false);
     }
   }
 
   const refreshSessions = useCallback(async () => {
     try {
+      setSidebarError(null);
       const s = await api.getSessions();
       setSessions(
         (s || []).map((sess) => ({ ...sess, color: getSessionColor(sess.id) })),
       );
-    } catch {}
+    } catch (e) {
+      setSidebarError(e.message || "Failed to sync chat sessions");
+    }
   }, []);
 
   const refreshDocuments = useCallback(async (sid) => {
@@ -556,6 +579,9 @@ export default function App() {
           language={language}
           onLanguageChange={handleLanguageChange}
           onUpdateSessionColor={handleUpdateSessionColor}
+          sessionsLoading={sessionsLoading}
+          error={sidebarError}
+          onErrorDismiss={() => setSidebarError(null)}
         />
       )}
 
