@@ -63,6 +63,77 @@ describe("StatusBar Component Suite", () => {
     });
   });
 
+  describe("Search Refinement Badges (#633)", () => {
+    test("renders semantic search refinement badge", () => {
+      render(<StatusBar searchRefinement="semantic" model="llama3" />);
+      const badge = screen.getByTestId("search-refinement-badge");
+      expect(badge).toBeInTheDocument();
+      expect(badge).toHaveTextContent("Search: Semantic");
+    });
+
+    test("renders keyword search refinement badge", () => {
+      render(<StatusBar searchRefinement="keyword" model="llama3" />);
+      const badge = screen.getByTestId("search-refinement-badge");
+      expect(badge).toBeInTheDocument();
+      expect(badge).toHaveTextContent("Search: Keyword");
+    });
+
+    test("renders hybrid search refinement badge", () => {
+      render(<StatusBar searchRefinement="hybrid" model="llama3" />);
+      const badge = screen.getByTestId("search-refinement-badge");
+      expect(badge).toBeInTheDocument();
+      expect(badge).toHaveTextContent("Search: Hybrid");
+    });
+
+    test("handles object input format for searchRefinement", () => {
+      render(<StatusBar searchRefinement={{ mode: "semantic" }} model="llama3" />);
+      expect(screen.getByTestId("search-refinement-badge")).toHaveTextContent("Search: Semantic");
+    });
+
+    test("does not render search refinement badge when searchRefinement is null/undefined", () => {
+      render(<StatusBar searchRefinement={null} model="llama3" />);
+      expect(screen.queryByTestId("search-refinement-badge")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("Contextual Action Menus (#635)", () => {
+    test("toggles contextual action dropdown menu on button click", () => {
+      render(<StatusBar model="llama3" />);
+      
+      expect(screen.queryByTestId("context-menu-dropdown")).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByTestId("btn-context-menu"));
+      expect(screen.getByTestId("context-menu-dropdown")).toBeInTheDocument();
+
+      fireEvent.click(screen.getByTestId("btn-context-menu"));
+      expect(screen.queryByTestId("context-menu-dropdown")).not.toBeInTheDocument();
+    });
+
+    test("renders custom contextual action items and executes callback", () => {
+      const handleAction = vi.fn();
+      const contextActions = [
+        { id: "act-1", label: "Export Chat", onClick: handleAction }
+      ];
+
+      render(<StatusBar model="llama3" contextActions={contextActions} />);
+
+      fireEvent.click(screen.getByTestId("btn-context-menu"));
+      const actionItem = screen.getByText("Export Chat");
+      expect(actionItem).toBeInTheDocument();
+
+      fireEvent.click(actionItem);
+      expect(handleAction).toHaveBeenCalledTimes(1);
+      expect(screen.queryByTestId("context-menu-dropdown")).not.toBeInTheDocument();
+    });
+
+    test("displays fallback when contextActions array is empty", () => {
+      render(<StatusBar model="llama3" contextActions={[]} />);
+
+      fireEvent.click(screen.getByTestId("btn-context-menu"));
+      expect(screen.getByText("No contextual actions")).toBeInTheDocument();
+    });
+  });
+
   describe("Status Indicator Badges", () => {
     test("renders model label correctly", () => {
       render(<StatusBar model="mistral-7b" />);
@@ -96,7 +167,7 @@ describe("StatusBar Component Suite", () => {
   });
 
   describe("Action Buttons & Interactions", () => {
-    test("triggers action callbacks on button clicks", () => {
+    test("triggers corresponding action callbacks on button clicks", () => {
       const onUpload = vi.fn();
       const onPlugins = vi.fn();
       const onSettings = vi.fn();
