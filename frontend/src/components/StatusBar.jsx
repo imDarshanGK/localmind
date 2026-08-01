@@ -1,12 +1,60 @@
 import { AppLogoIcon, BatchIcon, DocumentsIcon, LightningIcon, OfflineIcon, OnlineIcon, PlugIcon, SettingsIcon, TrashIcon } from "./Icons";
 
-export default function StatusBar({ ollamaOk, model, docCount, onUpload, onPlugins, onSettings, onClear, useStream, onToggleStream }) {
+// Helper badge renderer for compatibility tags (#630)
+function CompatibilityBadge({ compatibility }) {
+  if (!compatibility) return null;
+
+  // Normalize array vs object/string format
+  const badges = Array.isArray(compatibility)
+    ? compatibility
+    : typeof compatibility === "object"
+    ? Object.values(compatibility)
+    : [compatibility];
+
+  return (
+    <div className="inline-flex items-center gap-1 flex-wrap" data-testid="status-bar-compatibility">
+      {badges.map((badge, idx) => {
+        const isLocal = String(badge).toLowerCase().includes("local") || String(badge).toLowerCase().includes("v1");
+        const badgeStyle = isLocal
+          ? "bg-emerald-950/60 text-emerald-400 border-emerald-800/60"
+          : "bg-blue-950/60 text-blue-400 border-blue-800/60";
+
+        return (
+          <span
+            key={idx}
+            data-testid="compatibility-badge"
+            className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${badgeStyle}`}
+          >
+            {badge}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+export default function StatusBar({ 
+  ollamaOk, 
+  model, 
+  docCount, 
+  compatibility, 
+  onUpload, 
+  onPlugins, 
+  onSettings, 
+  onClear, 
+  useStream, 
+  onToggleStream 
+}) {
   return (
     <header className="flex items-center justify-between px-5 py-2.5 border-b border-gray-800 bg-gray-900 shrink-0">
       <div className="flex items-center gap-3">
         <AppLogoIcon className="w-5 h-5 text-purple-400" />
         <span className="font-semibold text-white text-sm">LocalMind</span>
         <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-purple-900 text-purple-300">{model}</span>
+
+        {/* Compatibility Badges (#630) */}
+        {compatibility && <CompatibilityBadge compatibility={compatibility} />}
+
         {ollamaOk === true  && <StatusBadge icon={<OnlineIcon className="w-3.5 h-3.5 text-green-300" />} className="bg-green-900 text-green-300" label="online" />}
         {ollamaOk === false && <StatusBadge icon={<OfflineIcon className="w-3.5 h-3.5 text-red-300" />} className="bg-red-900 text-red-300" label="ollama offline" />}
         {docCount > 0 && <StatusBadge icon={<DocumentsIcon className="w-3.5 h-3.5 text-blue-300" />} className="bg-blue-900 text-blue-300" label={`${docCount} doc${docCount>1?"s":""}`} />}
