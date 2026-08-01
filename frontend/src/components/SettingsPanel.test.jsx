@@ -20,6 +20,7 @@ const mockSettings = {
   temperature: 0.7,
   max_history_turns: 10,
   rag_top_k: 4,
+  rag_chunk_size: 600,
   rag_chunk_overlap: 50,
   theme: "dark",
   minimal_mode: false,
@@ -32,6 +33,8 @@ describe("SettingsPanel - Loading Skeleton Suite (#575)", () => {
     temperature: 0.7,
     max_history_turns: 10,
     rag_top_k: 4,
+    rag_chunk_size: 600,
+    rag_chunk_overlap: 50,
     theme: "dark",
   };
 
