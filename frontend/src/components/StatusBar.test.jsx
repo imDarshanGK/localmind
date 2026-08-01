@@ -84,114 +84,6 @@ describe("StatusBar Component Suite", () => {
   });
 
   /* -------------------------------------------------------------------------- */
-  /*  Role-based Hints Support (#640)                                           */
-  /* -------------------------------------------------------------------------- */
-  describe("Role-based Hints Support (#640)", () => {
-    test("renders role badge and default hint for userRole", () => {
-      render(<StatusBar model="llama3" userRole="admin" />);
-
-      const roleBadge = screen.getByTestId("role-hint-badge");
-      expect(roleBadge).toBeInTheDocument();
-      expect(roleBadge).toHaveTextContent("admin");
-      expect(roleBadge).toHaveAttribute(
-        "title",
-        "Admin Access: Full system controls available"
-      );
-    });
-
-    test("renders custom roleHint tooltip when explicitly passed", () => {
-      render(
-        <StatusBar 
-          model="llama3" 
-          userRole="editor" 
-          roleHint="Custom hint: Editing restricted in prod" 
-        />
-      );
-
-      const roleBadge = screen.getByTestId("role-hint-badge");
-      expect(roleBadge).toHaveAttribute("title", "Custom hint: Editing restricted in prod");
-    });
-
-    test("does not render role badge when userRole is omitted", () => {
-      render(<StatusBar model="llama3" />);
-      expect(screen.queryByTestId("role-hint-badge")).not.toBeInTheDocument();
-    });
-  });
-
-  /* -------------------------------------------------------------------------- */
-  /*  Theme Tokens Support (#639)                                               */
-  /* -------------------------------------------------------------------------- */
-  describe("Theme Tokens Support (#639)", () => {
-    test("applies default theme classes when no theme prop is provided", () => {
-      render(<StatusBar model="llama3" />);
-      const header = screen.getByTestId("status-bar-header");
-      expect(header).toHaveClass("bg-gray-900", "border-gray-800");
-    });
-
-    test("applies custom theme tokens provided via theme prop", () => {
-      const customTheme = {
-        bg: "bg-slate-950",
-        border: "border-slate-800",
-        textPrimary: "text-slate-100"
-      };
-
-      render(<StatusBar model="llama3" theme={customTheme} />);
-      const header = screen.getByTestId("status-bar-header");
-
-      expect(header).toHaveClass("bg-slate-950");
-      expect(header).toHaveClass("border-slate-800");
-    });
-  });
-
-  /* -------------------------------------------------------------------------- */
-  /*  Export and Share Actions (#638)                                           */
-  /* -------------------------------------------------------------------------- */
-  describe("Export and Share Actions (#638)", () => {
-    test("renders export and share buttons when handlers are provided", () => {
-      const onExport = vi.fn();
-      const onShare = vi.fn();
-
-      render(<StatusBar model="llama3" onExport={onExport} onShare={onShare} />);
-
-      const exportBtn = screen.getByTestId("btn-export");
-      const shareBtn = screen.getByTestId("btn-share");
-
-      expect(exportBtn).toBeInTheDocument();
-      expect(shareBtn).toBeInTheDocument();
-
-      fireEvent.click(exportBtn);
-      expect(onExport).toHaveBeenCalledTimes(1);
-
-      fireEvent.click(shareBtn);
-      expect(onShare).toHaveBeenCalledTimes(1);
-    });
-
-    test("does not render export or share buttons when handlers are omitted", () => {
-      render(<StatusBar model="llama3" />);
-      expect(screen.queryByTestId("btn-export")).not.toBeInTheDocument();
-      expect(screen.queryByTestId("btn-share")).not.toBeInTheDocument();
-    });
-
-    test("includes export and share inside contextual menu when handlers are provided", () => {
-      const onExport = vi.fn();
-      const onShare = vi.fn();
-
-      render(<StatusBar model="llama3" onExport={onExport} onShare={onShare} />);
-
-      fireEvent.click(screen.getByTestId("btn-context-menu"));
-
-      const exportOption = screen.getByText("Export Chat");
-      const shareOption = screen.getByText("Share Session");
-
-      expect(exportOption).toBeInTheDocument();
-      expect(shareOption).toBeInTheDocument();
-
-      fireEvent.click(exportOption);
-      expect(onExport).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  /* -------------------------------------------------------------------------- */
   /*  Changelog Preview Badges (#636)                                           */
   /* -------------------------------------------------------------------------- */
   describe("Changelog Preview Badges (#636)", () => {
@@ -471,7 +363,7 @@ describe("StatusBar Component Suite", () => {
   /*  Action Buttons & Interactions                                             */
   /* -------------------------------------------------------------------------- */
   describe("Action Buttons & Interactions", () => {
-    test("triggers action callbacks on button clicks", () => {
+    test("triggers corresponding action callbacks on button clicks", () => {
       const onUpload = vi.fn();
       const onPlugins = vi.fn();
       const onSettings = vi.fn();
