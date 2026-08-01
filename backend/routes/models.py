@@ -2,7 +2,6 @@
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
-
 from services import ollama_service
 
 router = APIRouter()

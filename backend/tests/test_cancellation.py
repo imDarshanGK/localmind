@@ -3,7 +3,6 @@ import tempfile
 from unittest.mock import AsyncMock, patch
 
 import pytest
-
 import services.db_service as db
 from models.schemas import ChatRequest
 from routes.chat import ACTIVE_STREAMS, cancel_stream, chat_stream

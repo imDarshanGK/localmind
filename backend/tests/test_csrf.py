@@ -16,10 +16,9 @@ import tempfile
 import time
 
 import pytest
-from fastapi.testclient import TestClient
-
 import services.db_service as db
 from app import app
+from fastapi.testclient import TestClient
 
 # ── shared test DB (same pattern as test_api.py) ─────────────────────────────
 _tmp = tempfile.mktemp(suffix="_csrf.db")

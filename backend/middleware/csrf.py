@@ -34,10 +34,6 @@ import time
 from urllib.parse import urlparse
 
 from prometheus_client import Counter
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.requests import Request
-from starlette.responses import JSONResponse, Response
-
 from services.db_service import (
     dedupe_delete,
     dedupe_get,
@@ -45,6 +41,9 @@ from services.db_service import (
     dedupe_set_done,
     dedupe_set_processing,
 )
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from starlette.responses import JSONResponse, Response
 
 logger = logging.getLogger(__name__)
 

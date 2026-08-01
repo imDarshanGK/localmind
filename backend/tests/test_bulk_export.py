@@ -1,10 +1,9 @@
 import tempfile
 
 import pytest
-from fastapi.testclient import TestClient
-
 import services.db_service as db
 from app import app
+from fastapi.testclient import TestClient
 
 # Setup temporary database for bulk export tests
 _tmp = tempfile.mktemp(suffix=".db")
