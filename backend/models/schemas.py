@@ -127,6 +127,7 @@ class AppSettings(BaseModel):
     temperature: float = 0.7
     max_history_turns: int = 10
     rag_top_k: int = 4
+    rag_chunk_size: int = 600
     rag_chunk_overlap: int = 50
     theme: str = "dark"
     minimal_mode: bool = False
