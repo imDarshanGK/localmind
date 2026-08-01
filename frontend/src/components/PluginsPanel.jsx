@@ -72,7 +72,7 @@ export default function PluginsPanel({ sessionId, onClose }) {
     }
   });
 
-  // State for contextual menu and action toast feedback (#605)
+  // State for contextual menu and action toast feedback (#602, #605)
   const [activeMenuId, setActiveMenuId] = useState(null);
   const [notification, setNotification] = useState("");
 
@@ -188,7 +188,7 @@ export default function PluginsPanel({ sessionId, onClose }) {
     }
   }, [input, sessionId]);
 
-  // Close contextual action menu on global click or Escape key (#605)
+  // Close contextual action menu on global click or Escape key (#602, #605)
   useEffect(() => {
     const handleGlobalClick = () => setActiveMenuId(null);
     const handleKeyDown = (e) => {
@@ -395,7 +395,7 @@ export default function PluginsPanel({ sessionId, onClose }) {
             />
           </div>
 
-          {/* Plugin selector with favorite & pin toggles (#601), compatibility badges (#597), & contextual menus (#605) */}
+          {/* Plugin selector with favorite & pin toggles (#601), compatibility badges (#597), & contextual menus (#602, #605) */}
           <div data-testid="plugin-selector-list" className="flex flex-wrap gap-2 mb-4 md:mb-3 shrink-0 min-h-[32px]">
             {filteredPlugins.length > 0 ? (
               filteredPlugins.map((p) => {
@@ -426,7 +426,7 @@ export default function PluginsPanel({ sessionId, onClose }) {
                       {isPinned ? "★" : "☆"}
                     </button>
 
-                    {/* Context Menu Trigger Button */}
+                    {/* Context Menu Trigger Button (#602) */}
                     <button
                       type="button"
                       onClick={(e) => toggleContextMenu(e, p.id)}
@@ -436,7 +436,7 @@ export default function PluginsPanel({ sessionId, onClose }) {
                       ⋮
                     </button>
 
-                    {/* Context Dropdown Menu (#605) */}
+                    {/* Context Dropdown Menu (#602, #605) */}
                     {isMenuOpen && (
                       <div
                         onClick={(e) => e.stopPropagation()}
