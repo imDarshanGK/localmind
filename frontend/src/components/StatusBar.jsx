@@ -1,5 +1,54 @@
-import { useState, useEffect } from "react";
-import { AppLogoIcon, BatchIcon, DocumentsIcon, LightningIcon, OfflineIcon, OnlineIcon, PlugIcon, SettingsIcon, TemplateIcon, TrashIcon } from "./Icons";
+import { useState, useEffect, useRef } from "react";
+import { 
+  AppLogoIcon, 
+  BatchIcon, 
+  DocumentsIcon, 
+  LightningIcon, 
+  OfflineIcon, 
+  OnlineIcon, 
+  PlugIcon, 
+  SettingsIcon, 
+  TemplateIcon, 
+  TrashIcon 
+} from "./Icons";
+
+// Helper badge renderer for source trust indicators (#632)
+function SourceTrustBadge({ trustLevel }) {
+  if (!trustLevel) return null;
+
+  const normalized = String(
+    typeof trustLevel === "object" ? trustLevel.level || trustLevel.status : trustLevel
+  ).toLowerCase();
+
+  let badgeStyle = "bg-gray-800 text-gray-400 border-gray-700";
+  let label = "Unknown Source";
+  let icon = "🛡️";
+
+  if (normalized.includes("untrusted") || normalized.includes("low") || normalized.includes("risk")) {
+    badgeStyle = "bg-rose-950/60 text-rose-300 border-rose-800/60";
+    label = "Untrusted Source";
+    icon = "⚠️";
+  } else if (normalized.includes("verified") || normalized.includes("trusted") || normalized.includes("high")) {
+    badgeStyle = "bg-emerald-950/60 text-emerald-300 border-emerald-800/60";
+    label = "Trusted Source";
+    icon = "✓";
+  } else if (normalized.includes("medium") || normalized.includes("caution")) {
+    badgeStyle = "bg-amber-950/60 text-amber-300 border-amber-800/60";
+    label = "Caution Source";
+    icon = "⚡";
+  }
+
+  return (
+    <span
+      data-testid="source-trust-badge"
+      className={`text-[10px] font-mono px-2 py-0.5 rounded border inline-flex items-center gap-1 ${badgeStyle}`}
+      title={`Source Trust Level: ${normalized}`}
+    >
+      <span>{icon}</span>
+      <span>{label}</span>
+    </span>
+  );
+}
 
 // Helper badge renderer for search refinement indicators (#633)
 function SearchRefinementBadge({ searchRefinement }) {
@@ -43,13 +92,14 @@ export default function StatusBar({
   ollamaOk, 
   model, 
   docCount, 
+  trustLevel,
   searchRefinement,
   onUpload, 
   onPrompts, 
   onPlugins, 
   onSettings, 
   onClear, 
-  useStream,
+  useStream, 
   onToggleStream,
   onTroubleshoot,
   focusMode,
@@ -99,6 +149,9 @@ export default function StatusBar({
         )}
 
         <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-purple-900 text-purple-300">{model}</span>
+
+        {/* Source Trust Indicator (#632) */}
+        {trustLevel && <SourceTrustBadge trustLevel={trustLevel} />}
 
         {/* Search Refinement Indicator (#633) */}
         {searchRefinement && <SearchRefinementBadge searchRefinement={searchRefinement} />}

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import React from "react";
-import { describe, test, expect, afterEach, vi } from "vitest";
+import { describe, test, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import StatusBar from "./StatusBar";
@@ -21,6 +21,39 @@ vi.mock("./Icons", () => ({
 describe("StatusBar Component Suite", () => {
   afterEach(() => {
     cleanup();
+  });
+
+  describe("Source Trust Indicator Badges (#632)", () => {
+    test("renders trusted source badge when trustLevel is 'trusted' or 'verified'", () => {
+      render(<StatusBar trustLevel="verified" model="llama3" />);
+      const badge = screen.getByTestId("source-trust-badge");
+      expect(badge).toBeInTheDocument();
+      expect(badge).toHaveTextContent("Trusted Source");
+    });
+
+    test("renders untrusted source badge when trustLevel is 'untrusted'", () => {
+      render(<StatusBar trustLevel="untrusted" model="llama3" />);
+      const badge = screen.getByTestId("source-trust-badge");
+      expect(badge).toBeInTheDocument();
+      expect(badge).toHaveTextContent("Untrusted Source");
+    });
+
+    test("renders caution badge when trustLevel is 'caution' or 'medium'", () => {
+      render(<StatusBar trustLevel="caution" model="llama3" />);
+      const badge = screen.getByTestId("source-trust-badge");
+      expect(badge).toBeInTheDocument();
+      expect(badge).toHaveTextContent("Caution Source");
+    });
+
+    test("handles object input format for trustLevel gracefully", () => {
+      render(<StatusBar trustLevel={{ level: "trusted" }} model="llama3" />);
+      expect(screen.getByTestId("source-trust-badge")).toHaveTextContent("Trusted Source");
+    });
+
+    test("does not render trust badge when trustLevel is null or undefined", () => {
+      render(<StatusBar trustLevel={null} model="llama3" />);
+      expect(screen.queryByTestId("source-trust-badge")).not.toBeInTheDocument();
+    });
   });
 
   describe("Search Refinement Badges (#633)", () => {
