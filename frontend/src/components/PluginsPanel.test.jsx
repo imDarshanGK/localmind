@@ -315,6 +315,44 @@ describe("PluginsPanel Interaction Tests (#595)", () => {
   });
 });
 
+describe("PluginsPanel Favorite & Pin Support (#601)", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.clearAllMocks();
+    api.getPlugins.mockResolvedValue({ plugins: mockPluginsList });
+    api.getPluginLogs.mockResolvedValue({ logs: [] });
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  test("toggles pin state and saves to localStorage", async () => {
+    render(<PluginsPanel sessionId="session-601" onClose={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Summarizer")).toBeInTheDocument();
+    });
+
+    const pinBtn = screen.getByLabelText("Pin Summarizer");
+    fireEvent.click(pinBtn);
+
+    expect(screen.getByLabelText("Unpin Summarizer")).toBeInTheDocument();
+    expect(JSON.parse(localStorage.getItem("plugins-panel-pinned:session-601"))).toContain("summarizer");
+  });
+
+  test("restores pinned favorites from localStorage on mount", async () => {
+    localStorage.setItem("plugins-panel-pinned:session-601", JSON.stringify(["summarizer"]));
+
+    render(<PluginsPanel sessionId="session-601" onClose={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Unpin Summarizer")).toBeInTheDocument();
+      expect(screen.getByLabelText("Pin Calculator")).toBeInTheDocument();
+    });
+  });
+});
+
 describe("PluginsPanel Export & Share Suite (#605)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
