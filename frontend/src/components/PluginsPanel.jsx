@@ -16,8 +16,8 @@ function CompatibilityBadge({ compatibility }) {
   if (!compatibility) return null;
 
   // Normalize array vs object/string format
-  const badges = Array.isArray(compatibility) 
-    ? compatibility 
+  const badges = Array.isArray(compatibility)
+    ? compatibility
     : typeof compatibility === "object"
     ? Object.values(compatibility)
     : [compatibility];
@@ -62,6 +62,16 @@ export default function PluginsPanel({ sessionId, onClose }) {
   const [copied, setCopied] = useState(false);
   const [logs, setLogs] = useState([]);
 
+  // Persistent Pinned / Favorite Plugin IDs (#601)
+  const [pinnedIds, setPinnedIds] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`plugins-panel-pinned:${sessionId}`);
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+
   // State for contextual menu and action toast feedback (#605)
   const [activeMenuId, setActiveMenuId] = useState(null);
   const [notification, setNotification] = useState("");
@@ -84,6 +94,15 @@ export default function PluginsPanel({ sessionId, onClose }) {
       return null;
     }
   });
+
+  // Sync pinned plugin state to localStorage (#601)
+  useEffect(() => {
+    try {
+      localStorage.setItem(`plugins-panel-pinned:${sessionId}`, JSON.stringify(pinnedIds));
+    } catch (e) {
+      console.warn("localStorage write blocked:", e);
+    }
+  }, [pinnedIds, sessionId]);
 
   // Sync collapsed state to localStorage (#592)
   useEffect(() => {
@@ -144,6 +163,13 @@ export default function PluginsPanel({ sessionId, onClose }) {
     setOutput("");
     setError("");
     setCopied(false);
+  }
+
+  function togglePin(e, pluginId) {
+    e.stopPropagation();
+    setPinnedIds((prev) =>
+      prev.includes(pluginId) ? prev.filter((id) => id !== pluginId) : [...prev, pluginId]
+    );
   }
 
   // Re-sync input draft whenever sessionId changes (#596)
@@ -248,8 +274,17 @@ export default function PluginsPanel({ sessionId, onClose }) {
     }
   }
 
+  // Sort plugins with pinned/favorites at the top (#601)
+  const sortedPlugins = [...plugins].sort((a, b) => {
+    const isAPinned = pinnedIds.includes(a.id);
+    const isBPinned = pinnedIds.includes(b.id);
+    if (isAPinned && !isBPinned) return -1;
+    if (!isAPinned && isBPinned) return 1;
+    return 0;
+  });
+
   // Filter plugins in real-time by search query (#600)
-  const filteredPlugins = plugins.filter((p) => {
+  const filteredPlugins = sortedPlugins.filter((p) => {
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
     const nameMatch = p.name?.toLowerCase().includes(q);
@@ -348,60 +383,87 @@ export default function PluginsPanel({ sessionId, onClose }) {
       {/* Collapsible Panel Section */}
       {!isCollapsed && (
         <>
-          {/* Plugin selector row with contextual dropdown menus (#605) & compatibility badges (#597) */}
-          <div data-testid="plugin-selector-list" className="flex flex-wrap gap-2 mb-4 md:mb-3 shrink-0">
-            {plugins.map((p) => {
-              const Icon = PLUGIN_ICONS[p.icon] || PlugIcon;
-              const isMenuOpen = activeMenuId === p.id;
+          {/* Search Refinement Input (#600) */}
+          <div className="mb-3">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search plugins..."
+              aria-label="Filter plugins"
+              className="w-full text-xs bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-gray-200 placeholder-gray-600 outline-none focus:border-purple-500 font-sans"
+            />
+          </div>
 
-              return (
-                <div
-                  key={p.id}
-                  onClick={() => handleSelectPlugin(p)}
-                  data-testid={`plugin-btn-${p.id}`}
-                  className={`relative text-xs px-3.5 py-2 md:py-1.5 rounded-lg border transition font-medium flex items-center gap-1.5 cursor-pointer touch-manipulation select-none
-                    ${selected?.id === p.id ? "border-purple-500 bg-purple-900/30 text-purple-300 shadow-sm shadow-purple-500/10" : "border-gray-700 text-gray-400 hover:bg-gray-800"}`}
-                >
-                  <Icon className="w-3.5 h-3.5" />
-                  <span>{p.name}</span>
+          {/* Plugin selector with favorite & pin toggles (#601), compatibility badges (#597), & contextual menus (#605) */}
+          <div data-testid="plugin-selector-list" className="flex flex-wrap gap-2 mb-4 md:mb-3 shrink-0 min-h-[32px]">
+            {filteredPlugins.length > 0 ? (
+              filteredPlugins.map((p) => {
+                const isPinned = pinnedIds.includes(p.id);
+                const Icon = PLUGIN_ICONS[p.icon] || PlugIcon;
+                const isMenuOpen = activeMenuId === p.id;
 
-                  {p.compatibility && <CompatibilityBadge compatibility={p.compatibility} />}
-
-                  {/* Context Menu Trigger Button */}
-                  <button
-                    type="button"
-                    onClick={(e) => toggleContextMenu(e, p.id)}
-                    aria-label={`Options for ${p.name}`}
-                    className="ml-1 text-gray-500 hover:text-gray-200 transition px-1 rounded hover:bg-gray-700/50 font-bold"
+                return (
+                  <div
+                    key={p.id}
+                    onClick={() => handleSelectPlugin(p)}
+                    data-testid={`plugin-btn-${p.id}`}
+                    className={`relative text-xs px-3.5 py-2 md:py-1.5 rounded-lg border transition font-medium flex items-center gap-1.5 cursor-pointer touch-manipulation select-none
+                      ${selected?.id === p.id ? "border-purple-500 bg-purple-900/30 text-purple-300 shadow-sm shadow-purple-500/10" : "border-gray-700 text-gray-400 hover:bg-gray-800"}`}
                   >
-                    ⋮
-                  </button>
+                    <Icon className="w-3.5 h-3.5" />
+                    <span>{p.name}</span>
 
-                  {/* Context Dropdown Menu (#605) */}
-                  {isMenuOpen && (
-                    <div
-                      onClick={(e) => e.stopPropagation()}
-                      className="absolute left-0 top-full mt-1 w-36 bg-gray-950 border border-gray-800 rounded-lg shadow-xl z-50 py-1 text-xs text-gray-300 font-normal"
+                    {p.compatibility && <CompatibilityBadge compatibility={p.compatibility} />}
+
+                    {/* Pin/Favorite Toggle Button (#601) */}
+                    <button
+                      type="button"
+                      onClick={(e) => togglePin(e, p.id)}
+                      aria-label={isPinned ? `Unpin ${p.name}` : `Pin ${p.name}`}
+                      className={`ml-1 hover:text-amber-300 transition ${isPinned ? "text-amber-400" : "text-gray-600"}`}
                     >
-                      <button
-                        type="button"
-                        onClick={(e) => handleSharePlugin(e, p)}
-                        className="w-full text-left px-3 py-1.5 hover:bg-gray-800 hover:text-white"
+                      {isPinned ? "★" : "☆"}
+                    </button>
+
+                    {/* Context Menu Trigger Button */}
+                    <button
+                      type="button"
+                      onClick={(e) => toggleContextMenu(e, p.id)}
+                      aria-label={`Options for ${p.name}`}
+                      className="ml-0.5 text-gray-500 hover:text-gray-200 transition px-1 rounded hover:bg-gray-700/50 font-bold"
+                    >
+                      ⋮
+                    </button>
+
+                    {/* Context Dropdown Menu (#605) */}
+                    {isMenuOpen && (
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        className="absolute left-0 top-full mt-1 w-36 bg-gray-950 border border-gray-800 rounded-lg shadow-xl z-50 py-1 text-xs text-gray-300 font-normal"
                       >
-                        Share Plugin
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => handleExportPlugin(e, p)}
-                        className="w-full text-left px-3 py-1.5 hover:bg-gray-800 hover:text-white"
-                      >
-                        Export Config
-                      </button>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                        <button
+                          type="button"
+                          onClick={(e) => handleSharePlugin(e, p)}
+                          className="w-full text-left px-3 py-1.5 hover:bg-gray-800 hover:text-white"
+                        >
+                          Share Plugin
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => handleExportPlugin(e, p)}
+                          className="w-full text-left px-3 py-1.5 hover:bg-gray-800 hover:text-white"
+                        >
+                          Export Config
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            ) : (
+              <p className="text-xs text-gray-500 italic py-1">No matching plugins found.</p>
+            )}
           </div>
 
           {/* Plugin Input/Output Area OR Empty-State Guidance */}
