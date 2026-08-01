@@ -315,6 +315,60 @@ describe("PluginsPanel Interaction Tests (#595)", () => {
   });
 });
 
+describe("PluginsPanel Drag and Drop Suite (#604)", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.clearAllMocks();
+    api.getPlugins.mockResolvedValue({ plugins: mockPluginsList });
+    api.getPluginLogs.mockResolvedValue({ logs: [] });
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  test("reorders plugins on drag and drop and persists order to localStorage", async () => {
+    render(<PluginsPanel sessionId="session-604" onClose={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("plugin-btn-calculator")).toBeInTheDocument();
+      expect(screen.getByTestId("plugin-btn-summarizer")).toBeInTheDocument();
+    });
+
+    const firstPlugin = screen.getByTestId("plugin-btn-calculator");
+    const secondPlugin = screen.getByTestId("plugin-btn-summarizer");
+
+    const mockDataTransfer = {
+      effectAllowed: "",
+      dropEffect: "",
+      setData: vi.fn(),
+      getData: vi.fn(),
+    };
+
+    fireEvent.dragStart(firstPlugin, { dataTransfer: mockDataTransfer });
+    fireEvent.dragOver(secondPlugin, { dataTransfer: mockDataTransfer });
+    fireEvent.drop(secondPlugin, { dataTransfer: mockDataTransfer });
+
+    const savedOrder = localStorage.getItem("plugins-panel-order:session-604");
+    expect(savedOrder).toBe(JSON.stringify(["summarizer", "calculator"]));
+  });
+
+  test("restores custom plugin order from localStorage on mount", async () => {
+    localStorage.setItem(
+      "plugins-panel-order:session-604-restore",
+      JSON.stringify(["summarizer", "calculator"])
+    );
+
+    render(<PluginsPanel sessionId="session-604-restore" onClose={vi.fn()} />);
+
+    await waitFor(() => {
+      const pluginItems = screen.getAllByTestId(/^plugin-btn-/);
+      expect(pluginItems[0]).toHaveTextContent("Summarizer");
+      expect(pluginItems[1]).toHaveTextContent("Calculator");
+    });
+  });
+});
+
 describe("PluginsPanel Export & Share Suite (#605)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
