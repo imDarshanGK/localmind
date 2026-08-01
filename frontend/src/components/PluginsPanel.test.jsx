@@ -42,6 +42,47 @@ const mockPluginsList = [
   },
 ];
 
+describe("PluginsPanel Search Refinement Suite (#600)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    api.getPlugins.mockResolvedValue({ plugins: mockPluginsList });
+    api.getPluginLogs.mockResolvedValue({ logs: [] });
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  test("filters plugins by search query matching name or description", async () => {
+    render(<PluginsPanel sessionId="test-search-session" onClose={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Calculator")).toBeInTheDocument();
+      expect(screen.getByText("Summarizer")).toBeInTheDocument();
+    });
+
+    const searchInput = screen.getByPlaceholderText(/Search plugins/i);
+    fireEvent.change(searchInput, { target: { value: "calc" } });
+
+    expect(screen.getByText("Calculator")).toBeInTheDocument();
+    expect(screen.queryByText("Summarizer")).not.toBeInTheDocument();
+  });
+
+  test("displays empty state message when search query matches no plugins", async () => {
+    render(<PluginsPanel sessionId="test-search-session" onClose={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Calculator")).toBeInTheDocument();
+    });
+
+    const searchInput = screen.getByPlaceholderText(/Search plugins/i);
+    fireEvent.change(searchInput, { target: { value: "unknown" } });
+
+    expect(screen.getByText("No matching plugins found.")).toBeInTheDocument();
+    expect(screen.queryByText("Calculator")).not.toBeInTheDocument();
+  });
+});
+
 describe("PluginsPanel Compatibility Badges (#597)", () => {
   beforeEach(() => {
     localStorage.clear();

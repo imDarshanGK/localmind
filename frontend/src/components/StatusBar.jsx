@@ -53,7 +53,12 @@ export default function StatusBar({
   onToggleStream,
   onTroubleshoot,
   focusMode,
-  onToggleFocus
+  onToggleFocus,
+  // Favorite & Pin props (#634)
+  isFavorite = false,
+  onToggleFavorite,
+  isPinned = false,
+  onTogglePin
 }) {
   const [rateLimit, setRateLimit] = useState(null);
 
@@ -68,6 +73,31 @@ export default function StatusBar({
       <div className="flex items-center gap-3">
         <AppLogoIcon className="w-5 h-5 text-purple-400" />
         <span className="font-semibold text-white text-sm">LocalMind</span>
+
+        {/* Favorite Action Toggle (#634) */}
+        {onToggleFavorite && (
+          <button
+            onClick={onToggleFavorite}
+            data-testid="btn-favorite"
+            title={isFavorite ? "Unfavorite session" : "Favorite session"}
+            className={`text-xs transition ${isFavorite ? "text-amber-400" : "text-gray-500 hover:text-amber-300"}`}
+          >
+            {isFavorite ? "★" : "☆"}
+          </button>
+        )}
+
+        {/* Pin Action Toggle (#634) */}
+        {onTogglePin && (
+          <button
+            onClick={onTogglePin}
+            data-testid="btn-pin"
+            title={isPinned ? "Unpin status bar" : "Pin status bar"}
+            className={`text-xs transition ${isPinned ? "text-indigo-400" : "text-gray-500 hover:text-indigo-300"}`}
+          >
+            {isPinned ? "📌" : "📍"}
+          </button>
+        )}
+
         <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-purple-900 text-purple-300">{model}</span>
 
         {/* Search Refinement Indicator (#633) */}
