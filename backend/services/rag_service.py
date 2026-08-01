@@ -21,9 +21,11 @@ from services.citation_utils import build_sources
 from services.csv_loader import CleanCSVLoader
 from services.docx_loader import DocxWithTablesLoader
 
+from utils.config import settings
+
 logger = logging.getLogger(__name__)
 
-CHROMA_PATH = os.getenv("CHROMADB_DIR", "./data/chromadb")
+CHROMA_PATH = str(settings.chromadb_dir)
 EMBED_MODEL  = "all-MiniLM-L6-v2"
 
 os.makedirs(CHROMA_PATH, exist_ok=True)

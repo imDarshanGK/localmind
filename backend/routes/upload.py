@@ -4,6 +4,7 @@ import os
 import time
 import traceback
 from pathlib import Path
+from utils.config import settings
 
 from fastapi import (
     APIRouter,
@@ -36,9 +37,9 @@ ALLOWED = {
     ".htm", ".csv", ".json", ".xml", ".rtf", ".odt",
     ".epub", ".log", ".tsv", ".ini", ".cfg", ".yaml", ".yml"
 }
-MAX_BYTES = 50 * 1024 * 1024  # 50 MB
+MAX_BYTES = settings.max_file_size
 
-UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", "./data/uploads"))
+UPLOAD_DIR = settings.upload_dir
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 

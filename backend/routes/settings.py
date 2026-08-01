@@ -10,6 +10,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, status
 from models.schemas import AppSettings
 from services.db_service import get_settings, save_setting, save_settings
+from utils.config import settings
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -18,16 +19,7 @@ DEFAULT_SETTINGS_API_TIMEOUT_SECONDS = 2.0
 
 
 def _resolve_settings_timeout_seconds() -> float:
-    raw_timeout = os.getenv("SETTINGS_API_TIMEOUT_SECONDS", str(DEFAULT_SETTINGS_API_TIMEOUT_SECONDS))
-    try:
-        parsed_timeout = float(raw_timeout)
-    except ValueError:
-        logger.warning(
-            "settings_timeout_invalid raw_value=%s fallback_timeout_s=%s",
-            raw_timeout,
-            DEFAULT_SETTINGS_API_TIMEOUT_SECONDS,
-        )
-        return DEFAULT_SETTINGS_API_TIMEOUT_SECONDS
+    parsed_timeout = float(settings.settings_api_timeout_seconds)
     if parsed_timeout <= 0:
         logger.warning(
             "settings_timeout_non_positive timeout_s=%s fallback_timeout_s=%s",

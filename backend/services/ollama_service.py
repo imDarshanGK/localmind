@@ -12,9 +12,11 @@ import httpx
 from utils.cache import TTLCache
 from utils.retry import with_retry
 
+from utils.config import settings
+
 logger = logging.getLogger(__name__)
 
-OLLAMA_BASE_URL = os.getenv("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
+OLLAMA_BASE_URL = settings.ollama_host.rstrip("/")
 TIMEOUT = 180.0
 
 SYSTEM_PROMPTS = {

@@ -17,9 +17,10 @@ import time
 from contextlib import suppress
 from typing import Any
 
+from utils.config import settings
 _module_logger = logging.getLogger(__name__)
 
-AUDIT_LOG_DIR = os.getenv("AUDIT_LOG_DIR", "./data/logs")
+AUDIT_LOG_DIR = str(settings.audit_log_dir)
 AUDIT_LOG_FILE = os.path.join(AUDIT_LOG_DIR, "audit.jsonl")
 
 _audit_logger = logging.getLogger("audit.upload_queue")

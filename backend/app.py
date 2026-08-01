@@ -27,6 +27,7 @@ from routes.sessions import router as sessions_router
 from routes.settings import router as settings_router
 from routes.upload import router as upload_router
 from services.db_service import get_db, init_db
+from utils.config import settings
 
 
 # --- Issue #284 Engine Stability: Contextual Thread-Safe Log Formatter ---
@@ -50,7 +51,7 @@ root_logger.setLevel(logging.INFO)
 root_logger.handlers = [stream_handler]
 
 logger = logging.getLogger(__name__)
-FRONTEND_DIST = Path(os.getenv("FRONTEND_DIST", "/app/frontend/dist"))
+FRONTEND_DIST = settings.frontend_dist
 
 
 def run_preflight_checks():
@@ -131,10 +132,9 @@ async def add_request_correlation_id(request: Request, call_next):
     return response
 
 
-default_cors_origins = "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://localhost:8000" 
 cors_origins = [
     origin.strip()
-    for origin in os.getenv("CORS_ORIGINS", default_cors_origins).split(",")
+    for origin in settings.cors_origins.split(",")
     if origin.strip()
 ]
 

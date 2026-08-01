@@ -13,9 +13,10 @@ from contextlib import contextmanager
 from sqlite3 import OperationalError
 
 import grapheme
+from utils.config import settings
 
 # ------------------------Vacuum Scheduling--------------------------------------------------------
-VACUUM_THRESHOLD = int(os.getenv("DB_VACUUM_THRESHOLD", "500"))
+VACUUM_THRESHOLD = settings.db_vacuum_threshold
 
 def _get_deleted_counter(conn) -> int:
     row = conn.execute(
@@ -115,7 +116,7 @@ def restore_db(src_path: str) -> None:
 
 
 
-DB_PATH = os.getenv("DB_PATH", "./data/localmind.db")
+DB_PATH = str(settings.db_path)
 os.makedirs(os.path.dirname(DB_PATH) if os.path.dirname(DB_PATH) else ".", exist_ok=True)
 logger = logging.getLogger(__name__)
 
@@ -247,7 +248,7 @@ def init_db():
             );
 
             INSERT OR IGNORE INTO app_settings (key, value) VALUES
-                ('default_model', '"llama3"'),
+                ('default_model', '""" + json.dumps(settings.default_model) + """'),
                 ('default_language', '"en"'),
                 ('temperature', '0.7'),
                 ('max_history_turns', '10'),
