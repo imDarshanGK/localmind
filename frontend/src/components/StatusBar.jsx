@@ -1,10 +1,86 @@
 import { useState, useEffect, useRef } from "react";
-import { AppLogoIcon, BatchIcon, DocumentsIcon, LightningIcon, OfflineIcon, OnlineIcon, PlugIcon, SettingsIcon, TrashIcon } from "./Icons";
+import { 
+  AppLogoIcon, 
+  BatchIcon, 
+  DocumentsIcon, 
+  LightningIcon, 
+  OfflineIcon, 
+  OnlineIcon, 
+  PlugIcon, 
+  SettingsIcon, 
+  TrashIcon 
+} from "./Icons";
+
+// Helper badge renderer for Changelog Previews (#636)
+function ChangelogBadge({ changelog }) {
+  const [open, setOpen] = useState(false);
+  const popoverRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (popoverRef.current && !popoverRef.current.contains(e.target)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  if (!changelog) return null;
+
+  const version = typeof changelog === "object" ? changelog.version || "vNext" : "Changelog";
+  const items = Array.isArray(changelog) 
+    ? changelog 
+    : typeof changelog === "object" && Array.isArray(changelog.items)
+    ? changelog.items
+    : typeof changelog === "string"
+    ? [changelog]
+    : [];
+
+  return (
+    <div className="relative inline-block" ref={popoverRef}>
+      <button
+        type="button"
+        data-testid="changelog-badge"
+        onClick={() => setOpen((prev) => !prev)}
+        className="text-[10px] font-mono px-2 py-0.5 rounded border inline-flex items-center gap-1 bg-amber-950/60 text-amber-300 border-amber-800/60 hover:bg-amber-900/60 transition cursor-pointer"
+        title="View Changelog Preview"
+      >
+        <span>🚀</span>
+        <span>{version}</span>
+      </button>
+
+      {open && (
+        <div 
+          data-testid="changelog-popover"
+          className="absolute left-0 mt-1.5 w-64 p-3 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50 text-xs text-gray-200"
+        >
+          <div className="font-semibold text-amber-300 pb-1 mb-2 border-b border-gray-700 flex items-center justify-between">
+            <span>What's New ({version})</span>
+            <span className="text-[10px] text-gray-400 font-normal">Preview</span>
+          </div>
+          {items.length > 0 ? (
+            <ul className="space-y-1.5 list-disc list-inside text-gray-300 max-h-48 overflow-y-auto">
+              {items.map((item, idx) => (
+                <li key={idx} className="leading-snug">
+                  {typeof item === "string" ? item : item.text || item.title || JSON.stringify(item)}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-gray-400 italic">No recent changelog notes available.</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function StatusBar({ 
   ollamaOk, 
   model, 
   docCount, 
+  changelog, // Added prop for Issue #636
   onUpload, 
   onPlugins, 
   onSettings, 
@@ -64,6 +140,10 @@ export default function StatusBar({
         )}
 
         <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-purple-900 text-purple-300">{model}</span>
+
+        {/* Changelog Preview Badge (#636) */}
+        {changelog && <ChangelogBadge changelog={changelog} />}
+
         {ollamaOk === true  && <StatusBadge icon={<OnlineIcon className="w-3.5 h-3.5 text-green-300" />} className="bg-green-900 text-green-300" label="online" />}
         {ollamaOk === false && <StatusBadge icon={<OfflineIcon className="w-3.5 h-3.5 text-red-300" />} className="bg-red-900 text-red-300" label="ollama offline" />}
         {docCount > 0 && <StatusBadge testId="doc-count-badge" icon={<DocumentsIcon className="w-3.5 h-3.5 text-blue-300" />} className="bg-blue-900 text-blue-300" label={`${docCount} doc${docCount>1?"s":""}`} />}

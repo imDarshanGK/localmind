@@ -23,6 +23,53 @@ describe("StatusBar Component Suite", () => {
     cleanup();
   });
 
+  /* -------------------------------------------------------------------------- */
+  /*  Changelog Preview Badges (#636)                                           */
+  /* -------------------------------------------------------------------------- */
+  describe("Changelog Preview Badges (#636)", () => {
+    test("renders changelog badge and opens popover on click", () => {
+      render(
+        <StatusBar 
+          changelog={{ version: "v1.2.0", items: ["Added search mode", "Fixed status bar UI"] }} 
+          model="llama3" 
+        />
+      );
+
+      const badge = screen.getByTestId("changelog-badge");
+      expect(badge).toBeInTheDocument();
+      expect(badge).toHaveTextContent("v1.2.0");
+
+      fireEvent.click(badge);
+      expect(screen.getByTestId("changelog-popover")).toBeInTheDocument();
+      expect(screen.getByText("Added search mode")).toBeInTheDocument();
+      expect(screen.getByText("Fixed status bar UI")).toBeInTheDocument();
+    });
+
+    test("handles array input format for changelog", () => {
+      render(<StatusBar changelog={["Bug fix A", "Feature B"]} model="llama3" />);
+      
+      const badge = screen.getByTestId("changelog-badge");
+      expect(badge).toBeInTheDocument();
+
+      fireEvent.click(badge);
+      expect(screen.getByText("Bug fix A")).toBeInTheDocument();
+      expect(screen.getByText("Feature B")).toBeInTheDocument();
+    });
+
+    test("handles simple string input for changelog", () => {
+      render(<StatusBar changelog="v2.0 Release Notes" model="llama3" />);
+      
+      const badge = screen.getByTestId("changelog-badge");
+      fireEvent.click(badge);
+      expect(screen.getByText("v2.0 Release Notes")).toBeInTheDocument();
+    });
+
+    test("does not render changelog badge when prop is null/undefined", () => {
+      render(<StatusBar changelog={null} model="llama3" />);
+      expect(screen.queryByTestId("changelog-badge")).not.toBeInTheDocument();
+    });
+  });
+
   describe("Favorite & Pin Support (#634)", () => {
     test("renders favorite button and handles toggle state", () => {
       const onToggleFavorite = vi.fn();
