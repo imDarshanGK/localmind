@@ -248,7 +248,6 @@ def init_db():
             );
 
             INSERT OR IGNORE INTO app_settings (key, value) VALUES
-                ('default_model', '""" + json.dumps(settings.default_model) + """'),
                 ('default_language', '"en"'),
                 ('temperature', '0.7'),
                 ('max_history_turns', '10'),
@@ -258,6 +257,10 @@ def init_db():
                            
 
         """)
+        conn.execute(
+            "INSERT OR IGNORE INTO app_settings (key, value) VALUES (?, ?)",
+            ("default_model", json.dumps(settings.default_model))
+        )
         try:
             conn.execute("ALTER TABLE documents ADD COLUMN status TEXT DEFAULT 'completed'")
         except sqlite3.OperationalError:
