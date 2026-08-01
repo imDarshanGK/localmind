@@ -8,6 +8,7 @@ import {
   OnlineIcon, 
   PlugIcon, 
   SettingsIcon, 
+  TemplateIcon, 
   TrashIcon 
 } from "./Icons";
 
@@ -76,17 +77,132 @@ function ChangelogBadge({ changelog }) {
   );
 }
 
+// Helper badge renderer for source trust indicators (#632)
+function SourceTrustBadge({ trustLevel }) {
+  if (!trustLevel) return null;
+
+  const normalized = String(
+    typeof trustLevel === "object" ? trustLevel.level || trustLevel.status : trustLevel
+  ).toLowerCase();
+
+  let badgeStyle = "bg-gray-800 text-gray-400 border-gray-700";
+  let label = "Unknown Source";
+  let icon = "🛡️";
+
+  if (normalized.includes("untrusted") || normalized.includes("low") || normalized.includes("risk")) {
+    badgeStyle = "bg-rose-950/60 text-rose-300 border-rose-800/60";
+    label = "Untrusted Source";
+    icon = "⚠️";
+  } else if (normalized.includes("verified") || normalized.includes("trusted") || normalized.includes("high")) {
+    badgeStyle = "bg-emerald-950/60 text-emerald-300 border-emerald-800/60";
+    label = "Trusted Source";
+    icon = "✓";
+  } else if (normalized.includes("medium") || normalized.includes("caution")) {
+    badgeStyle = "bg-amber-950/60 text-amber-300 border-amber-800/60";
+    label = "Caution Source";
+    icon = "⚡";
+  }
+
+  return (
+    <span
+      data-testid="source-trust-badge"
+      className={`text-[10px] font-mono px-2 py-0.5 rounded border inline-flex items-center gap-1 ${badgeStyle}`}
+      title={`Source Trust Level: ${normalized}`}
+    >
+      <span>{icon}</span>
+      <span>{label}</span>
+    </span>
+  );
+}
+
+// Helper badge renderer for search refinement indicators (#633)
+function SearchRefinementBadge({ searchRefinement }) {
+  if (!searchRefinement) return null;
+
+  const mode = String(
+    typeof searchRefinement === "object" ? searchRefinement.mode || searchRefinement.type : searchRefinement
+  ).toLowerCase();
+
+  let badgeStyle = "bg-slate-800 text-slate-300 border-slate-700";
+  let label = "Search: Standard";
+  let icon = "🔍";
+
+  if (mode.includes("semantic") || mode.includes("vector")) {
+    badgeStyle = "bg-indigo-950/60 text-indigo-300 border-indigo-800/60";
+    label = "Search: Semantic";
+    icon = "🧠";
+  } else if (mode.includes("keyword") || mode.includes("lexical") || mode.includes("exact")) {
+    badgeStyle = "bg-sky-950/60 text-sky-300 border-sky-800/60";
+    label = "Search: Keyword";
+    icon = "🔤";
+  } else if (mode.includes("hybrid") || mode.includes("combined") || mode.includes("dense")) {
+    badgeStyle = "bg-purple-950/60 text-purple-300 border-purple-800/60";
+    label = "Search: Hybrid";
+    icon = "🔀";
+  }
+
+  return (
+    <span
+      data-testid="search-refinement-badge"
+      className={`text-[10px] font-mono px-2 py-0.5 rounded border inline-flex items-center gap-1 shrink-0 ${badgeStyle}`}
+      title={`Active Search Refinement Mode: ${mode}`}
+    >
+      <span>{icon}</span>
+      <span>{label}</span>
+    </span>
+  );
+}
+
+// Helper badge renderer for compatibility tags (#630)
+function CompatibilityBadge({ compatibility }) {
+  if (!compatibility) return null;
+
+  const badges = Array.isArray(compatibility)
+    ? compatibility
+    : typeof compatibility === "object"
+    ? Object.values(compatibility)
+    : [compatibility];
+
+  return (
+    <div className="inline-flex items-center gap-1 flex-wrap" data-testid="status-bar-compatibility">
+      {badges.map((badge, idx) => {
+        const isLocal = String(badge).toLowerCase().includes("local") || String(badge).toLowerCase().includes("v1");
+        const badgeStyle = isLocal
+          ? "bg-emerald-950/60 text-emerald-400 border-emerald-800/60"
+          : "bg-blue-950/60 text-blue-400 border-blue-800/60";
+
+        return (
+          <span
+            key={idx}
+            data-testid="compatibility-badge"
+            className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${badgeStyle}`}
+          >
+            {badge}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function StatusBar({ 
   ollamaOk, 
   model, 
   docCount, 
-  changelog, // Added prop for Issue #636
+  compatibility,
+  trustLevel,
+  searchRefinement,
+  changelog,
   onUpload, 
+  onPrompts, 
   onPlugins, 
   onSettings, 
   onClear, 
   useStream, 
   onToggleStream,
+  onTroubleshoot,
+  focusMode,
+  onToggleFocus,
   // Favorite & Pin Props (#634)
   isFavorite = false,
   onToggleFavorite,
@@ -95,10 +211,16 @@ export default function StatusBar({
   // Contextual Action Menu Props (#635)
   contextActions = []
 }) {
+  const [rateLimit, setRateLimit] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
 
-  // Close context menu on outside click
+  useEffect(() => {
+    const handleRateLimit = (e) => setRateLimit(e.detail);
+    window.addEventListener("ratelimit-update", handleRateLimit);
+    return () => window.removeEventListener("ratelimit-update", handleRateLimit);
+  }, []);
+
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (menuRef.current && !menuRef.current.contains(event.target)) {
@@ -141,21 +263,54 @@ export default function StatusBar({
 
         <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-purple-900 text-purple-300">{model}</span>
 
+        {/* Compatibility Badges (#630) */}
+        {compatibility && <CompatibilityBadge compatibility={compatibility} />}
+        {/* Source Trust Indicator (#632) */}
+        {trustLevel && <SourceTrustBadge trustLevel={trustLevel} />}
+
+        {/* Search Refinement Indicator (#633) */}
+        {searchRefinement && <SearchRefinementBadge searchRefinement={searchRefinement} />}
+
         {/* Changelog Preview Badge (#636) */}
         {changelog && <ChangelogBadge changelog={changelog} />}
 
         {ollamaOk === true  && <StatusBadge icon={<OnlineIcon className="w-3.5 h-3.5 text-green-300" />} className="bg-green-900 text-green-300" label="online" />}
         {ollamaOk === false && <StatusBadge icon={<OfflineIcon className="w-3.5 h-3.5 text-red-300" />} className="bg-red-900 text-red-300" label="ollama offline" />}
         {docCount > 0 && <StatusBadge testId="doc-count-badge" icon={<DocumentsIcon className="w-3.5 h-3.5 text-blue-300" />} className="bg-blue-900 text-blue-300" label={`${docCount} doc${docCount>1?"s":""}`} />}
+
+        {rateLimit && (
+          <StatusBadge 
+            icon={<LightningIcon className="w-3.5 h-3.5 text-yellow-300" />} 
+            className="bg-yellow-900 text-yellow-300" 
+            label={`API: ${rateLimit.remaining}/${rateLimit.limit}`} 
+          />
+        )}
       </div>
-      
+
       <div className="flex items-center gap-1.5">
+        <Btn onClick={onToggleFocus} title={focusMode ? "Exit focus mode" : "Focus mode — hide side panels"} testId="btn-focus"
+          active={focusMode}
+          icon={
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 1-2 2h-3" />
+            </svg>
+          }
+          label="Focus" />
         <Btn onClick={onToggleStream} testId="btn-stream" title={useStream ? "Streaming ON" : "Streaming OFF"}
           active={useStream} icon={useStream ? <LightningIcon className="w-3.5 h-3.5" /> : <BatchIcon className="w-3.5 h-3.5" />} label={useStream ? "Stream" : "Batch"} />
         <Btn onClick={onUpload}   testId="btn-docs"   icon={<DocumentsIcon className="w-3.5 h-3.5" />} label="Docs"     />
+        <Btn onClick={onPrompts}  icon={<TemplateIcon className="w-3.5 h-3.5" />} label="Prompts"  />
         <Btn onClick={onPlugins}  testId="btn-plugins" icon={<PlugIcon className="w-3.5 h-3.5" />} label="Plugins"  />
         <Btn onClick={onClear}    testId="btn-clear"    icon={<TrashIcon className="w-3.5 h-3.5" />} label="Clear"    />
         <Btn onClick={onSettings} testId="btn-settings" icon={<SettingsIcon className="w-3.5 h-3.5" />} label="Settings" />
+
+        <button
+          onClick={onTroubleshoot}
+          className="text-xs px-3 py-1.5 rounded-lg border border-gray-700 text-gray-400 hover:bg-gray-800 hover:text-gray-200 transition font-medium inline-flex items-center"
+          title="Open Troubleshooting System Guide"
+        >
+          ? Help
+        </button>
 
         {/* Contextual Action Menu (#635) */}
         <div className="relative" ref={menuRef}>
