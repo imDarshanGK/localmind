@@ -1,4 +1,5 @@
-import { AppLogoIcon, BatchIcon, DocumentsIcon, LightningIcon, OfflineIcon, OnlineIcon, PlugIcon, SettingsIcon, TrashIcon } from "./Icons";
+import { useState, useEffect } from "react";
+import { AppLogoIcon, BatchIcon, DocumentsIcon, LightningIcon, OfflineIcon, OnlineIcon, PlugIcon, SettingsIcon, TemplateIcon, TrashIcon } from "./Icons";
 
 // Helper badge renderer for source trust indicators (#632)
 function SourceTrustBadge({ trustLevel }) {
@@ -43,14 +44,26 @@ export default function StatusBar({
   ollamaOk, 
   model, 
   docCount, 
-  trustLevel, 
+  trustLevel,
   onUpload, 
+  onPrompts, 
   onPlugins, 
   onSettings, 
   onClear, 
-  useStream, 
-  onToggleStream 
+  useStream,
+  onToggleStream,
+  onTroubleshoot,
+  focusMode,
+  onToggleFocus
 }) {
+  const [rateLimit, setRateLimit] = useState(null);
+
+  useEffect(() => {
+    const handleRateLimit = (e) => setRateLimit(e.detail);
+    window.addEventListener("ratelimit-update", handleRateLimit);
+    return () => window.removeEventListener("ratelimit-update", handleRateLimit);
+  }, []);
+
   return (
     <header className="flex items-center justify-between px-5 py-2.5 border-b border-gray-800 bg-gray-900 shrink-0">
       <div className="flex items-center gap-3">
@@ -64,14 +77,40 @@ export default function StatusBar({
         {ollamaOk === true  && <StatusBadge icon={<OnlineIcon className="w-3.5 h-3.5 text-green-300" />} className="bg-green-900 text-green-300" label="online" />}
         {ollamaOk === false && <StatusBadge icon={<OfflineIcon className="w-3.5 h-3.5 text-red-300" />} className="bg-red-900 text-red-300" label="ollama offline" />}
         {docCount > 0 && <StatusBadge testId="doc-count-badge" icon={<DocumentsIcon className="w-3.5 h-3.5 text-blue-300" />} className="bg-blue-900 text-blue-300" label={`${docCount} doc${docCount>1?"s":""}`} />}
+        
+        {rateLimit && (
+          <StatusBadge 
+            icon={<LightningIcon className="w-3.5 h-3.5 text-yellow-300" />} 
+            className="bg-yellow-900 text-yellow-300" 
+            label={`API: ${rateLimit.remaining}/${rateLimit.limit}`} 
+          />
+        )}
       </div>
+
       <div className="flex items-center gap-1.5">
+        <Btn onClick={onToggleFocus} title={focusMode ? "Exit focus mode" : "Focus mode — hide side panels"} testId="btn-focus"
+          active={focusMode}
+          icon={
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 1-2 2h-3" />
+            </svg>
+          }
+          label="Focus" />
         <Btn onClick={onToggleStream} testId="btn-stream" title={useStream ? "Streaming ON" : "Streaming OFF"}
           active={useStream} icon={useStream ? <LightningIcon className="w-3.5 h-3.5" /> : <BatchIcon className="w-3.5 h-3.5" />} label={useStream ? "Stream" : "Batch"} />
         <Btn onClick={onUpload}   testId="btn-docs"   icon={<DocumentsIcon className="w-3.5 h-3.5" />} label="Docs"     />
+        <Btn onClick={onPrompts}  icon={<TemplateIcon className="w-3.5 h-3.5" />} label="Prompts"  />
         <Btn onClick={onPlugins}  testId="btn-plugins" icon={<PlugIcon className="w-3.5 h-3.5" />} label="Plugins"  />
         <Btn onClick={onClear}    testId="btn-clear"    icon={<TrashIcon className="w-3.5 h-3.5" />} label="Clear"    />
         <Btn onClick={onSettings} testId="btn-settings" icon={<SettingsIcon className="w-3.5 h-3.5" />} label="Settings" />
+        
+        <button
+          onClick={onTroubleshoot}
+          className="text-xs px-3 py-1.5 rounded-lg border border-gray-700 text-gray-400 hover:bg-gray-800 hover:text-gray-200 transition font-medium inline-flex items-center"
+          title="Open Troubleshooting System Guide"
+        >
+          ? Help
+        </button>
       </div>
     </header>
   );
