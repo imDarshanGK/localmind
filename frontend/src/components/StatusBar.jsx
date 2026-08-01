@@ -362,7 +362,7 @@ export default function StatusBar({
         {/* Contextual Action Menu (#635) */}
         <div className="relative" ref={menuRef}>
           <button
-            onClick={() => setMenuOpen((prev)}
+            onClick={() => setMenuOpen((prev) => !prev)}
             data-testid="btn-context-menu"
             title="Contextual Actions"
             className={`text-xs px-2 py-1.5 rounded-lg border transition font-medium inline-flex items-center ${t.btnBorder} ${t.textSecondary} ${t.btnHover}`}
