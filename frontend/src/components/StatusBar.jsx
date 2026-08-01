@@ -88,10 +88,44 @@ function SearchRefinementBadge({ searchRefinement }) {
   );
 }
 
+// Helper badge renderer for compatibility tags (#630)
+function CompatibilityBadge({ compatibility }) {
+  if (!compatibility) return null;
+
+  // Normalize array vs object/string format
+  const badges = Array.isArray(compatibility)
+    ? compatibility
+    : typeof compatibility === "object"
+    ? Object.values(compatibility)
+    : [compatibility];
+
+  return (
+    <div className="inline-flex items-center gap-1 flex-wrap" data-testid="status-bar-compatibility">
+      {badges.map((badge, idx) => {
+        const isLocal = String(badge).toLowerCase().includes("local") || String(badge).toLowerCase().includes("v1");
+        const badgeStyle = isLocal
+          ? "bg-emerald-950/60 text-emerald-400 border-emerald-800/60"
+          : "bg-blue-950/60 text-blue-400 border-blue-800/60";
+
+        return (
+          <span
+            key={idx}
+            data-testid="compatibility-badge"
+            className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${badgeStyle}`}
+          >
+            {badge}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function StatusBar({ 
   ollamaOk, 
   model, 
   docCount, 
+  compatibility,
   trustLevel,
   searchRefinement,
   onUpload, 
@@ -150,6 +184,8 @@ export default function StatusBar({
 
         <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-purple-900 text-purple-300">{model}</span>
 
+        {/* Compatibility Badges (#630) */}
+        {compatibility && <CompatibilityBadge compatibility={compatibility} />}
         {/* Source Trust Indicator (#632) */}
         {trustLevel && <SourceTrustBadge trustLevel={trustLevel} />}
 
