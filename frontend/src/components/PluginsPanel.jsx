@@ -11,11 +11,50 @@ const PLUGIN_ICONS = {
   jsonformat: BracesIcon,
 };
 
+// Helper badge renderer for compatibility tags (#597)
+function CompatibilityBadge({ compatibility }) {
+  if (!compatibility) return null;
+
+  // Normalize array vs object/string format
+  const badges = Array.isArray(compatibility) 
+    ? compatibility 
+    : typeof compatibility === "object"
+    ? Object.values(compatibility)
+    : [compatibility];
+
+  return (
+    <div className="inline-flex items-center gap-1 flex-wrap">
+      {badges.map((badge, idx) => {
+        const isLocal = String(badge).toLowerCase().includes("local") || String(badge).toLowerCase().includes("v1");
+        const badgeStyle = isLocal
+          ? "bg-emerald-950/60 text-emerald-400 border-emerald-800/60"
+          : "bg-blue-950/60 text-blue-400 border-blue-800/60";
+
+        return (
+          <span
+            key={idx}
+            data-testid="compatibility-badge"
+            className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${badgeStyle}`}
+          >
+            {badge}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function PluginsPanel({ sessionId, onClose }) {
   const [plugins, setPlugins] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selected, setSelected] = useState(null);
-  const [input, setInput] = useState("");
+
+  // Persistent input state initialized from localStorage (#596)
+  const [input, setInput] = useState(() => {
+    if (!sessionId) return "";
+    return localStorage.getItem(`localmind_plugin_draft_${sessionId}`) || "";
+  });
+
   const [output, setOutput] = useState("");
   const [running, setRunning] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -97,7 +136,7 @@ export default function PluginsPanel({ sessionId, onClose }) {
       .finally(() => setLoading(false));
 
     fetchLogs();
-  }, [selectedPluginId]);
+  }, [selectedPluginId, sessionId]);
 
   function handleSelectPlugin(plugin) {
     setSelected(plugin);
@@ -107,7 +146,23 @@ export default function PluginsPanel({ sessionId, onClose }) {
     setCopied(false);
   }
 
-  // Close contextual action menu on global click or Escape key
+  // Re-sync input draft whenever sessionId changes (#596)
+  useEffect(() => {
+    if (!sessionId) return;
+    setInput(localStorage.getItem(`localmind_plugin_draft_${sessionId}`) || "");
+  }, [sessionId]);
+
+  // Persist plugin draft input to localStorage on edit (#596)
+  useEffect(() => {
+    if (!sessionId) return;
+    if (input) {
+      localStorage.setItem(`localmind_plugin_draft_${sessionId}`, input);
+    } else {
+      localStorage.removeItem(`localmind_plugin_draft_${sessionId}`);
+    }
+  }, [input, sessionId]);
+
+  // Close contextual action menu on global click or Escape key (#605)
   useEffect(() => {
     const handleGlobalClick = () => setActiveMenuId(null);
     const handleKeyDown = (e) => {
@@ -179,6 +234,10 @@ export default function PluginsPanel({ sessionId, onClose }) {
       if (r.success) {
         setOutput(r.output);
         await fetchLogs();
+        // Clear saved draft from localStorage after successful execution (#596)
+        if (sessionId) {
+          localStorage.removeItem(`localmind_plugin_draft_${sessionId}`);
+        }
       } else {
         setError(r.error || "Plugin failed");
       }
@@ -289,7 +348,7 @@ export default function PluginsPanel({ sessionId, onClose }) {
       {/* Collapsible Panel Section */}
       {!isCollapsed && (
         <>
-          {/* Plugin selector row with contextual dropdown menus (#605) */}
+          {/* Plugin selector row with contextual dropdown menus (#605) & compatibility badges (#597) */}
           <div data-testid="plugin-selector-list" className="flex flex-wrap gap-2 mb-4 md:mb-3 shrink-0">
             {plugins.map((p) => {
               const Icon = PLUGIN_ICONS[p.icon] || PlugIcon;
@@ -305,6 +364,8 @@ export default function PluginsPanel({ sessionId, onClose }) {
                 >
                   <Icon className="w-3.5 h-3.5" />
                   <span>{p.name}</span>
+
+                  {p.compatibility && <CompatibilityBadge compatibility={p.compatibility} />}
 
                   {/* Context Menu Trigger Button */}
                   <button
@@ -346,7 +407,15 @@ export default function PluginsPanel({ sessionId, onClose }) {
           {/* Plugin Input/Output Area OR Empty-State Guidance */}
           {selected ? (
             <div data-testid="plugin-workspace" className="space-y-3 md:space-y-2 flex-1 md:flex-initial flex flex-col justify-start shrink-0">
-              <p className="text-xs text-gray-500">{selected.description}</p>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs text-gray-500">{selected.description}</p>
+                {selected.compatibility && (
+                  <div className="shrink-0 flex items-center gap-1 text-[11px] text-gray-400">
+                    <span className="text-gray-500">Compatibility:</span>
+                    <CompatibilityBadge compatibility={selected.compatibility} />
+                  </div>
+                )}
+              </div>
               <textarea
                 data-testid="plugin-input-textarea"
                 value={input}
