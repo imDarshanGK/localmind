@@ -39,47 +39,50 @@ describe("StatusBar Component Suite", () => {
   });
 
   /* -------------------------------------------------------------------------- */
-  /*  Drag-and-Drop Action Button Ordering (#637)                               */
+  /*  Export and Share Actions (#638)                                           */
   /* -------------------------------------------------------------------------- */
-  describe("Drag-and-Drop Action Button Ordering (#637)", () => {
-    test("renders action buttons inside draggable wrappers", () => {
-      render(<StatusBar model="llama3" />);
-      
-      const draggableStream = screen.getByTestId("draggable-action-stream");
-      const draggableSettings = screen.getByTestId("draggable-action-settings");
+  describe("Export and Share Actions (#638)", () => {
+    test("renders export and share buttons when handlers are provided", () => {
+      const onExport = vi.fn();
+      const onShare = vi.fn();
 
-      expect(draggableStream).toHaveAttribute("draggable", "true");
-      expect(draggableSettings).toHaveAttribute("draggable", "true");
+      render(<StatusBar model="llama3" onExport={onExport} onShare={onShare} />);
+
+      const exportBtn = screen.getByTestId("btn-export");
+      const shareBtn = screen.getByTestId("btn-share");
+
+      expect(exportBtn).toBeInTheDocument();
+      expect(shareBtn).toBeInTheDocument();
+
+      fireEvent.click(exportBtn);
+      expect(onExport).toHaveBeenCalledTimes(1);
+
+      fireEvent.click(shareBtn);
+      expect(onShare).toHaveBeenCalledTimes(1);
     });
 
-    test("reorders buttons when a drag-and-drop sequence occurs", () => {
+    test("does not render export or share buttons when handlers are omitted", () => {
       render(<StatusBar model="llama3" />);
+      expect(screen.queryByTestId("btn-export")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("btn-share")).not.toBeInTheDocument();
+    });
 
-      const streamDrag = screen.getByTestId("draggable-action-stream");
-      const settingsDrag = screen.getByTestId("draggable-action-settings");
+    test("includes export and share inside contextual menu when handlers are provided", () => {
+      const onExport = vi.fn();
+      const onShare = vi.fn();
 
-      // Mock DataTransfer storage for JSDOM environment
-      const mockDataStore = { "text/plain": "settings" };
-      const mockDataTransfer = {
-        setData: (type, val) => { mockDataStore[type] = val; },
-        getData: (type) => mockDataStore[type] || "",
-        effectAllowed: "move",
-        dropEffect: "move",
-      };
+      render(<StatusBar model="llama3" onExport={onExport} onShare={onShare} />);
 
-      // Simulate dragging "settings" onto "stream"
-      fireEvent.dragStart(settingsDrag, { dataTransfer: mockDataTransfer });
-      fireEvent.drop(streamDrag, { dataTransfer: mockDataTransfer, preventDefault: vi.fn() });
+      fireEvent.click(screen.getByTestId("btn-context-menu"));
 
-      const actionsContainer = screen.getByTestId("status-bar-actions");
-      const childTestIds = Array.from(actionsContainer.children)
-        .map((child) => child.getAttribute("data-testid"))
-        .filter(Boolean);
+      const exportOption = screen.getByText("Export Chat");
+      const shareOption = screen.getByText("Share Session");
 
-      // Verify "settings" moved right before "stream"
-      const settingsIdx = childTestIds.indexOf("draggable-action-settings");
-      const streamIdx = childTestIds.indexOf("draggable-action-stream");
-      expect(settingsIdx).toBeLessThan(streamIdx);
+      expect(exportOption).toBeInTheDocument();
+      expect(shareOption).toBeInTheDocument();
+
+      fireEvent.click(exportOption);
+      expect(onExport).toHaveBeenCalledTimes(1);
     });
   });
 
