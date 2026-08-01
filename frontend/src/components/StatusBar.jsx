@@ -28,6 +28,14 @@ const defaultTheme = {
   dropdownHover: "hover:bg-gray-700 hover:text-white"
 };
 
+// Default Role Hints mapping (#640)
+const defaultRoleHints = {
+  admin: "Admin Access: Full system controls available",
+  developer: "Dev Mode: API debugging & plugin tools active",
+  editor: "Editor: Model parameters & workspace editing enabled",
+  viewer: "Read-Only: View mode active"
+};
+
 // Helper badge renderer for Changelog Previews (#636)
 function ChangelogBadge({ changelog }) {
   const [open, setOpen] = useState(false);
@@ -227,12 +235,18 @@ export default function StatusBar({
   // Contextual Action Menu Props (#635)
   contextActions = [],
   // Theme Tokens Prop (#639)
-  theme = {}
+  theme = {},
+  // Role-based Hints Props (#640)
+  userRole,
+  roleHint
 }) {
   const t = { ...defaultTheme, ...theme };
   const [rateLimit, setRateLimit] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
+
+  // Determine active hint text based on explicit prop or default role mapping (#640)
+  const activeRoleHint = roleHint || (userRole ? defaultRoleHints[userRole.toLowerCase()] : null);
 
   useEffect(() => {
     const handleRateLimit = (e) => setRateLimit(e.detail);
@@ -284,6 +298,17 @@ export default function StatusBar({
         )}
 
         <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${t.modelBadge}`}>{model}</span>
+
+        {/* Role Badge & Contextual Hint (#640) */}
+        {userRole && (
+          <span 
+            data-testid="role-hint-badge" 
+            title={activeRoleHint}
+            className="text-xs px-2 py-0.5 rounded-full bg-amber-900/60 text-amber-300 border border-amber-700/50 cursor-help font-medium capitalize"
+          >
+            🛡️ {userRole}
+          </span>
+        )}
 
         {/* Compatibility Badges (#630) */}
         {compatibility && <CompatibilityBadge compatibility={compatibility} />}

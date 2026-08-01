@@ -39,6 +39,41 @@ describe("StatusBar Component Suite", () => {
   });
 
   /* -------------------------------------------------------------------------- */
+  /*  Role-based Hints Support (#640)                                           */
+  /* -------------------------------------------------------------------------- */
+  describe("Role-based Hints Support (#640)", () => {
+    test("renders role badge and default hint for userRole", () => {
+      render(<StatusBar model="llama3" userRole="admin" />);
+
+      const roleBadge = screen.getByTestId("role-hint-badge");
+      expect(roleBadge).toBeInTheDocument();
+      expect(roleBadge).toHaveTextContent("admin");
+      expect(roleBadge).toHaveAttribute(
+        "title",
+        "Admin Access: Full system controls available"
+      );
+    });
+
+    test("renders custom roleHint tooltip when explicitly passed", () => {
+      render(
+        <StatusBar 
+          model="llama3" 
+          userRole="editor" 
+          roleHint="Custom hint: Editing restricted in prod" 
+        />
+      );
+
+      const roleBadge = screen.getByTestId("role-hint-badge");
+      expect(roleBadge).toHaveAttribute("title", "Custom hint: Editing restricted in prod");
+    });
+
+    test("does not render role badge when userRole is omitted", () => {
+      render(<StatusBar model="llama3" />);
+      expect(screen.queryByTestId("role-hint-badge")).not.toBeInTheDocument();
+    });
+  });
+
+  /* -------------------------------------------------------------------------- */
   /*  Theme Tokens Support (#639)                                               */
   /* -------------------------------------------------------------------------- */
   describe("Theme Tokens Support (#639)", () => {
