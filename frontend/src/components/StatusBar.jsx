@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { 
   AppLogoIcon, 
   BatchIcon, 
@@ -79,8 +79,8 @@ function SearchRefinementBadge({ searchRefinement }) {
   return (
     <span
       data-testid="search-refinement-badge"
-      className={`text-[10px] font-mono px-2 py-0.5 rounded border inline-flex items-center gap-1 ${badgeStyle}`}
-      title={`Search Refinement Mode: ${mode}`}
+      className={`text-[10px] font-mono px-2 py-0.5 rounded border inline-flex items-center gap-1 shrink-0 ${badgeStyle}`}
+      title={`Active Search Refinement Mode: ${mode}`}
     >
       <span>{icon}</span>
       <span>{label}</span>
