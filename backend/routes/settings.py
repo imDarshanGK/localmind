@@ -88,7 +88,18 @@ async def update_settings(body: AppSettings):
             }]
         )
 
-    # 3. Enforce safety validation boundary limits on RAG Chunk Overlap
+    # 3. Enforce safety validation boundary limits on RAG Chunk Size
+    if body.rag_chunk_size < 100 or body.rag_chunk_size > 2000:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=[{
+                "loc": ["body", "rag_chunk_size"],
+                "msg": "RAG chunk size must be between 100 and 2000 characters.",
+                "type": "value_error"
+            }]
+        )
+
+    # 4. Enforce safety validation boundary limits on RAG Chunk Overlap
     if body.rag_chunk_overlap < 0 or body.rag_chunk_overlap > 200:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,

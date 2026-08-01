@@ -39,6 +39,11 @@ This significantly reduces the CSRF surface, but a residual risk exists:
 3. **`Referer` fallback** — when `Origin` is absent but `Referer` is present,
    the header is normalised to `scheme://host` and checked against the same
    list.
+4. **Failure recovery** — if an unexpected exception occurs during origin parsing
+   or validation, the middleware catches the exception, logs an error traceback,
+   and returns `HTTP 500` (`Security verification error: middleware failure recovery triggered`)
+   to guarantee a fail-closed security posture.
+
 
 #### Phase 2: Request Deduplication
 For allowed mutating requests, the middleware hashes the request (IP, method, path, and body) to prevent duplicate executions:
@@ -130,6 +135,10 @@ The Request Deduplication logic uses a SQLite WAL-mode database to store cached 
 - **Concurrency Strategy**: We use `INSERT OR REPLACE` for the `'processing'` and `'done'` states. 
 
 - **Multi-Worker Limit**: If deployed with multiple Uvicorn/Gunicorn workers, two workers processing the same request in parallel might overwrite each other's cached responses (last-write-wins). This is perfectly acceptable for a local, single-user tool but is documented here for future maintainers exploring scaling out.
+### Why Fail-Closed Failure Recovery?
+
+If header processing or origin validation fails unexpectedly (e.g. malformed headers or runtime errors during header inspection), allowing the request to proceed without validation could bypass security checks. Failing closed with an HTTP 500 error response and logging the traceback guarantees that security checks are strictly enforced.
+
 
 ## References
 

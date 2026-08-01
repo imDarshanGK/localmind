@@ -135,19 +135,32 @@ class SecurityMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         # 1. CSRF Origin Validation
-        origin = _origin_from_header(request)
-        if origin is not None and origin not in self._allowed:
-            logger.warning(
-                "CSRF check failed: method=%s path=%s origin=%r not in allowlist",
+        try:
+            origin = _origin_from_header(request)
+
+            if origin is not None and origin not in self._allowed:
+                logger.warning(
+                    "CSRF check failed: method=%s path=%s origin=%r not in allowlist",
+                    request.method,
+                    request.url.path,
+                    origin,
+                )
+                CSRF_REQUESTS.labels(status="rejected").inc()
+                CSRF_REJECTIONS.labels(method=request.method, reason="invalid_origin").inc()
+                return JSONResponse(
+                    {"detail": "CSRF check failed: origin not allowed"},
+                    status_code=403,
+                )
+        except Exception:
+            logger.exception(
+                "Failure recovery triggered in security middleware: method=%s path=%s",
                 request.method,
                 request.url.path,
-                origin,
             )
-            CSRF_REQUESTS.labels(status="rejected").inc()
-            CSRF_REJECTIONS.labels(method=request.method, reason="invalid_origin").inc()
+            CSRF_REQUESTS.labels(status="error").inc()
             return JSONResponse(
-                {"detail": "CSRF check failed: origin not allowed"},
-                status_code=403,
+                {"detail": "Security verification error: middleware failure recovery triggered"},
+                status_code=500,
             )
 
         # 2. Request Deduplication (SQLite-backed)
@@ -238,3 +251,4 @@ class SecurityMiddleware(BaseHTTPMiddleware):
 
         CSRF_REQUESTS.labels(status="allowed").inc()
         return new_response
+

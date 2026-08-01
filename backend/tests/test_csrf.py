@@ -432,3 +432,26 @@ def test_successful_response_is_still_cached_after_error_guard():
     r2 = client.post("/api/sessions/", json=payload)
     assert r2.status_code == 200
     assert r2.json() == r1.json(), "Deduplicated response did not match original"
+# ── Failure Recovery Tests ───────────────────────────────────────────────────
+
+from unittest.mock import patch
+
+
+def test_security_middleware_failure_recovery_on_exception():
+    """When an exception occurs during origin verification, middleware returns 500 fail-closed."""
+    with patch("middleware.csrf._origin_from_header", side_effect=RuntimeError("Header extraction fault")):
+        r = client.post(
+            "/api/sessions/",
+            json={"title": "Failure recovery test"},
+        )
+        assert r.status_code == 500
+        assert "Security verification error" in r.json().get("detail", "")
+
+
+def test_security_middleware_failure_recovery_safe_methods():
+    """Safe HTTP methods bypass origin processing and succeed even during header faults."""
+    with patch("middleware.csrf._origin_from_header", side_effect=RuntimeError("Header extraction fault")):
+        r = client.get("/api/sessions/")
+        assert r.status_code == 200
+
+
