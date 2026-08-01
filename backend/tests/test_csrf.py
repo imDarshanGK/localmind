@@ -12,8 +12,6 @@ Test strategy:
 All tests share a single in-memory SQLite DB (via conftest.py bootstrap).
 """
 
-import hashlib
-import json
 import tempfile
 import time
 

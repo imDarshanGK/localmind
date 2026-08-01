@@ -4,6 +4,7 @@ import os
 import tempfile
 
 from docx import Document as DocxDocument
+
 from services.docx_loader import DocxWithTablesLoader
 
 

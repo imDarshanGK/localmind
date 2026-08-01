@@ -2,6 +2,7 @@ import time
 from unittest.mock import patch
 
 import pytest
+
 from services.ollama_service import get_model_info, model_metadata_cache
 from utils.cache import TTLCache
 
