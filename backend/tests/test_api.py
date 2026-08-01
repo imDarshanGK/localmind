@@ -6,9 +6,10 @@ import os
 import tempfile
 from unittest.mock import AsyncMock, patch
 
+from fastapi.testclient import TestClient
+
 import services.db_service as db
 from app import app
-from fastapi.testclient import TestClient
 
 _tmp = tempfile.mktemp(suffix=".db")
 db.DB_PATH = _tmp

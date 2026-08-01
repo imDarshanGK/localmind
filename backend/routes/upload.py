@@ -5,7 +5,6 @@ import os
 import time
 import traceback
 from pathlib import Path
-from utils.config import settings
 
 from fastapi import (
     APIRouter,
@@ -16,9 +15,11 @@ from fastapi import (
     Query,
     UploadFile,
 )
+
 from models.schemas import UploadResponse
 from services import db_service
 from utils import audit_log
+from utils.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -64,10 +65,10 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 @router.post("/", response_model=UploadResponse)
 async def upload(
-    file: UploadFile = File(...),
+    file: UploadFile = File(...),  # noqa: B008
     session_id: str = Form(...),
     background_tasks: BackgroundTasks = None,
-):  # noqa: B008
+):
     logger.info(
         "upload_request route=/upload session=%s file=%s", session_id, file.filename
     )
