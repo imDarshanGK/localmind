@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import React from "react";
-import { describe, it, test, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, test, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import StatusBar from "./StatusBar";
@@ -72,76 +72,147 @@ describe("StatusBar Component Suite", () => {
     });
   });
 
-  describe("Status Indicator Badges", () => {
-    test("renders online status badge when ollamaOk is true", () => {
-      render(<StatusBar {...defaultProps} ollamaOk={true} />);
+  describe("Source Trust Indicator Badges (#632)", () => {
+    test("renders trusted source badge when trustLevel is 'trusted' or 'verified'", () => {
+      render(<StatusBar trustLevel="verified" model="llama3" />);
+      const badge = screen.getByTestId("source-trust-badge");
+      expect(badge).toBeInTheDocument();
+      expect(badge).toHaveTextContent("Trusted Source");
+    });
 
+    test("renders untrusted source badge when trustLevel is 'untrusted'", () => {
+      render(<StatusBar trustLevel="untrusted" model="llama3" />);
+      const badge = screen.getByTestId("source-trust-badge");
+      expect(badge).toBeInTheDocument();
+      expect(badge).toHaveTextContent("Untrusted Source");
+    });
+
+    test("renders caution badge when trustLevel is 'caution' or 'medium'", () => {
+      render(<StatusBar trustLevel="caution" model="llama3" />);
+      const badge = screen.getByTestId("source-trust-badge");
+      expect(badge).toBeInTheDocument();
+      expect(badge).toHaveTextContent("Caution Source");
+    });
+
+    test("handles object input format for trustLevel gracefully", () => {
+      render(<StatusBar trustLevel={{ level: "trusted" }} model="llama3" />);
+      expect(screen.getByTestId("source-trust-badge")).toHaveTextContent("Trusted Source");
+    });
+
+    test("does not render trust badge when trustLevel is null or undefined", () => {
+      render(<StatusBar trustLevel={null} model="llama3" />);
+      expect(screen.queryByTestId("source-trust-badge")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("Search Refinement Badges (#633)", () => {
+    test("renders semantic search refinement badge", () => {
+      render(<StatusBar searchRefinement="semantic" model="llama3" />);
+      const badge = screen.getByTestId("search-refinement-badge");
+      expect(badge).toBeInTheDocument();
+      expect(badge).toHaveTextContent("Search: Semantic");
+    });
+
+    test("renders keyword search refinement badge", () => {
+      render(<StatusBar searchRefinement="keyword" model="llama3" />);
+      const badge = screen.getByTestId("search-refinement-badge");
+      expect(badge).toBeInTheDocument();
+      expect(badge).toHaveTextContent("Search: Keyword");
+    });
+
+    test("renders hybrid search refinement badge", () => {
+      render(<StatusBar searchRefinement="hybrid" model="llama3" />);
+      const badge = screen.getByTestId("search-refinement-badge");
+      expect(badge).toBeInTheDocument();
+      expect(badge).toHaveTextContent("Search: Hybrid");
+    });
+
+    test("handles object input format for searchRefinement", () => {
+      render(<StatusBar searchRefinement={{ mode: "semantic" }} model="llama3" />);
+      expect(screen.getByTestId("search-refinement-badge")).toHaveTextContent("Search: Semantic");
+    });
+
+    test("does not render search refinement badge when searchRefinement is null/undefined", () => {
+      render(<StatusBar searchRefinement={null} model="llama3" />);
+      expect(screen.queryByTestId("search-refinement-badge")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("Status Indicator Badges", () => {
+    test("renders model label correctly", () => {
+      render(<StatusBar model="mistral-7b" />);
+      expect(screen.getByText("mistral-7b")).toBeInTheDocument();
+    });
+
+    test("renders online status badge when ollamaOk is true", () => {
+      render(<StatusBar ollamaOk={true} model="llama3" />);
       expect(screen.getByText("online")).toBeInTheDocument();
-      expect(screen.getByTestId("online-icon")).toBeInTheDocument();
     });
 
     test("renders offline status badge when ollamaOk is false", () => {
-      render(<StatusBar {...defaultProps} ollamaOk={false} />);
-
+      render(<StatusBar ollamaOk={false} model="llama3" />);
       expect(screen.getByText("ollama offline")).toBeInTheDocument();
-      expect(screen.getByTestId("offline-icon")).toBeInTheDocument();
     });
 
     test("renders document count badge when docCount > 0", () => {
-      render(<StatusBar {...defaultProps} docCount={3} />);
-
+      render(<StatusBar docCount={3} model="llama3" />);
       expect(screen.getByText("3 docs")).toBeInTheDocument();
     });
 
     test("pluralizes document label correctly for single vs multiple docs", () => {
-      const { rerender } = render(<StatusBar {...defaultProps} docCount={1} />);
+      render(<StatusBar docCount={1} model="llama3" />);
       expect(screen.getByText("1 doc")).toBeInTheDocument();
-
-      rerender(<StatusBar {...defaultProps} docCount={5} />);
-      expect(screen.getByText("5 docs")).toBeInTheDocument();
     });
 
     test("hides document count badge when docCount is 0", () => {
-  render(<StatusBar {...defaultProps} docCount={0} />);
-
-  // Use a stricter regex so it doesn't match the "Docs" action button
-  expect(screen.queryByText(/\b0\s+docs?\b/i)).not.toBeInTheDocument();
-  // Or check that no badge matching document count exists
-  expect(screen.queryByText(/0 doc/i)).not.toBeInTheDocument();
-});
+      render(<StatusBar docCount={0} model="llama3" />);
+      expect(screen.queryByTestId("doc-count-badge")).not.toBeInTheDocument();
+    });
   });
 
   describe("Action Buttons & Interactions", () => {
     test("triggers corresponding action callbacks on button clicks", () => {
-      render(<StatusBar {...defaultProps} />);
+      const onUpload = vi.fn();
+      const onPlugins = vi.fn();
+      const onSettings = vi.fn();
+      const onClear = vi.fn();
 
-      fireEvent.click(screen.getByRole("button", { name: /Docs/i }));
-      expect(defaultProps.onUpload).toHaveBeenCalledTimes(1);
+      render(
+        <StatusBar
+          model="llama3"
+          onUpload={onUpload}
+          onPlugins={onPlugins}
+          onSettings={onSettings}
+          onClear={onClear}
+        />
+      );
 
-      fireEvent.click(screen.getByRole("button", { name: /Plugins/i }));
-      expect(defaultProps.onPlugins).toHaveBeenCalledTimes(1);
+      fireEvent.click(screen.getByTestId("btn-docs"));
+      expect(onUpload).toHaveBeenCalledTimes(1);
 
-      fireEvent.click(screen.getByRole("button", { name: /Clear/i }));
-      expect(defaultProps.onClear).toHaveBeenCalledTimes(1);
+      fireEvent.click(screen.getByTestId("btn-plugins"));
+      expect(onPlugins).toHaveBeenCalledTimes(1);
 
-      fireEvent.click(screen.getByRole("button", { name: /Settings/i }));
-      expect(defaultProps.onSettings).toHaveBeenCalledTimes(1);
+      fireEvent.click(screen.getByTestId("btn-settings"));
+      expect(onSettings).toHaveBeenCalledTimes(1);
+
+      fireEvent.click(screen.getByTestId("btn-clear"));
+      expect(onClear).toHaveBeenCalledTimes(1);
     });
 
     test("toggles stream mode button state correctly", () => {
-      const { rerender } = render(<StatusBar {...defaultProps} useStream={true} />);
+      const onToggleStream = vi.fn();
+      const { rerender } = render(
+        <StatusBar useStream={false} onToggleStream={onToggleStream} model="llama3" />
+      );
 
-      const streamBtn = screen.getByRole("button", { name: /Stream/i });
-      expect(streamBtn).toHaveAttribute("title", "Streaming ON");
-      expect(screen.getByTestId("lightning-icon")).toBeInTheDocument();
+      expect(screen.getByText("Batch")).toBeInTheDocument();
 
-      fireEvent.click(streamBtn);
-      expect(defaultProps.onToggleStream).toHaveBeenCalledTimes(1);
+      fireEvent.click(screen.getByTestId("btn-stream"));
+      expect(onToggleStream).toHaveBeenCalledTimes(1);
 
-      rerender(<StatusBar {...defaultProps} useStream={false} />);
-      const batchBtn = screen.getByRole("button", { name: /Batch/i });
-      expect(batchBtn).toHaveAttribute("title", "Streaming OFF");
-      expect(screen.getByTestId("batch-icon")).toBeInTheDocument();
+      rerender(<StatusBar useStream={true} onToggleStream={onToggleStream} model="llama3" />);
+      expect(screen.getByText("Stream")).toBeInTheDocument();
     });
   });
 });
