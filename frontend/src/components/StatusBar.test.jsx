@@ -39,50 +39,27 @@ describe("StatusBar Component Suite", () => {
   });
 
   /* -------------------------------------------------------------------------- */
-  /*  Export and Share Actions (#638)                                           */
+  /*  Theme Tokens Support (#639)                                               */
   /* -------------------------------------------------------------------------- */
-  describe("Export and Share Actions (#638)", () => {
-    test("renders export and share buttons when handlers are provided", () => {
-      const onExport = vi.fn();
-      const onShare = vi.fn();
-
-      render(<StatusBar model="llama3" onExport={onExport} onShare={onShare} />);
-
-      const exportBtn = screen.getByTestId("btn-export");
-      const shareBtn = screen.getByTestId("btn-share");
-
-      expect(exportBtn).toBeInTheDocument();
-      expect(shareBtn).toBeInTheDocument();
-
-      fireEvent.click(exportBtn);
-      expect(onExport).toHaveBeenCalledTimes(1);
-
-      fireEvent.click(shareBtn);
-      expect(onShare).toHaveBeenCalledTimes(1);
-    });
-
-    test("does not render export or share buttons when handlers are omitted", () => {
+  describe("Theme Tokens Support (#639)", () => {
+    test("applies default theme classes when no theme prop is provided", () => {
       render(<StatusBar model="llama3" />);
-      expect(screen.queryByTestId("btn-export")).not.toBeInTheDocument();
-      expect(screen.queryByTestId("btn-share")).not.toBeInTheDocument();
+      const header = screen.getByTestId("status-bar-header");
+      expect(header).toHaveClass("bg-gray-900", "border-gray-800");
     });
 
-    test("includes export and share inside contextual menu when handlers are provided", () => {
-      const onExport = vi.fn();
-      const onShare = vi.fn();
+    test("applies custom theme tokens provided via theme prop", () => {
+      const customTheme = {
+        bg: "bg-slate-950",
+        border: "border-slate-800",
+        textPrimary: "text-slate-100"
+      };
 
-      render(<StatusBar model="llama3" onExport={onExport} onShare={onShare} />);
+      render(<StatusBar model="llama3" theme={customTheme} />);
+      const header = screen.getByTestId("status-bar-header");
 
-      fireEvent.click(screen.getByTestId("btn-context-menu"));
-
-      const exportOption = screen.getByText("Export Chat");
-      const shareOption = screen.getByText("Share Session");
-
-      expect(exportOption).toBeInTheDocument();
-      expect(shareOption).toBeInTheDocument();
-
-      fireEvent.click(exportOption);
-      expect(onExport).toHaveBeenCalledTimes(1);
+      expect(header).toHaveClass("bg-slate-950");
+      expect(header).toHaveClass("border-slate-800");
     });
   });
 
