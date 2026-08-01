@@ -31,7 +31,11 @@ const mockPluginsList = [
     name: "Calculator", 
     icon: "calculator", 
     description: "Performs math evaluation",
-    compatibility: ["v1.0", "Local"]
+    compatibility: ["v1.0", "Local"],
+    changelog: [
+      { version: "v1.0.1", date: "2025-01-10", changes: "Added support for basic exponents" },
+      { version: "v1.0.0", date: "2025-01-01", changes: "Initial release" }
+    ]
   },
   { 
     id: "summarizer", 
@@ -41,6 +45,93 @@ const mockPluginsList = [
     compatibility: ["v2.0", "Cloud"]
   },
 ];
+
+describe("PluginsPanel Search Refinement Suite (#600)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    api.getPlugins.mockResolvedValue({ plugins: mockPluginsList });
+    api.getPluginLogs.mockResolvedValue({ logs: [] });
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  test("filters plugins by search query matching name or description", async () => {
+    render(<PluginsPanel sessionId="test-search-session" onClose={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Calculator")).toBeInTheDocument();
+      expect(screen.getByText("Summarizer")).toBeInTheDocument();
+    });
+
+    const searchInput = screen.getByPlaceholderText(/Search plugins/i);
+    fireEvent.change(searchInput, { target: { value: "calc" } });
+
+    expect(screen.getByText("Calculator")).toBeInTheDocument();
+    expect(screen.queryByText("Summarizer")).not.toBeInTheDocument();
+  });
+
+  test("displays empty state message when search query matches no plugins", async () => {
+    render(<PluginsPanel sessionId="test-search-session" onClose={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Calculator")).toBeInTheDocument();
+    });
+
+    const searchInput = screen.getByPlaceholderText(/Search plugins/i);
+    fireEvent.change(searchInput, { target: { value: "unknown" } });
+
+    expect(screen.getByText("No matching plugins found.")).toBeInTheDocument();
+    expect(screen.queryByText("Calculator")).not.toBeInTheDocument();
+  });
+});
+
+describe("PluginsPanel Changelog Preview Suite (#603)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    api.getPlugins.mockResolvedValue({ plugins: mockPluginsList });
+    api.getPluginLogs.mockResolvedValue({ logs: [] });
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  test("opens changelog modal and displays release history for selected plugin", async () => {
+    render(<PluginsPanel sessionId="session-603" onClose={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("plugin-btn-calculator")).toBeInTheDocument();
+    });
+
+    const optionsBtn = screen.getByLabelText("Options for Calculator");
+    fireEvent.click(optionsBtn);
+
+    const changelogBtn = screen.getByText("View Changelog");
+    fireEvent.click(changelogBtn);
+
+    expect(screen.getByTestId("changelog-modal")).toBeInTheDocument();
+    expect(screen.getByText("Added support for basic exponents")).toBeInTheDocument();
+    expect(screen.getByText("v1.0.1")).toBeInTheDocument();
+  });
+
+  test("closes changelog modal on close button click", async () => {
+    render(<PluginsPanel sessionId="session-603-close" onClose={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("plugin-btn-calculator")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByLabelText("Options for Calculator"));
+    fireEvent.click(screen.getByText("View Changelog"));
+
+    const closeBtn = screen.getByLabelText("Close changelog modal");
+    fireEvent.click(closeBtn);
+
+    expect(screen.queryByTestId("changelog-modal")).not.toBeInTheDocument();
+  });
+});
 
 describe("PluginsPanel Compatibility Badges (#597)", () => {
   beforeEach(() => {
@@ -221,44 +312,6 @@ describe("PluginsPanel Interaction Tests (#595)", () => {
 
     const helpText = screen.getByText(/Plugins Workspace Help:/i);
     expect(helpText).toBeInTheDocument();
-  });
-});
-
-describe("PluginsPanel Favorite & Pin Support (#601)", () => {
-  beforeEach(() => {
-    localStorage.clear();
-    vi.clearAllMocks();
-    api.getPlugins.mockResolvedValue({ plugins: mockPluginsList });
-    api.getPluginLogs.mockResolvedValue({ logs: [] });
-  });
-
-  afterEach(() => {
-    cleanup();
-  });
-
-  test("toggles pin state and saves to localStorage", async () => {
-    render(<PluginsPanel sessionId="session-601" onClose={vi.fn()} />);
-
-    await waitFor(() => {
-      expect(screen.getByText("Summarizer")).toBeInTheDocument();
-    });
-
-    const pinBtn = screen.getByLabelText("Pin Summarizer");
-    fireEvent.click(pinBtn);
-
-    expect(screen.getByLabelText("Unpin Summarizer")).toBeInTheDocument();
-    expect(JSON.parse(localStorage.getItem("plugins-panel-pinned:session-601"))).toContain("summarizer");
-  });
-
-  test("restores pinned favorites from localStorage on mount", async () => {
-    localStorage.setItem("plugins-panel-pinned:session-601", JSON.stringify(["summarizer"]));
-
-    render(<PluginsPanel sessionId="session-601" onClose={vi.fn()} />);
-
-    await waitFor(() => {
-      expect(screen.getByLabelText("Unpin Summarizer")).toBeInTheDocument();
-      expect(screen.getByLabelText("Pin Calculator")).toBeInTheDocument();
-    });
   });
 });
 

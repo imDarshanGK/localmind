@@ -56,6 +56,39 @@ describe("StatusBar Component Suite", () => {
     });
   });
 
+  describe("Search Refinement Badges (#633)", () => {
+    test("renders semantic search refinement badge", () => {
+      render(<StatusBar searchRefinement="semantic" model="llama3" />);
+      const badge = screen.getByTestId("search-refinement-badge");
+      expect(badge).toBeInTheDocument();
+      expect(badge).toHaveTextContent("Search: Semantic");
+    });
+
+    test("renders keyword search refinement badge", () => {
+      render(<StatusBar searchRefinement="keyword" model="llama3" />);
+      const badge = screen.getByTestId("search-refinement-badge");
+      expect(badge).toBeInTheDocument();
+      expect(badge).toHaveTextContent("Search: Keyword");
+    });
+
+    test("renders hybrid search refinement badge", () => {
+      render(<StatusBar searchRefinement="hybrid" model="llama3" />);
+      const badge = screen.getByTestId("search-refinement-badge");
+      expect(badge).toBeInTheDocument();
+      expect(badge).toHaveTextContent("Search: Hybrid");
+    });
+
+    test("handles object input format for searchRefinement", () => {
+      render(<StatusBar searchRefinement={{ mode: "semantic" }} model="llama3" />);
+      expect(screen.getByTestId("search-refinement-badge")).toHaveTextContent("Search: Semantic");
+    });
+
+    test("does not render search refinement badge when searchRefinement is null/undefined", () => {
+      render(<StatusBar searchRefinement={null} model="llama3" />);
+      expect(screen.queryByTestId("search-refinement-badge")).not.toBeInTheDocument();
+    });
+  });
+
   describe("Status Indicator Badges", () => {
     test("renders model label correctly", () => {
       render(<StatusBar model="mistral-7b" />);

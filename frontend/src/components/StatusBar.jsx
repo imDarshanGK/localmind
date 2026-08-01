@@ -1,5 +1,16 @@
-import { useState, useEffect } from "react";
-import { AppLogoIcon, BatchIcon, DocumentsIcon, LightningIcon, OfflineIcon, OnlineIcon, PlugIcon, SettingsIcon, TemplateIcon, TrashIcon } from "./Icons";
+import { useState, useEffect, useRef } from "react";
+import { 
+  AppLogoIcon, 
+  BatchIcon, 
+  DocumentsIcon, 
+  LightningIcon, 
+  OfflineIcon, 
+  OnlineIcon, 
+  PlugIcon, 
+  SettingsIcon, 
+  TemplateIcon, 
+  TrashIcon 
+} from "./Icons";
 
 // Helper badge renderer for source trust indicators (#632)
 function SourceTrustBadge({ trustLevel }) {
@@ -13,7 +24,6 @@ function SourceTrustBadge({ trustLevel }) {
   let label = "Unknown Source";
   let icon = "🛡️";
 
-  // Check untrusted FIRST to prevent "untrusted" from matching "trusted"
   if (normalized.includes("untrusted") || normalized.includes("low") || normalized.includes("risk")) {
     badgeStyle = "bg-rose-950/60 text-rose-300 border-rose-800/60";
     label = "Untrusted Source";
@@ -40,21 +50,65 @@ function SourceTrustBadge({ trustLevel }) {
   );
 }
 
+// Helper badge renderer for search refinement indicators (#633)
+function SearchRefinementBadge({ searchRefinement }) {
+  if (!searchRefinement) return null;
+
+  const mode = String(
+    typeof searchRefinement === "object" ? searchRefinement.mode || searchRefinement.type : searchRefinement
+  ).toLowerCase();
+
+  let badgeStyle = "bg-slate-800 text-slate-300 border-slate-700";
+  let label = "Search: Standard";
+  let icon = "🔍";
+
+  if (mode.includes("semantic") || mode.includes("vector")) {
+    badgeStyle = "bg-indigo-950/60 text-indigo-300 border-indigo-800/60";
+    label = "Search: Semantic";
+    icon = "🧠";
+  } else if (mode.includes("keyword") || mode.includes("lexical") || mode.includes("exact")) {
+    badgeStyle = "bg-sky-950/60 text-sky-300 border-sky-800/60";
+    label = "Search: Keyword";
+    icon = "🔤";
+  } else if (mode.includes("hybrid") || mode.includes("combined") || mode.includes("dense")) {
+    badgeStyle = "bg-purple-950/60 text-purple-300 border-purple-800/60";
+    label = "Search: Hybrid";
+    icon = "🔀";
+  }
+
+  return (
+    <span
+      data-testid="search-refinement-badge"
+      className={`text-[10px] font-mono px-2 py-0.5 rounded border inline-flex items-center gap-1 ${badgeStyle}`}
+      title={`Search Refinement Mode: ${mode}`}
+    >
+      <span>{icon}</span>
+      <span>{label}</span>
+    </span>
+  );
+}
+
 export default function StatusBar({ 
   ollamaOk, 
   model, 
   docCount, 
   trustLevel,
+  searchRefinement,
   onUpload, 
   onPrompts, 
   onPlugins, 
   onSettings, 
   onClear, 
-  useStream,
+  useStream, 
   onToggleStream,
   onTroubleshoot,
   focusMode,
-  onToggleFocus
+  onToggleFocus,
+  // Favorite & Pin props (#634)
+  isFavorite = false,
+  onToggleFavorite,
+  isPinned = false,
+  onTogglePin
 }) {
   const [rateLimit, setRateLimit] = useState(null);
 
@@ -69,10 +123,38 @@ export default function StatusBar({
       <div className="flex items-center gap-3">
         <AppLogoIcon className="w-5 h-5 text-purple-400" />
         <span className="font-semibold text-white text-sm">LocalMind</span>
+
+        {/* Favorite Action Toggle (#634) */}
+        {onToggleFavorite && (
+          <button
+            onClick={onToggleFavorite}
+            data-testid="btn-favorite"
+            title={isFavorite ? "Unfavorite session" : "Favorite session"}
+            className={`text-xs transition ${isFavorite ? "text-amber-400" : "text-gray-500 hover:text-amber-300"}`}
+          >
+            {isFavorite ? "★" : "☆"}
+          </button>
+        )}
+
+        {/* Pin Action Toggle (#634) */}
+        {onTogglePin && (
+          <button
+            onClick={onTogglePin}
+            data-testid="btn-pin"
+            title={isPinned ? "Unpin status bar" : "Pin status bar"}
+            className={`text-xs transition ${isPinned ? "text-indigo-400" : "text-gray-500 hover:text-indigo-300"}`}
+          >
+            {isPinned ? "📌" : "📍"}
+          </button>
+        )}
+
         <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-purple-900 text-purple-300">{model}</span>
 
         {/* Source Trust Indicator (#632) */}
         {trustLevel && <SourceTrustBadge trustLevel={trustLevel} />}
+
+        {/* Search Refinement Indicator (#633) */}
+        {searchRefinement && <SearchRefinementBadge searchRefinement={searchRefinement} />}
 
         {ollamaOk === true  && <StatusBadge icon={<OnlineIcon className="w-3.5 h-3.5 text-green-300" />} className="bg-green-900 text-green-300" label="online" />}
         {ollamaOk === false && <StatusBadge icon={<OfflineIcon className="w-3.5 h-3.5 text-red-300" />} className="bg-red-900 text-red-300" label="ollama offline" />}
