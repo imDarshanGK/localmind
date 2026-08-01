@@ -1,0 +1,68 @@
+name: Issue Claim
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  issues: write
+
+jobs:
+  assign_issue:
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.issue.pull_request && startsWith(github.event.comment.body, '/claim') }}
+    steps:
+      - name: Assign issue
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const commenter = context.payload.comment.user.login;
+            const assignees = context.payload.issue.assignees;
+
+            // If the issue is already assigned, don't allow claiming
+            if (assignees && assignees.length > 0) {
+              console.log('Issue is already assigned.');
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: `@${commenter} This issue is already assigned and cannot be claimed.`
+              });
+              return;
+            }
+
+            // Assign the issue
+            try {
+              // Check number of issues currently assigned to the user
+              const userIssues = await github.rest.search.issuesAndPullRequests({
+                q: `repo:${context.repo.owner}/${context.repo.repo} assignee:${commenter} is:issue is:open`,
+                per_page: 1
+              });
+
+              if (userIssues.data.total_count >= 10) {
+                console.log(`User ${commenter} has reached the max assigned issues limit.`);
+                await github.rest.issues.createComment({
+                  issue_number: context.issue.number,
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  body: `@${commenter} You can only have a maximum of 10 open issues assigned to you at a time. Please complete or unassign some issues before claiming new ones.`
+                });
+                return;
+              }
+
+              await github.rest.issues.addAssignees({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                assignees: [commenter]
+              });
+              
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: `Assigned to @${commenter}! 🎉`
+              });
+            } catch (error) {
+              console.log('Failed to assign:', error);
+            }

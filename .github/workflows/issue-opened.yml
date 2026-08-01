@@ -1,0 +1,36 @@
+name: Auto-assign Issue
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  issues: write
+
+jobs:
+  auto_assign:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Assign to author
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const author = context.payload.issue.user.login;
+
+            // Don't assign to the repo owner or bot
+            if (author === context.repo.owner || author.includes('[bot]')) {
+              console.log('Skipping auto-assignment for owner or bot.');
+              return;
+            }
+
+            try {
+              await github.rest.issues.addAssignees({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                assignees: [author]
+              });
+              console.log(`Auto-assigned to @${author}`);
+            } catch (error) {
+              console.log(`Could not auto-assign @${author}:`, error);
+            }

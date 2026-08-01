@@ -1,0 +1,17 @@
+name: Purge Dormant Accounts
+
+on:
+  schedule:
+    - cron: "0 3 * * 0"
+
+jobs:
+  purge:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Invoke Edge Function
+        run: |
+          curl \
+            -X POST \
+            "${{ secrets.SUPABASE_FUNCTION_URL }}/purge-dormant-accounts" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}"
