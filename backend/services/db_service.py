@@ -246,6 +246,16 @@ def init_db():
                 created_at TEXT DEFAULT (datetime('now'))
             );
 
+            CREATE TABLE IF NOT EXISTS dedupe_cache (
+                req_hash      TEXT PRIMARY KEY,
+                expires_at    REAL NOT NULL,
+                status        TEXT NOT NULL DEFAULT 'processing',
+                response_body BLOB,
+                status_code   INTEGER,
+                headers       TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_dedupe_expires ON dedupe_cache (expires_at);
+
             INSERT OR IGNORE INTO app_settings (key, value) VALUES
                 ('default_model', '"llama3"'),
                 ('default_language', '"en"'),
@@ -663,3 +673,106 @@ def update_prompt_template(template_id: int, prompt_title: str | None = None, pr
 def delete_prompt_template(template_id: int):
     with get_db() as conn:
         conn.execute("DELETE FROM prompt_templates WHERE id=?", (template_id,))
+
+def dedupe_get(req_hash: str, now: float) -> dict | None:
+    """Return a non-expired cache entry for *req_hash*, or None.
+
+    Returns a dict with keys: ``status`` ('processing' | 'done'),
+    and optionally ``response_body`` (bytes), ``status_code`` (int),
+    ``headers`` (dict) when status is 'done'.
+    """
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT status, response_body, status_code, headers "
+            "FROM dedupe_cache WHERE req_hash = ? AND expires_at > ?",
+            (req_hash, now),
+        ).fetchone()
+    if row is None:
+        return None
+    entry: dict = {"status": row["status"]}
+    if row["status"] == "done":
+        entry["response_body"] = row["response_body"]
+        entry["status_code"] = row["status_code"]
+        entry["headers"] = json.loads(row["headers"]) if row["headers"] else {}
+    return entry
+
+
+def dedupe_set_processing(req_hash: str, expires_at: float) -> None:
+    """Insert a 'processing' sentinel so concurrent duplicates get a 409."""
+    with get_db() as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO dedupe_cache (req_hash, expires_at, status) "
+            "VALUES (?, ?, 'processing')",
+            (req_hash, expires_at),
+        )
+
+
+def dedupe_set_done(
+    req_hash: str,
+    response_body: bytes,
+    status_code: int,
+    headers: dict,
+    expires_at: float,
+) -> None:
+    """Persist the completed response so identical follow-up requests are served
+    from the cache without hitting any route handler."""
+    with get_db() as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO dedupe_cache "
+            "(req_hash, expires_at, status, response_body, status_code, headers) "
+            "VALUES (?, ?, 'done', ?, ?, ?)",
+            (req_hash, expires_at, response_body, status_code, json.dumps(headers)),
+        )
+
+
+def dedupe_delete(req_hash: str) -> None:
+    """Remove a single row from the deduplication cache by its hash.
+
+    Used by the middleware when a handler returns an error response (4xx / 5xx).
+    Keeping a failed response in the cache would replay the error to the client
+    for up to ``_DEDUPE_WINDOW_SECONDS`` seconds, hiding transient failures.
+    Deleting the sentinel lets the client retry immediately.
+    """
+    with get_db() as conn:
+        conn.execute("DELETE FROM dedupe_cache WHERE req_hash = ?", (req_hash,))
+
+
+def dedupe_purge_expired(now: float) -> None:
+    """Delete all expired rows and feed the deletion count into the VACUUM
+    scheduler.
+
+    Called at the start of every mutating request dispatch so the table stays
+    near-zero in size without a separate background task.  Hooking into
+    ``_maybe_vacuum`` ensures that high-traffic bursts (many rows created and
+    expired quickly) do not cause long-term SQLite file bloat — once the
+    cumulative deletion counter crosses ``VACUUM_THRESHOLD``, a full VACUUM
+    is triggered automatically.
+    """
+    with get_db() as conn:
+        cur = conn.execute("DELETE FROM dedupe_cache WHERE expires_at < ?", (now,))
+        deleted = cur.rowcount
+    if deleted:
+        _maybe_vacuum(deleted)
+
+
+def dedupe_clear_orphaned_processing() -> None:
+    """Delete every row whose status is still 'processing'.
+
+    A 'processing' row that survives a server restart will never be resolved
+    to 'done' — the handler that would have called ``dedupe_set_done`` is
+    gone.  Leaving these rows in place would cause the first legitimate retry
+    (arriving within the original 5-second window) to receive a false 409.
+
+    This function must be called **once at application startup**, before the
+    server begins accepting traffic.
+    """
+    with get_db() as conn:
+        cur = conn.execute("DELETE FROM dedupe_cache WHERE status = 'processing'")
+        deleted = cur.rowcount
+    if deleted:
+        logger.warning(
+            "dedupe_clear_orphaned_processing: removed %d stale 'processing' "
+            "row(s) left over from a prior server run.",
+            deleted,
+        )
+        _maybe_vacuum(deleted)
