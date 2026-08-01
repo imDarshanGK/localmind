@@ -15,6 +15,7 @@ const PLUGIN_ICONS = {
 function CompatibilityBadge({ compatibility }) {
   if (!compatibility) return null;
 
+  // Normalize array vs object/string format
   const badges = Array.isArray(compatibility)
     ? compatibility
     : typeof compatibility === "object"
@@ -249,7 +250,7 @@ export default function PluginsPanel({ sessionId, onClose }) {
     }
   }, [input, sessionId]);
 
-  // Close menus and modals on outside click or Escape key (#603)
+  // Close menus and modals on outside click or Escape key (#603, #605)
   useEffect(() => {
     const handleGlobalClick = () => setActiveMenuId(null);
     const handleKeyDown = (e) => {
@@ -330,6 +331,7 @@ export default function PluginsPanel({ sessionId, onClose }) {
       if (r.success) {
         setOutput(r.output);
         await fetchLogs();
+        // Clear saved draft from localStorage after successful execution (#596)
         if (sessionId) {
           localStorage.removeItem(`localmind_plugin_draft_${sessionId}`);
         }

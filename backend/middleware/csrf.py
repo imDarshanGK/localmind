@@ -88,22 +88,30 @@ class OriginValidationMiddleware(BaseHTTPMiddleware):
         if request.method in _SAFE_METHODS:
             return await call_next(request)
 
-        origin = _origin_from_header(request)
+        try:
+            origin = _origin_from_header(request)
 
-        if origin is None:
-            # No Origin / Referer — allow (same-origin or non-browser client).
-            return await call_next(request)
-
-        if origin not in self._allowed:
-            logger.warning(
-                "CSRF check failed: method=%s path=%s origin=%r not in allowlist",
+            if origin is not None and origin not in self._allowed:
+                logger.warning(
+                    "CSRF check failed: method=%s path=%s origin=%r not in allowlist",
+                    request.method,
+                    request.url.path,
+                    origin,
+                )
+                return JSONResponse(
+                    {"detail": "CSRF check failed: origin not allowed"},
+                    status_code=403,
+                )
+        except Exception:
+            logger.exception(
+                "Failure recovery triggered in security middleware: method=%s path=%s",
                 request.method,
                 request.url.path,
-                origin,
             )
             return JSONResponse(
-                {"detail": "CSRF check failed: origin not allowed"},
-                status_code=403,
+                {"detail": "Security verification error: middleware failure recovery triggered"},
+                status_code=500,
             )
 
         return await call_next(request)
+
