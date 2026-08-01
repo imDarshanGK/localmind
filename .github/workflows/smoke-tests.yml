@@ -1,0 +1,34 @@
+name: Smoke Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+jobs:
+  smoke-test:
+    name: Docker Compose Smoke Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Start stack
+        run: docker compose up -d --build
+
+      - name: Execute smoke tests
+        run: bash tests/smoke_test.sh
+
+      - name: Print diagnostics on failure
+        if: failure()
+        run: |
+          docker compose ps
+          docker compose logs
+
+      - name: Always clean up
+        if: always()
+        run: docker compose down -v
