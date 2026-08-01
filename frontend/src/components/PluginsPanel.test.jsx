@@ -236,15 +236,6 @@ describe("PluginsPanel Drag and Drop Suite (#604)", () => {
     cleanup();
   });
 
-  test("renders the plugins panel and plugin items", async () => {
-    render(<PluginsPanel sessionId="test-session" onClose={vi.fn()} />);
-
-    await waitFor(() => {
-      expect(screen.getByTestId("plugin-btn-calculator")).toBeInTheDocument();
-      expect(screen.getByTestId("plugin-btn-summarizer")).toBeInTheDocument();
-    });
-  });
-
   test("reorders plugins on drag and drop and persists order to localStorage", async () => {
     render(<PluginsPanel sessionId="session-604" onClose={vi.fn()} />);
 
@@ -283,6 +274,44 @@ describe("PluginsPanel Drag and Drop Suite (#604)", () => {
       const pluginItems = screen.getAllByTestId(/^plugin-btn-/);
       expect(pluginItems[0]).toHaveTextContent("Summarizer");
       expect(pluginItems[1]).toHaveTextContent("Calculator");
+    });
+  });
+});
+
+describe("PluginsPanel Favorite & Pin Support (#601)", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.clearAllMocks();
+    api.getPlugins.mockResolvedValue({ plugins: mockPluginsList });
+    api.getPluginLogs.mockResolvedValue({ logs: [] });
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  test("toggles pin state and saves to localStorage", async () => {
+    render(<PluginsPanel sessionId="session-601" onClose={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Summarizer")).toBeInTheDocument();
+    });
+
+    const pinBtn = screen.getByLabelText("Pin Summarizer");
+    fireEvent.click(pinBtn);
+
+    expect(screen.getByLabelText("Unpin Summarizer")).toBeInTheDocument();
+    expect(JSON.parse(localStorage.getItem("plugins-panel-pinned:session-601"))).toContain("summarizer");
+  });
+
+  test("restores pinned favorites from localStorage on mount", async () => {
+    localStorage.setItem("plugins-panel-pinned:session-601", JSON.stringify(["summarizer"]));
+
+    render(<PluginsPanel sessionId="session-601" onClose={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Unpin Summarizer")).toBeInTheDocument();
+      expect(screen.getByLabelText("Pin Calculator")).toBeInTheDocument();
     });
   });
 });
