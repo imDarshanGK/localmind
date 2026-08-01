@@ -105,6 +105,46 @@ describe("StatusBar Component Suite", () => {
     });
   });
 
+  describe("Favorite & Pin Support (#634)", () => {
+    test("renders favorite button and handles toggle state", () => {
+      const onToggleFavorite = vi.fn();
+      const { rerender } = render(
+        <StatusBar model="llama3" isFavorite={false} onToggleFavorite={onToggleFavorite} />
+      );
+
+      const favBtn = screen.getByTestId("btn-favorite");
+      expect(favBtn).toHaveTextContent("☆");
+
+      fireEvent.click(favBtn);
+      expect(onToggleFavorite).toHaveBeenCalledTimes(1);
+
+      rerender(<StatusBar model="llama3" isFavorite={true} onToggleFavorite={onToggleFavorite} />);
+      expect(screen.getByTestId("btn-favorite")).toHaveTextContent("★");
+    });
+
+    test("renders pin button and handles toggle state", () => {
+      const onTogglePin = vi.fn();
+      const { rerender } = render(
+        <StatusBar model="llama3" isPinned={false} onTogglePin={onTogglePin} />
+      );
+
+      const pinBtn = screen.getByTestId("btn-pin");
+      expect(pinBtn).toHaveTextContent("📍");
+
+      fireEvent.click(pinBtn);
+      expect(onTogglePin).toHaveBeenCalledTimes(1);
+
+      rerender(<StatusBar model="llama3" isPinned={true} onTogglePin={onTogglePin} />);
+      expect(screen.getByTestId("btn-pin")).toHaveTextContent("📌");
+    });
+
+    test("does not render favorite or pin controls when handlers are omitted", () => {
+      render(<StatusBar model="llama3" />);
+      expect(screen.queryByTestId("btn-favorite")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("btn-pin")).not.toBeInTheDocument();
+    });
+  });
+
   describe("Search Refinement Badges (#633)", () => {
     test("renders semantic search refinement badge", () => {
       render(<StatusBar searchRefinement="semantic" model="llama3" />);
@@ -135,6 +175,44 @@ describe("StatusBar Component Suite", () => {
     test("does not render search refinement badge when searchRefinement is null/undefined", () => {
       render(<StatusBar searchRefinement={null} model="llama3" />);
       expect(screen.queryByTestId("search-refinement-badge")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("Contextual Action Menus (#635)", () => {
+    test("toggles contextual action dropdown menu on button click", () => {
+      render(<StatusBar model="llama3" />);
+      
+      expect(screen.queryByTestId("context-menu-dropdown")).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByTestId("btn-context-menu"));
+      expect(screen.getByTestId("context-menu-dropdown")).toBeInTheDocument();
+
+      fireEvent.click(screen.getByTestId("btn-context-menu"));
+      expect(screen.queryByTestId("context-menu-dropdown")).not.toBeInTheDocument();
+    });
+
+    test("renders custom contextual action items and executes callback", () => {
+      const handleAction = vi.fn();
+      const contextActions = [
+        { id: "act-1", label: "Export Chat", onClick: handleAction }
+      ];
+
+      render(<StatusBar model="llama3" contextActions={contextActions} />);
+
+      fireEvent.click(screen.getByTestId("btn-context-menu"));
+      const actionItem = screen.getByText("Export Chat");
+      expect(actionItem).toBeInTheDocument();
+
+      fireEvent.click(actionItem);
+      expect(handleAction).toHaveBeenCalledTimes(1);
+      expect(screen.queryByTestId("context-menu-dropdown")).not.toBeInTheDocument();
+    });
+
+    test("displays fallback when contextActions array is empty", () => {
+      render(<StatusBar model="llama3" contextActions={[]} />);
+
+      fireEvent.click(screen.getByTestId("btn-context-menu"));
+      expect(screen.getByText("No contextual actions")).toBeInTheDocument();
     });
   });
 
