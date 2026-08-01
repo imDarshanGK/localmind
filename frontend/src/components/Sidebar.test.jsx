@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from "react";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { render, screen, fireEvent, cleanup, act } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, act, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import Sidebar from "./Sidebar";
 import * as pinHelper from "../utils/pinHelper";
@@ -24,6 +24,7 @@ vi.mock("./Icons", () => ({
   LockIcon: () => <span data-testid="lock-icon" />,
   StarIcon: () => <span data-testid="star-icon" />,
   PinIcon: ({ filled }) => <span data-testid="pin-icon" data-filled={filled} />,
+  CloseIcon: () => <span data-testid="close-icon" />,
 }));
 
 afterEach(() => {
@@ -193,11 +194,14 @@ describe("Sidebar Component - Mobile Responsive Layout (#557)", () => {
     };
   });
 
-  it("triggers onDeleteSession with session ID when clicking the delete button", () => {
+  it("triggers onDeleteSession with session ID when clicking the delete button and confirming", () => {
     render(<Sidebar {...defaultProps} />);
-    const deleteBtn = screen.getByTestId("delete-session-1");
+    const deleteBtn = screen.getByRole("button", { name: "Delete chat session Mobile Session A" });
 
     fireEvent.click(deleteBtn);
+
+    const confirmBtn = screen.getByRole("button", { name: "Delete" });
+    fireEvent.click(confirmBtn);
 
     expect(defaultProps.onDeleteSession).toHaveBeenCalledWith("1");
   });
@@ -242,17 +246,21 @@ describe("Sidebar Component - Mobile Responsive Layout (#557)", () => {
     expect(screen.queryByTestId("sidebar-backdrop")).not.toBeInTheDocument();
   });
 
-  it("auto-closes the mobile sidebar panel drawer when clicking the + New Chat button option", () => {
+  it("auto-closes the mobile sidebar panel drawer when clicking the + New Chat button option", async () => {
     render(<Sidebar {...defaultProps} />);
 
     const toggleBtn = screen.getByRole("button", { name: /toggle navigation sidebar/i });
     fireEvent.click(toggleBtn);
 
     const newChatBtn = screen.getByTestId("new-chat-btn");
-    fireEvent.click(newChatBtn);
+    await act(async () => {
+      fireEvent.click(newChatBtn);
+    });
 
     expect(defaultProps.onNewChat).toHaveBeenCalled();
-    expect(screen.queryByTestId("sidebar-backdrop")).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByTestId("sidebar-backdrop")).not.toBeInTheDocument();
+    });
   });
 });
 
@@ -311,7 +319,7 @@ describe("Sidebar Component - Accessibility Landmarks (#558)", () => {
   });
 
   it("should expose aria-current targets reflecting the active dynamic session focus context", () => {
-    render(<Sidebar {...defaultProps} />);
+    render(<Sidebar {...defaultProps} currentSession="1" />);
     
     const activeBtn = screen.getByTestId("load-session-1");
     const inactiveBtn = screen.getByTestId("load-session-2");
@@ -496,7 +504,7 @@ describe("Sidebar Keyboard Navigation Suite (#556)", () => {
       />
     );
 
-    const listContainer = screen.getByTestId("sidebar-sessions-list");
+    const listContainer = screen.getByTestId("sessions-list");
 
     fireEvent.keyDown(listContainer, { key: "ArrowDown" });
     expect(screen.getByTestId("session-item-1").className).toContain("bg-gray-700");
@@ -528,7 +536,7 @@ describe("Sidebar Keyboard Navigation Suite (#556)", () => {
       />
     );
 
-    const listContainer = screen.getByTestId("sidebar-sessions-list");
+    const listContainer = screen.getByTestId("sessions-list");
 
     fireEvent.keyDown(listContainer, { key: "ArrowDown" });
     fireEvent.keyDown(listContainer, { key: "Enter" });
@@ -552,7 +560,7 @@ describe("Sidebar Keyboard Navigation Suite (#556)", () => {
       />
     );
 
-    const listContainer = screen.getByTestId("sidebar-sessions-list");
+    const listContainer = screen.getByTestId("sessions-list");
 
     fireEvent.keyDown(listContainer, { key: "ArrowDown" });
     fireEvent.keyDown(listContainer, { key: "Escape" });
@@ -718,12 +726,12 @@ describe("Sidebar Component - Tooltip Help Suite (#560)", () => {
   it("attaches dynamic session tooltips to individual chat rows and delete actions", () => {
     render(<Sidebar {...defaultProps} />);
 
-    // Session Switch Button Tooltip (Exact match on button title/content)
-    const sessionBtn = screen.getByRole("button", { name: /^Project Alpha\(3\)$/i });
+    // Session Switch Button Tooltip
+    const sessionBtn = screen.getByTestId("load-session-1");
     expect(sessionBtn).toHaveAttribute("title", "Switch to session: Project Alpha");
 
     // Session Delete Button Tooltip
-    const deleteBtn = screen.getByRole("button", { name: "Delete session Project Alpha" });
+    const deleteBtn = screen.getByRole("button", { name: "Delete chat session Project Alpha" });
     expect(deleteBtn).toHaveAttribute("title", 'Delete session "Project Alpha"');
   });
 
@@ -737,5 +745,87 @@ describe("Sidebar Component - Tooltip Help Suite (#560)", () => {
     // External GitHub Link Tooltip
     const githubLink = screen.getByRole("link", { name: /star on github/i });
     expect(githubLink).toHaveAttribute("title", "Open GitHub Repository in a new tab");
+  });
+});
+
+describe("Sidebar Component - Session Loading & Skeleton Suite", () => {
+  const mockModels = [{ name: "llama3" }];
+
+  it("renders 4 loading skeletons when sessionsLoading is true", () => {
+    render(
+      <Sidebar
+        sessions={[]}
+        models={mockModels}
+        model="llama3"
+        language="en"
+        onNewChat={vi.fn()}
+        onLoadSession={vi.fn()}
+        onDeleteSession={vi.fn()}
+        onModelChange={vi.fn()}
+        onLanguageChange={vi.fn()}
+        sessionsLoading={true}
+      />
+    );
+
+    // Verify loading skeleton container exists
+    const skeletonContainer = screen.getByTestId("sidebar-sessions-skeleton");
+    expect(skeletonContainer).toBeInTheDocument();
+
+    // Verify exactly 4 skeleton row elements are rendered
+    const skeletonItems = screen.getAllByTestId("session-skeleton");
+    expect(skeletonItems).toHaveLength(4);
+
+    // Verify regular empty state message is NOT shown while loading
+    expect(screen.queryByTestId("empty-message")).not.toBeInTheDocument();
+  });
+
+  it("does not render skeletons and shows sessions list once loading is complete", () => {
+    const mockSessions = [
+      { id: "1", title: "Active Chat", message_count: 0 },
+    ];
+    render(
+      <Sidebar
+        sessions={mockSessions}
+        models={mockModels}
+        model="llama3"
+        language="en"
+        onNewChat={vi.fn()}
+        onLoadSession={vi.fn()}
+        onDeleteSession={vi.fn()}
+        onModelChange={vi.fn()}
+        onLanguageChange={vi.fn()}
+        sessionsLoading={false}
+      />
+    );
+
+    // Verify skeleton elements are NOT in the document
+    expect(screen.queryByTestId("sidebar-sessions-skeleton")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("session-skeleton")).not.toBeInTheDocument();
+
+    // Verify session item is rendered
+    expect(screen.getByText("Active Chat")).toBeInTheDocument();
+  });
+
+  it("renders empty state guidance when loading is finished with zero sessions", () => {
+    render(
+      <Sidebar
+        sessions={[]}
+        models={mockModels}
+        model="llama3"
+        language="en"
+        onNewChat={vi.fn()}
+        onLoadSession={vi.fn()}
+        onDeleteSession={vi.fn()}
+        onModelChange={vi.fn()}
+        onLanguageChange={vi.fn()}
+        sessionsLoading={false}
+      />
+    );
+
+    // Verify skeleton elements are NOT in the document
+    expect(screen.queryByTestId("sidebar-sessions-skeleton")).not.toBeInTheDocument();
+
+    // Verify empty state message is rendered
+    expect(screen.getByTestId("empty-message")).toHaveTextContent("No chats yet. Start one!");
   });
 });

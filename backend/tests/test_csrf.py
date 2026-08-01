@@ -236,3 +236,25 @@ def test_prometheus_metrics():
     
     after_rejections = REGISTRY.get_sample_value('csrf_rejections_total', {'method': 'POST', 'reason': 'invalid_origin'}) or 0.0
     assert after_rejections > before_rejections
+
+# ── Failure Recovery Tests ───────────────────────────────────────────────────
+
+from unittest.mock import patch
+
+
+def test_security_middleware_failure_recovery_on_exception():
+    """When an exception occurs during origin verification, middleware returns 500 fail-closed."""
+    with patch("middleware.csrf._origin_from_header", side_effect=RuntimeError("Header extraction fault")):
+        r = client.post(
+            "/api/sessions/",
+            json={"title": "Failure recovery test"},
+        )
+        assert r.status_code == 500
+        assert "Security verification error" in r.json().get("detail", "")
+
+
+def test_security_middleware_failure_recovery_safe_methods():
+    """Safe HTTP methods bypass origin processing and succeed even during header faults."""
+    with patch("middleware.csrf._origin_from_header", side_effect=RuntimeError("Header extraction fault")):
+        r = client.get("/api/sessions/")
+        assert r.status_code == 200
