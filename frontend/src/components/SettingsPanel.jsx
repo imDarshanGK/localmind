@@ -19,7 +19,7 @@ export default function SettingsPanel({ settings = {}, isLoading = false, onSave
     temperature:       settings?.temperature       ?? 0.7,
     max_history_turns: settings?.max_history_turns || 10,
     rag_top_k:        settings?.rag_top_k         || 4,
-    rag_chunk_size:   settings?.rag_chunk_size    || 600,
+    rag_chunk_size:    settings?.rag_chunk_size    ?? 600,
     rag_chunk_overlap: settings?.rag_chunk_overlap ?? 50,
     theme:            settings?.theme             || "dark",
     minimal_mode:     settings?.minimal_mode      ?? false,
@@ -240,9 +240,9 @@ export default function SettingsPanel({ settings = {}, isLoading = false, onSave
                 <input
                   id="chunk-size-slider"
                   type="range"
-                  min="100"
+                  min="200"
                   max="2000"
-                  step="50"
+                  step="100"
                   value={form.rag_chunk_size}
                   onChange={e => set("rag_chunk_size", parseInt(e.target.value))}
                   className="w-full accent-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500 rounded"
