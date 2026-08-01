@@ -4,6 +4,7 @@ import time
 from unittest.mock import AsyncMock, patch
 
 import pytest
+
 import services.db_service as db
 from models.schemas import ChatRequest
 from routes.chat import ACTIVE_STREAMS, StreamBuffer, chat_stream
