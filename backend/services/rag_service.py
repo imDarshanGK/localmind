@@ -17,7 +17,6 @@ from langchain_community.document_loaders import (
 )
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from sentence_transformers import SentenceTransformer
-
 from services.citation_utils import build_sources
 from services.csv_loader import CleanCSVLoader
 from services.docx_loader import DocxWithTablesLoader

@@ -2,7 +2,6 @@ from unittest.mock import AsyncMock, patch
 
 import httpx
 import pytest
-
 from services.ollama_service import chat, chat_stream
 
 
