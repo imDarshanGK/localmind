@@ -1,5 +1,15 @@
 import { useState, useEffect, useRef } from "react";
-import { AppLogoIcon, BatchIcon, DocumentsIcon, LightningIcon, OfflineIcon, OnlineIcon, PlugIcon, SettingsIcon, TrashIcon } from "./Icons";
+import { 
+  AppLogoIcon, 
+  BatchIcon, 
+  DocumentsIcon, 
+  LightningIcon, 
+  OfflineIcon, 
+  OnlineIcon, 
+  PlugIcon, 
+  SettingsIcon, 
+  TrashIcon 
+} from "./Icons";
 
 export default function StatusBar({ 
   ollamaOk, 
@@ -16,11 +26,21 @@ export default function StatusBar({
   onToggleFavorite,
   isPinned = false,
   onTogglePin,
+  // Export & Share Props (#638)
+  onExport,
+  onShare,
   // Contextual Action Menu Props (#635)
   contextActions = []
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
+
+  // Merge onExport and onShare into the contextual menu items (#638)
+  const effectiveContextActions = [
+    ...(onExport ? [{ id: "export-action", label: "Export Chat", onClick: onExport, icon: "📥" }] : []),
+    ...(onShare ? [{ id: "share-action", label: "Share Session", onClick: onShare, icon: "🔗" }] : []),
+    ...contextActions
+  ];
 
   // Close context menu on outside click
   useEffect(() => {
@@ -69,7 +89,29 @@ export default function StatusBar({
         {docCount > 0 && <StatusBadge testId="doc-count-badge" icon={<DocumentsIcon className="w-3.5 h-3.5 text-blue-300" />} className="bg-blue-900 text-blue-300" label={`${docCount} doc${docCount>1?"s":""}`} />}
       </div>
       
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-1.5" data-testid="status-bar-actions">
+        {/* Direct Export & Share Quick Action Buttons (#638) */}
+        {onExport && (
+          <button
+            onClick={onExport}
+            data-testid="btn-export"
+            title="Export session"
+            className="text-xs px-2 py-1.5 rounded-lg border border-gray-700 text-gray-400 hover:bg-gray-800 hover:text-gray-200 transition font-medium inline-flex items-center gap-1"
+          >
+            📥 <span className="hidden sm:inline">Export</span>
+          </button>
+        )}
+        {onShare && (
+          <button
+            onClick={onShare}
+            data-testid="btn-share"
+            title="Share session"
+            className="text-xs px-2 py-1.5 rounded-lg border border-gray-700 text-gray-400 hover:bg-gray-800 hover:text-gray-200 transition font-medium inline-flex items-center gap-1"
+          >
+            🔗 <span className="hidden sm:inline">Share</span>
+          </button>
+        )}
+
         <Btn onClick={onToggleStream} testId="btn-stream" title={useStream ? "Streaming ON" : "Streaming OFF"}
           active={useStream} icon={useStream ? <LightningIcon className="w-3.5 h-3.5" /> : <BatchIcon className="w-3.5 h-3.5" />} label={useStream ? "Stream" : "Batch"} />
         <Btn onClick={onUpload}   testId="btn-docs"   icon={<DocumentsIcon className="w-3.5 h-3.5" />} label="Docs"     />
@@ -93,8 +135,8 @@ export default function StatusBar({
               data-testid="context-menu-dropdown"
               className="absolute right-0 mt-1 w-44 rounded-md shadow-lg bg-gray-800 border border-gray-700 z-50 py-1 text-xs"
             >
-              {contextActions.length > 0 ? (
-                contextActions.map((action, idx) => (
+              {effectiveContextActions.length > 0 ? (
+                effectiveContextActions.map((action, idx) => (
                   <button
                     key={action.id || idx}
                     onClick={() => {
