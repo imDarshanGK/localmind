@@ -12,30 +12,6 @@ import {
   TrashIcon 
 } from "./Icons";
 
-// Default theme tokens fallback (#639)
-const defaultTheme = {
-  bg: "bg-gray-900",
-  border: "border-gray-800",
-  textPrimary: "text-white",
-  textSecondary: "text-gray-400",
-  brandIcon: "text-purple-400",
-  modelBadge: "bg-purple-900 text-purple-300",
-  btnBorder: "border-gray-700",
-  btnHover: "hover:bg-gray-800 hover:text-gray-200",
-  btnActive: "border-purple-500 text-purple-300 bg-purple-900/30",
-  dropdownBg: "bg-gray-800",
-  dropdownBorder: "border-gray-700",
-  dropdownHover: "hover:bg-gray-700 hover:text-white"
-};
-
-// Default Role Hints mapping (#640)
-const defaultRoleHints = {
-  admin: "Admin Access: Full system controls available",
-  developer: "Dev Mode: API debugging & plugin tools active",
-  editor: "Editor: Model parameters & workspace editing enabled",
-  viewer: "Read-Only: View mode active"
-};
-
 // Helper badge renderer for Changelog Previews (#636)
 function ChangelogBadge({ changelog }) {
   const [open, setOpen] = useState(false);
@@ -232,18 +208,9 @@ export default function StatusBar({
   onToggleFavorite,
   isPinned = false,
   onTogglePin,
-  // Export & Share Props (#638)
-  onExport,
-  onShare,
   // Contextual Action Menu Props (#635)
-  contextActions = [],
-  // Theme Tokens Prop (#639)
-  theme = {},
-  // Role-based Hints Props (#640)
-  userRole,
-  roleHint
+  contextActions = []
 }) {
-  const t = { ...defaultTheme, ...theme };
   const [rateLimit, setRateLimit] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
@@ -252,16 +219,6 @@ export default function StatusBar({
   const defaultActionOrder = ["focus", "stream", "docs", "prompts", "plugins", "clear", "settings", "troubleshoot"];
   const [actionOrder, setActionOrder] = useState(defaultActionOrder);
   const [draggedItem, setDraggedItem] = useState(null);
-
-  // Determine active hint text based on explicit prop or default role mapping (#640)
-  const activeRoleHint = roleHint || (userRole ? defaultRoleHints[userRole.toLowerCase()] : null);
-
-  // Merge onExport and onShare into effective context actions (#638)
-  const effectiveContextActions = [
-    ...(onExport ? [{ id: "export-action", label: "Export Chat", onClick: onExport, icon: "📥" }] : []),
-    ...(onShare ? [{ id: "share-action", label: "Share Session", onClick: onShare, icon: "🔗" }] : []),
-    ...contextActions
-  ];
 
   useEffect(() => {
     const handleRateLimit = (e) => setRateLimit(e.detail);
@@ -314,7 +271,6 @@ export default function StatusBar({
       case "focus":
         return (
           <Btn 
-            theme={t}
             onClick={onToggleFocus} 
             title={focusMode ? "Exit focus mode" : "Focus mode — hide side panels"} 
             testId="btn-focus"
@@ -330,7 +286,6 @@ export default function StatusBar({
       case "stream":
         return (
           <Btn 
-            theme={t}
             key="stream" 
             onClick={onToggleStream} 
             testId="btn-stream" 
@@ -341,21 +296,21 @@ export default function StatusBar({
           />
         );
       case "docs":
-        return <Btn theme={t} key="docs" onClick={onUpload} testId="btn-docs" icon={<DocumentsIcon className="w-3.5 h-3.5" />} label="Docs" />;
+        return <Btn key="docs" onClick={onUpload} testId="btn-docs" icon={<DocumentsIcon className="w-3.5 h-3.5" />} label="Docs" />;
       case "prompts":
-        return <Btn theme={t} key="prompts" onClick={onPrompts} icon={<TemplateIcon className="w-3.5 h-3.5" />} label="Prompts" />;
+        return <Btn key="prompts" onClick={onPrompts} icon={<TemplateIcon className="w-3.5 h-3.5" />} label="Prompts" />;
       case "plugins":
-        return <Btn theme={t} key="plugins" onClick={onPlugins} testId="btn-plugins" icon={<PlugIcon className="w-3.5 h-3.5" />} label="Plugins" />;
+        return <Btn key="plugins" onClick={onPlugins} testId="btn-plugins" icon={<PlugIcon className="w-3.5 h-3.5" />} label="Plugins" />;
       case "clear":
-        return <Btn theme={t} key="clear" onClick={onClear} testId="btn-clear" icon={<TrashIcon className="w-3.5 h-3.5" />} label="Clear" />;
+        return <Btn key="clear" onClick={onClear} testId="btn-clear" icon={<TrashIcon className="w-3.5 h-3.5" />} label="Clear" />;
       case "settings":
-        return <Btn theme={t} key="settings" onClick={onSettings} testId="btn-settings" icon={<SettingsIcon className="w-3.5 h-3.5" />} label="Settings" />;
+        return <Btn key="settings" onClick={onSettings} testId="btn-settings" icon={<SettingsIcon className="w-3.5 h-3.5" />} label="Settings" />;
       case "troubleshoot":
         return (
           <button
             key="troubleshoot"
             onClick={onTroubleshoot}
-            className={`text-xs px-3 py-1.5 rounded-lg border transition font-medium inline-flex items-center ${t.btnBorder} ${t.textSecondary} ${t.btnHover}`}
+            className="text-xs px-3 py-1.5 rounded-lg border border-gray-700 text-gray-400 hover:bg-gray-800 hover:text-gray-200 transition font-medium inline-flex items-center"
             title="Open Troubleshooting System Guide"
           >
             ? Help
@@ -367,13 +322,10 @@ export default function StatusBar({
   };
 
   return (
-    <header 
-      data-testid="status-bar-header" 
-      className={`flex items-center justify-between px-5 py-2.5 border-b shrink-0 relative transition-colors ${t.bg} ${t.border}`}
-    >
+    <header className="flex items-center justify-between px-5 py-2.5 border-b border-gray-800 bg-gray-900 shrink-0 relative">
       <div className="flex items-center gap-3">
-        <AppLogoIcon className={`w-5 h-5 ${t.brandIcon}`} />
-        <span className={`font-semibold text-sm ${t.textPrimary}`}>LocalMind</span>
+        <AppLogoIcon className="w-5 h-5 text-purple-400" />
+        <span className="font-semibold text-white text-sm">LocalMind</span>
 
         {/* Favorite Action Toggle */}
         {onToggleFavorite && (
@@ -399,18 +351,7 @@ export default function StatusBar({
           </button>
         )}
 
-        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${t.modelBadge}`}>{model}</span>
-
-        {/* Role Badge & Contextual Hint (#640) */}
-        {userRole && (
-          <span 
-            data-testid="role-hint-badge" 
-            title={activeRoleHint}
-            className="text-xs px-2 py-0.5 rounded-full bg-amber-900/60 text-amber-300 border border-amber-700/50 cursor-help font-medium capitalize"
-          >
-            🛡️ {userRole}
-          </span>
-        )}
+        <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-purple-900 text-purple-300">{model}</span>
 
         {/* Compatibility Badges (#630) */}
         {compatibility && <CompatibilityBadge compatibility={compatibility} />}
@@ -437,28 +378,6 @@ export default function StatusBar({
       </div>
       
       <div className="flex items-center gap-1.5" data-testid="status-bar-actions">
-        {/* Direct Export & Share Quick Action Buttons (#638) */}
-        {onExport && (
-          <button
-            onClick={onExport}
-            data-testid="btn-export"
-            title="Export session"
-            className={`text-xs px-2 py-1.5 rounded-lg border transition font-medium inline-flex items-center gap-1 ${t.btnBorder} ${t.textSecondary} ${t.btnHover}`}
-          >
-            📥 <span className="hidden sm:inline">Export</span>
-          </button>
-        )}
-        {onShare && (
-          <button
-            onClick={onShare}
-            data-testid="btn-share"
-            title="Share session"
-            className={`text-xs px-2 py-1.5 rounded-lg border transition font-medium inline-flex items-center gap-1 ${t.btnBorder} ${t.textSecondary} ${t.btnHover}`}
-          >
-            🔗 <span className="hidden sm:inline">Share</span>
-          </button>
-        )}
-
         {/* Reorderable Action Buttons (#637) */}
         {actionOrder.map((key) => (
           <div
@@ -480,7 +399,7 @@ export default function StatusBar({
             onClick={() => setMenuOpen((prev) => !prev)}
             data-testid="btn-context-menu"
             title="Contextual Actions"
-            className={`text-xs px-2 py-1.5 rounded-lg border transition font-medium inline-flex items-center ${t.btnBorder} ${t.textSecondary} ${t.btnHover}`}
+            className="text-xs px-2 py-1.5 rounded-lg border border-gray-700 text-gray-400 hover:bg-gray-800 hover:text-gray-200 transition font-medium inline-flex items-center"
           >
             ⋮
           </button>
@@ -488,17 +407,17 @@ export default function StatusBar({
           {menuOpen && (
             <div 
               data-testid="context-menu-dropdown"
-              className={`absolute right-0 mt-1 w-44 rounded-md shadow-lg border z-50 py-1 text-xs ${t.dropdownBg} ${t.dropdownBorder}`}
+              className="absolute right-0 mt-1 w-44 rounded-md shadow-lg bg-gray-800 border border-gray-700 z-50 py-1 text-xs"
             >
-              {effectiveContextActions.length > 0 ? (
-                effectiveContextActions.map((action, idx) => (
+              {contextActions.length > 0 ? (
+                contextActions.map((action, idx) => (
                   <button
                     key={action.id || idx}
                     onClick={() => {
                       action.onClick?.();
                       setMenuOpen(false);
                     }}
-                    className={`w-full text-left px-3 py-1.5 flex items-center gap-2 transition ${t.textSecondary} ${t.dropdownHover}`}
+                    className="w-full text-left px-3 py-1.5 text-gray-300 hover:bg-gray-700 hover:text-white flex items-center gap-2 transition"
                   >
                     {action.icon && <span>{action.icon}</span>}
                     <span>{action.label}</span>
@@ -515,11 +434,11 @@ export default function StatusBar({
   );
 }
 
-function Btn({ onClick, label, icon, active, title, testId, theme = defaultTheme }) {
+function Btn({ onClick, label, icon, active, title, testId }) {
   return (
     <button onClick={onClick} title={title} data-testid={testId}
       className={`text-xs px-3 py-1.5 rounded-lg border transition font-medium inline-flex items-center gap-1.5
-        ${active ? theme.btnActive : `${theme.btnBorder} ${theme.textSecondary} ${theme.btnHover}`}`}>
+        ${active ? "border-purple-500 text-purple-300 bg-purple-900/30" : "border-gray-700 text-gray-400 hover:bg-gray-800 hover:text-gray-200"}`}>
       {icon}
       {label}
     </button>
