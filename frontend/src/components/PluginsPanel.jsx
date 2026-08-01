@@ -76,6 +76,9 @@ export default function PluginsPanel({ sessionId, onClose }) {
   const [activeMenuId, setActiveMenuId] = useState(null);
   const [notification, setNotification] = useState("");
 
+  // Changelog modal state (#603)
+  const [changelogPlugin, setChangelogPlugin] = useState(null);
+
   // Persistence: View collapsed state (#592)
   const [isCollapsed, setIsCollapsed] = useState(() => {
     try {
@@ -188,11 +191,14 @@ export default function PluginsPanel({ sessionId, onClose }) {
     }
   }, [input, sessionId]);
 
-  // Close contextual action menu on global click or Escape key (#602, #605)
+  // Close menus and modals on outside click or Escape key (#603, #605)
   useEffect(() => {
     const handleGlobalClick = () => setActiveMenuId(null);
     const handleKeyDown = (e) => {
-      if (e.key === "Escape") setActiveMenuId(null);
+      if (e.key === "Escape") {
+        setActiveMenuId(null);
+        setChangelogPlugin(null);
+      }
     };
     window.addEventListener("click", handleGlobalClick);
     window.addEventListener("keydown", handleKeyDown);
@@ -243,6 +249,12 @@ export default function PluginsPanel({ sessionId, onClose }) {
       showNotification(`Share link: ${shareUrl}`);
     }
   };
+
+  function handleOpenChangelog(e, plugin) {
+    e.stopPropagation();
+    setChangelogPlugin(plugin);
+    setActiveMenuId(null);
+  }
 
   const toggleContextMenu = (e, pluginId) => {
     e.stopPropagation();
@@ -395,7 +407,7 @@ export default function PluginsPanel({ sessionId, onClose }) {
             />
           </div>
 
-          {/* Plugin selector with favorite & pin toggles (#601), compatibility badges (#597), & contextual menus (#602, #605) */}
+          {/* Plugin selector with favorite & pin toggles (#601), compatibility badges (#597), & contextual menus (#602, #603, #605) */}
           <div data-testid="plugin-selector-list" className="flex flex-wrap gap-2 mb-4 md:mb-3 shrink-0 min-h-[32px]">
             {filteredPlugins.length > 0 ? (
               filteredPlugins.map((p) => {
@@ -436,7 +448,7 @@ export default function PluginsPanel({ sessionId, onClose }) {
                       ⋮
                     </button>
 
-                    {/* Context Dropdown Menu (#602, #605) */}
+                    {/* Context Dropdown Menu (#602, #603, #605) */}
                     {isMenuOpen && (
                       <div
                         onClick={(e) => e.stopPropagation()}
@@ -455,6 +467,13 @@ export default function PluginsPanel({ sessionId, onClose }) {
                           className="w-full text-left px-3 py-1.5 hover:bg-gray-800 hover:text-white"
                         >
                           Export Config
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => handleOpenChangelog(e, p)}
+                          className="w-full text-left px-3 py-1.5 hover:bg-gray-800 hover:text-white"
+                        >
+                          View Changelog
                         </button>
                       </div>
                     )}
@@ -563,6 +582,55 @@ export default function PluginsPanel({ sessionId, onClose }) {
             )}
           </div>
         </>
+      )}
+
+      {/* Changelog Modal (#603) */}
+      {changelogPlugin && (
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50"
+          onClick={() => setChangelogPlugin(null)}
+          data-testid="changelog-modal"
+        >
+          <div
+            className="bg-gray-900 border border-gray-800 rounded-xl p-5 max-w-md w-full shadow-2xl space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-gray-800 pb-3">
+              <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                <span>{changelogPlugin.name}</span>
+                <span className="text-xs font-mono text-purple-400 bg-purple-950/60 border border-purple-800/50 px-2 py-0.5 rounded-full">
+                  Changelog
+                </span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setChangelogPlugin(null)}
+                className="text-gray-500 hover:text-white transition font-bold text-lg leading-none p-1"
+                aria-label="Close changelog modal"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
+              {changelogPlugin.changelog && changelogPlugin.changelog.length > 0 ? (
+                changelogPlugin.changelog.map((item, idx) => (
+                  <div key={idx} className="bg-gray-800/40 border border-gray-800 p-3 rounded-lg space-y-1">
+                    <div className="flex items-center justify-between text-xs font-mono">
+                      <span className="text-purple-300 font-semibold">{item.version}</span>
+                      <span className="text-gray-500 text-[11px]">{item.date}</span>
+                    </div>
+                    <p className="text-xs text-gray-300 leading-relaxed">{item.changes}</p>
+                  </div>
+                ))
+              ) : (
+                <p className="text-xs text-gray-500 italic text-center py-4">
+                  No changelog preview available for {changelogPlugin.name}.
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
