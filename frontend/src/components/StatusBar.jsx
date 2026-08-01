@@ -215,12 +215,18 @@ export default function StatusBar({
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
 
+  // Drag-and-drop state for action buttons (#637)
+  const defaultActionOrder = ["focus", "stream", "docs", "prompts", "plugins", "clear", "settings", "troubleshoot"];
+  const [actionOrder, setActionOrder] = useState(defaultActionOrder);
+  const [draggedItem, setDraggedItem] = useState(null);
+
   useEffect(() => {
     const handleRateLimit = (e) => setRateLimit(e.detail);
     window.addEventListener("ratelimit-update", handleRateLimit);
     return () => window.removeEventListener("ratelimit-update", handleRateLimit);
   }, []);
 
+  // Close context menu on outside click
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (menuRef.current && !menuRef.current.contains(event.target)) {
@@ -230,6 +236,90 @@ export default function StatusBar({
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  // Drag and Drop handlers (#637)
+  const handleDragStart = (e, key) => {
+    setDraggedItem(key);
+    e.dataTransfer.setData("text/plain", key);
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  };
+
+  const handleDrop = (e, targetKey) => {
+    e.preventDefault();
+    const sourceKey = e.dataTransfer.getData("text/plain") || draggedItem;
+    if (!sourceKey || sourceKey === targetKey) return;
+
+    const updated = [...actionOrder];
+    const draggedIndex = updated.indexOf(sourceKey);
+
+    if (draggedIndex !== -1) {
+      updated.splice(draggedIndex, 1);
+      const targetIndex = updated.indexOf(targetKey);
+      updated.splice(targetIndex, 0, sourceKey);
+      setActionOrder(updated);
+    }
+    setDraggedItem(null);
+  };
+
+  const renderActionButton = (key) => {
+    switch (key) {
+      case "focus":
+        return (
+          <Btn 
+            onClick={onToggleFocus} 
+            title={focusMode ? "Exit focus mode" : "Focus mode — hide side panels"} 
+            testId="btn-focus"
+            active={focusMode}
+            icon={
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 1-2 2h-3" />
+              </svg>
+            }
+            label="Focus" 
+          />
+        );
+      case "stream":
+        return (
+          <Btn 
+            key="stream" 
+            onClick={onToggleStream} 
+            testId="btn-stream" 
+            title={useStream ? "Streaming ON" : "Streaming OFF"}
+            active={useStream} 
+            icon={useStream ? <LightningIcon className="w-3.5 h-3.5" /> : <BatchIcon className="w-3.5 h-3.5" />} 
+            label={useStream ? "Stream" : "Batch"} 
+          />
+        );
+      case "docs":
+        return <Btn key="docs" onClick={onUpload} testId="btn-docs" icon={<DocumentsIcon className="w-3.5 h-3.5" />} label="Docs" />;
+      case "prompts":
+        return <Btn key="prompts" onClick={onPrompts} icon={<TemplateIcon className="w-3.5 h-3.5" />} label="Prompts" />;
+      case "plugins":
+        return <Btn key="plugins" onClick={onPlugins} testId="btn-plugins" icon={<PlugIcon className="w-3.5 h-3.5" />} label="Plugins" />;
+      case "clear":
+        return <Btn key="clear" onClick={onClear} testId="btn-clear" icon={<TrashIcon className="w-3.5 h-3.5" />} label="Clear" />;
+      case "settings":
+        return <Btn key="settings" onClick={onSettings} testId="btn-settings" icon={<SettingsIcon className="w-3.5 h-3.5" />} label="Settings" />;
+      case "troubleshoot":
+        return (
+          <button
+            key="troubleshoot"
+            onClick={onTroubleshoot}
+            className="text-xs px-3 py-1.5 rounded-lg border border-gray-700 text-gray-400 hover:bg-gray-800 hover:text-gray-200 transition font-medium inline-flex items-center"
+            title="Open Troubleshooting System Guide"
+          >
+            ? Help
+          </button>
+        );
+      default:
+        return null;
+    }
+  };
 
   return (
     <header className="flex items-center justify-between px-5 py-2.5 border-b border-gray-800 bg-gray-900 shrink-0 relative">
@@ -286,31 +376,22 @@ export default function StatusBar({
           />
         )}
       </div>
-
-      <div className="flex items-center gap-1.5">
-        <Btn onClick={onToggleFocus} title={focusMode ? "Exit focus mode" : "Focus mode — hide side panels"} testId="btn-focus"
-          active={focusMode}
-          icon={
-            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 1-2 2h-3" />
-            </svg>
-          }
-          label="Focus" />
-        <Btn onClick={onToggleStream} testId="btn-stream" title={useStream ? "Streaming ON" : "Streaming OFF"}
-          active={useStream} icon={useStream ? <LightningIcon className="w-3.5 h-3.5" /> : <BatchIcon className="w-3.5 h-3.5" />} label={useStream ? "Stream" : "Batch"} />
-        <Btn onClick={onUpload}   testId="btn-docs"   icon={<DocumentsIcon className="w-3.5 h-3.5" />} label="Docs"     />
-        <Btn onClick={onPrompts}  icon={<TemplateIcon className="w-3.5 h-3.5" />} label="Prompts"  />
-        <Btn onClick={onPlugins}  testId="btn-plugins" icon={<PlugIcon className="w-3.5 h-3.5" />} label="Plugins"  />
-        <Btn onClick={onClear}    testId="btn-clear"    icon={<TrashIcon className="w-3.5 h-3.5" />} label="Clear"    />
-        <Btn onClick={onSettings} testId="btn-settings" icon={<SettingsIcon className="w-3.5 h-3.5" />} label="Settings" />
-
-        <button
-          onClick={onTroubleshoot}
-          className="text-xs px-3 py-1.5 rounded-lg border border-gray-700 text-gray-400 hover:bg-gray-800 hover:text-gray-200 transition font-medium inline-flex items-center"
-          title="Open Troubleshooting System Guide"
-        >
-          ? Help
-        </button>
+      
+      <div className="flex items-center gap-1.5" data-testid="status-bar-actions">
+        {/* Reorderable Action Buttons (#637) */}
+        {actionOrder.map((key) => (
+          <div
+            key={key}
+            draggable
+            data-testid={`draggable-action-${key}`}
+            onDragStart={(e) => handleDragStart(e, key)}
+            onDragOver={handleDragOver}
+            onDrop={(e) => handleDrop(e, key)}
+            className="cursor-grab active:cursor-grabbing transition-opacity duration-150"
+          >
+            {renderActionButton(key)}
+          </div>
+        ))}
 
         {/* Contextual Action Menu (#635) */}
         <div className="relative" ref={menuRef}>

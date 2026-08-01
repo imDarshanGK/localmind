@@ -39,6 +39,51 @@ describe("StatusBar Component Suite", () => {
   });
 
   /* -------------------------------------------------------------------------- */
+  /*  Drag-and-Drop Action Button Ordering (#637)                               */
+  /* -------------------------------------------------------------------------- */
+  describe("Drag-and-Drop Action Button Ordering (#637)", () => {
+    test("renders action buttons inside draggable wrappers", () => {
+      render(<StatusBar model="llama3" />);
+      
+      const draggableStream = screen.getByTestId("draggable-action-stream");
+      const draggableSettings = screen.getByTestId("draggable-action-settings");
+
+      expect(draggableStream).toHaveAttribute("draggable", "true");
+      expect(draggableSettings).toHaveAttribute("draggable", "true");
+    });
+
+    test("reorders buttons when a drag-and-drop sequence occurs", () => {
+      render(<StatusBar model="llama3" />);
+
+      const streamDrag = screen.getByTestId("draggable-action-stream");
+      const settingsDrag = screen.getByTestId("draggable-action-settings");
+
+      // Mock DataTransfer storage for JSDOM environment
+      const mockDataStore = { "text/plain": "settings" };
+      const mockDataTransfer = {
+        setData: (type, val) => { mockDataStore[type] = val; },
+        getData: (type) => mockDataStore[type] || "",
+        effectAllowed: "move",
+        dropEffect: "move",
+      };
+
+      // Simulate dragging "settings" onto "stream"
+      fireEvent.dragStart(settingsDrag, { dataTransfer: mockDataTransfer });
+      fireEvent.drop(streamDrag, { dataTransfer: mockDataTransfer, preventDefault: vi.fn() });
+
+      const actionsContainer = screen.getByTestId("status-bar-actions");
+      const childTestIds = Array.from(actionsContainer.children)
+        .map((child) => child.getAttribute("data-testid"))
+        .filter(Boolean);
+
+      // Verify "settings" moved right before "stream"
+      const settingsIdx = childTestIds.indexOf("draggable-action-settings");
+      const streamIdx = childTestIds.indexOf("draggable-action-stream");
+      expect(settingsIdx).toBeLessThan(streamIdx);
+    });
+  });
+
+  /* -------------------------------------------------------------------------- */
   /*  Changelog Preview Badges (#636)                                           */
   /* -------------------------------------------------------------------------- */
   describe("Changelog Preview Badges (#636)", () => {
@@ -85,6 +130,9 @@ describe("StatusBar Component Suite", () => {
     });
   });
 
+  /* -------------------------------------------------------------------------- */
+  /*  Compatibility Badges (#630)                                               */
+  /* -------------------------------------------------------------------------- */
   describe("Compatibility Badges (#630)", () => {
     test("renders compatibility badges when array is provided", () => {
       render(<StatusBar {...defaultProps} compatibility={["v1.0", "Local", "Cloud"]} />);
@@ -120,6 +168,9 @@ describe("StatusBar Component Suite", () => {
     });
   });
 
+  /* -------------------------------------------------------------------------- */
+  /*  Source Trust Indicator Badges (#632)                                      */
+  /* -------------------------------------------------------------------------- */
   describe("Source Trust Indicator Badges (#632)", () => {
     test("renders trusted source badge when trustLevel is 'trusted' or 'verified'", () => {
       render(<StatusBar trustLevel="verified" model="llama3" />);
@@ -153,6 +204,45 @@ describe("StatusBar Component Suite", () => {
     });
   });
 
+  /* -------------------------------------------------------------------------- */
+  /*  Search Refinement Badges (#633)                                           */
+  /* -------------------------------------------------------------------------- */
+  describe("Search Refinement Badges (#633)", () => {
+    test("renders semantic search refinement badge", () => {
+      render(<StatusBar searchRefinement="semantic" model="llama3" />);
+      const badge = screen.getByTestId("search-refinement-badge");
+      expect(badge).toBeInTheDocument();
+      expect(badge).toHaveTextContent("Search: Semantic");
+    });
+
+    test("renders keyword search refinement badge", () => {
+      render(<StatusBar searchRefinement="keyword" model="llama3" />);
+      const badge = screen.getByTestId("search-refinement-badge");
+      expect(badge).toBeInTheDocument();
+      expect(badge).toHaveTextContent("Search: Keyword");
+    });
+
+    test("renders hybrid search refinement badge", () => {
+      render(<StatusBar searchRefinement="hybrid" model="llama3" />);
+      const badge = screen.getByTestId("search-refinement-badge");
+      expect(badge).toBeInTheDocument();
+      expect(badge).toHaveTextContent("Search: Hybrid");
+    });
+
+    test("handles object input format for searchRefinement", () => {
+      render(<StatusBar searchRefinement={{ mode: "semantic" }} model="llama3" />);
+      expect(screen.getByTestId("search-refinement-badge")).toHaveTextContent("Search: Semantic");
+    });
+
+    test("does not render search refinement badge when searchRefinement is null/undefined", () => {
+      render(<StatusBar searchRefinement={null} model="llama3" />);
+      expect(screen.queryByTestId("search-refinement-badge")).not.toBeInTheDocument();
+    });
+  });
+
+  /* -------------------------------------------------------------------------- */
+  /*  Favorite & Pin Support (#634)                                             */
+  /* -------------------------------------------------------------------------- */
   describe("Favorite & Pin Support (#634)", () => {
     test("renders favorite button and handles toggle state", () => {
       const onToggleFavorite = vi.fn();
@@ -193,39 +283,9 @@ describe("StatusBar Component Suite", () => {
     });
   });
 
-  describe("Search Refinement Badges (#633)", () => {
-    test("renders semantic search refinement badge", () => {
-      render(<StatusBar searchRefinement="semantic" model="llama3" />);
-      const badge = screen.getByTestId("search-refinement-badge");
-      expect(badge).toBeInTheDocument();
-      expect(badge).toHaveTextContent("Search: Semantic");
-    });
-
-    test("renders keyword search refinement badge", () => {
-      render(<StatusBar searchRefinement="keyword" model="llama3" />);
-      const badge = screen.getByTestId("search-refinement-badge");
-      expect(badge).toBeInTheDocument();
-      expect(badge).toHaveTextContent("Search: Keyword");
-    });
-
-    test("renders hybrid search refinement badge", () => {
-      render(<StatusBar searchRefinement="hybrid" model="llama3" />);
-      const badge = screen.getByTestId("search-refinement-badge");
-      expect(badge).toBeInTheDocument();
-      expect(badge).toHaveTextContent("Search: Hybrid");
-    });
-
-    test("handles object input format for searchRefinement", () => {
-      render(<StatusBar searchRefinement={{ mode: "semantic" }} model="llama3" />);
-      expect(screen.getByTestId("search-refinement-badge")).toHaveTextContent("Search: Semantic");
-    });
-
-    test("does not render search refinement badge when searchRefinement is null/undefined", () => {
-      render(<StatusBar searchRefinement={null} model="llama3" />);
-      expect(screen.queryByTestId("search-refinement-badge")).not.toBeInTheDocument();
-    });
-  });
-
+  /* -------------------------------------------------------------------------- */
+  /*  Contextual Action Menus (#635)                                            */
+  /* -------------------------------------------------------------------------- */
   describe("Contextual Action Menus (#635)", () => {
     test("toggles contextual action dropdown menu on button click", () => {
       render(<StatusBar model="llama3" />);
@@ -242,13 +302,13 @@ describe("StatusBar Component Suite", () => {
     test("renders custom contextual action items and executes callback", () => {
       const handleAction = vi.fn();
       const contextActions = [
-        { id: "act-1", label: "Export Chat", onClick: handleAction }
+        { id: "act-1", label: "Custom Action", onClick: handleAction }
       ];
 
       render(<StatusBar model="llama3" contextActions={contextActions} />);
 
       fireEvent.click(screen.getByTestId("btn-context-menu"));
-      const actionItem = screen.getByText("Export Chat");
+      const actionItem = screen.getByText("Custom Action");
       expect(actionItem).toBeInTheDocument();
 
       fireEvent.click(actionItem);
@@ -264,6 +324,9 @@ describe("StatusBar Component Suite", () => {
     });
   });
 
+  /* -------------------------------------------------------------------------- */
+  /*  Status Indicator Badges                                                   */
+  /* -------------------------------------------------------------------------- */
   describe("Status Indicator Badges", () => {
     test("renders model label correctly", () => {
       render(<StatusBar model="mistral-7b" />);
@@ -296,6 +359,9 @@ describe("StatusBar Component Suite", () => {
     });
   });
 
+  /* -------------------------------------------------------------------------- */
+  /*  Action Buttons & Interactions                                             */
+  /* -------------------------------------------------------------------------- */
   describe("Action Buttons & Interactions", () => {
     test("triggers corresponding action callbacks on button clicks", () => {
       const onUpload = vi.fn();
