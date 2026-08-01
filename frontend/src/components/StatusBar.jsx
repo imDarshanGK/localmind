@@ -1,10 +1,49 @@
 import { useState, useEffect } from "react";
 import { AppLogoIcon, BatchIcon, DocumentsIcon, LightningIcon, OfflineIcon, OnlineIcon, PlugIcon, SettingsIcon, TemplateIcon, TrashIcon } from "./Icons";
 
+// Helper badge renderer for search refinement indicators (#633)
+function SearchRefinementBadge({ searchRefinement }) {
+  if (!searchRefinement) return null;
+
+  const mode = String(
+    typeof searchRefinement === "object" ? searchRefinement.mode || searchRefinement.type : searchRefinement
+  ).toLowerCase();
+
+  let badgeStyle = "bg-slate-800 text-slate-300 border-slate-700";
+  let label = "Search: Standard";
+  let icon = "🔍";
+
+  if (mode.includes("semantic") || mode.includes("vector")) {
+    badgeStyle = "bg-indigo-950/60 text-indigo-300 border-indigo-800/60";
+    label = "Search: Semantic";
+    icon = "🧠";
+  } else if (mode.includes("keyword") || mode.includes("lexical") || mode.includes("exact")) {
+    badgeStyle = "bg-sky-950/60 text-sky-300 border-sky-800/60";
+    label = "Search: Keyword";
+    icon = "🔤";
+  } else if (mode.includes("hybrid") || mode.includes("combined") || mode.includes("dense")) {
+    badgeStyle = "bg-purple-950/60 text-purple-300 border-purple-800/60";
+    label = "Search: Hybrid";
+    icon = "🔀";
+  }
+
+  return (
+    <span
+      data-testid="search-refinement-badge"
+      className={`text-[10px] font-mono px-2 py-0.5 rounded border inline-flex items-center gap-1 ${badgeStyle}`}
+      title={`Search Refinement Mode: ${mode}`}
+    >
+      <span>{icon}</span>
+      <span>{label}</span>
+    </span>
+  );
+}
+
 export default function StatusBar({ 
   ollamaOk, 
   model, 
   docCount, 
+  searchRefinement,
   onUpload, 
   onPrompts, 
   onPlugins, 
@@ -12,9 +51,14 @@ export default function StatusBar({
   onClear, 
   useStream,
   onToggleStream,
-  onTroubleshoot, // Keeps your troubleshooting navigation hook intact
+  onTroubleshoot,
   focusMode,
-  onToggleFocus
+  onToggleFocus,
+  // Favorite & Pin props (#634)
+  isFavorite = false,
+  onToggleFavorite,
+  isPinned = false,
+  onTogglePin
 }) {
   const [rateLimit, setRateLimit] = useState(null);
 
@@ -29,10 +73,40 @@ export default function StatusBar({
       <div className="flex items-center gap-3">
         <AppLogoIcon className="w-5 h-5 text-purple-400" />
         <span className="font-semibold text-white text-sm">LocalMind</span>
+
+        {/* Favorite Action Toggle (#634) */}
+        {onToggleFavorite && (
+          <button
+            onClick={onToggleFavorite}
+            data-testid="btn-favorite"
+            title={isFavorite ? "Unfavorite session" : "Favorite session"}
+            className={`text-xs transition ${isFavorite ? "text-amber-400" : "text-gray-500 hover:text-amber-300"}`}
+          >
+            {isFavorite ? "★" : "☆"}
+          </button>
+        )}
+
+        {/* Pin Action Toggle (#634) */}
+        {onTogglePin && (
+          <button
+            onClick={onTogglePin}
+            data-testid="btn-pin"
+            title={isPinned ? "Unpin status bar" : "Pin status bar"}
+            className={`text-xs transition ${isPinned ? "text-indigo-400" : "text-gray-500 hover:text-indigo-300"}`}
+          >
+            {isPinned ? "📌" : "📍"}
+          </button>
+        )}
+
         <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-purple-900 text-purple-300">{model}</span>
+
+        {/* Search Refinement Indicator (#633) */}
+        {searchRefinement && <SearchRefinementBadge searchRefinement={searchRefinement} />}
+
         {ollamaOk === true  && <StatusBadge icon={<OnlineIcon className="w-3.5 h-3.5 text-green-300" />} className="bg-green-900 text-green-300" label="online" />}
         {ollamaOk === false && <StatusBadge icon={<OfflineIcon className="w-3.5 h-3.5 text-red-300" />} className="bg-red-900 text-red-300" label="ollama offline" />}
-        {docCount > 0 && <StatusBadge icon={<DocumentsIcon className="w-3.5 h-3.5 text-blue-300" />} className="bg-blue-900 text-blue-300" label={`${docCount} doc${docCount>1?"s":""}`} />}
+        {docCount > 0 && <StatusBadge testId="doc-count-badge" icon={<DocumentsIcon className="w-3.5 h-3.5 text-blue-300" />} className="bg-blue-900 text-blue-300" label={`${docCount} doc${docCount>1?"s":""}`} />}
+        
         {rateLimit && (
           <StatusBadge 
             icon={<LightningIcon className="w-3.5 h-3.5 text-yellow-300" />} 
@@ -41,24 +115,24 @@ export default function StatusBar({
           />
         )}
       </div>
+
       <div className="flex items-center gap-1.5">
         <Btn onClick={onToggleFocus} title={focusMode ? "Exit focus mode" : "Focus mode — hide side panels"} testId="btn-focus"
           active={focusMode}
           icon={
             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3m13-5v3a2 2 0 0 1-2 2h-3" />
+              <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 1-2 2h-3" />
             </svg>
           }
           label="Focus" />
-        <Btn onClick={onToggleStream} title={useStream ? "Streaming ON" : "Streaming OFF"} testId="btn-stream"
+        <Btn onClick={onToggleStream} testId="btn-stream" title={useStream ? "Streaming ON" : "Streaming OFF"}
           active={useStream} icon={useStream ? <LightningIcon className="w-3.5 h-3.5" /> : <BatchIcon className="w-3.5 h-3.5" />} label={useStream ? "Stream" : "Batch"} />
         <Btn onClick={onUpload}   testId="btn-docs"   icon={<DocumentsIcon className="w-3.5 h-3.5" />} label="Docs"     />
         <Btn onClick={onPrompts}  icon={<TemplateIcon className="w-3.5 h-3.5" />} label="Prompts"  />
-        <Btn onClick={onPlugins}  testId="btn-plugins"  icon={<PlugIcon className="w-3.5 h-3.5" />} label="Plugins"  />
+        <Btn onClick={onPlugins}  testId="btn-plugins" icon={<PlugIcon className="w-3.5 h-3.5" />} label="Plugins"  />
         <Btn onClick={onClear}    testId="btn-clear"    icon={<TrashIcon className="w-3.5 h-3.5" />} label="Clear"    />
         <Btn onClick={onSettings} testId="btn-settings" icon={<SettingsIcon className="w-3.5 h-3.5" />} label="Settings" />
         
-        {/* Safely appends your Troubleshooting system button to the trigger array matrix */}
         <button
           onClick={onTroubleshoot}
           className="text-xs px-3 py-1.5 rounded-lg border border-gray-700 text-gray-400 hover:bg-gray-800 hover:text-gray-200 transition font-medium inline-flex items-center"
@@ -82,9 +156,9 @@ function Btn({ onClick, label, icon, active, title, testId }) {
   );
 }
 
-function StatusBadge({ icon, label, className }) {
+function StatusBadge({ icon, label, className, testId }) {
   return (
-    <span className={`text-xs px-2 py-0.5 rounded-full inline-flex items-center gap-1 ${className}`}>
+    <span data-testid={testId} className={`text-xs px-2 py-0.5 rounded-full inline-flex items-center gap-1 ${className}`}>
       {icon}
       {label}
     </span>

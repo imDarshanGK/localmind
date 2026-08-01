@@ -466,7 +466,7 @@ export default function PluginsPanel({ sessionId, onClose }) {
             />
           </div>
 
-          {/* Draggable & Sortable Plugin selector list (#604) */}
+          {/* Plugin selector with favorite & pin toggles (#601), compatibility badges (#597), & contextual menus (#602, #603, #605) */}
           <div data-testid="plugin-selector-list" className="flex flex-wrap gap-2 mb-4 md:mb-3 shrink-0 min-h-[32px]">
             {filteredPlugins.length > 0 ? (
               filteredPlugins.map((p, index) => {
@@ -503,7 +503,7 @@ export default function PluginsPanel({ sessionId, onClose }) {
                       {isPinned ? "★" : "☆"}
                     </button>
 
-                    {/* Context Menu Trigger Button */}
+                    {/* Context Menu Trigger Button (#602) */}
                     <button
                       type="button"
                       onClick={(e) => toggleContextMenu(e, p.id)}
