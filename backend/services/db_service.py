@@ -13,7 +13,6 @@ from contextlib import contextmanager
 from sqlite3 import OperationalError
 
 import grapheme
-
 from utils.config import settings
 
 # ------------------------Vacuum Scheduling--------------------------------------------------------

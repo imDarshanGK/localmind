@@ -8,7 +8,6 @@ import logging
 from collections.abc import AsyncGenerator
 
 import httpx
-
 from utils.cache import TTLCache
 from utils.config import settings
 from utils.retry import with_retry

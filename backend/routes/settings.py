@@ -7,7 +7,6 @@ from collections.abc import Callable
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, status
-
 from models.schemas import AppSettings
 from services.db_service import get_settings, save_setting, save_settings
 from utils.config import settings
