@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
 import React from "react";
-import { describe, test, expect, afterEach, vi } from "vitest";
+import { describe, test, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import StatusBar from "./StatusBar";
 
-// Mock icon components
+// Mock Icon components
 vi.mock("./Icons", () => ({
   AppLogoIcon: () => <span data-testid="app-logo-icon" />,
   BatchIcon: () => <span data-testid="batch-icon" />,
@@ -19,8 +19,90 @@ vi.mock("./Icons", () => ({
 }));
 
 describe("StatusBar Component Suite", () => {
+  const defaultProps = {
+    ollamaOk: true,
+    model: "llama3",
+    docCount: 2,
+    compatibility: ["v1.0", "Local"],
+    onUpload: vi.fn(),
+    onPlugins: vi.fn(),
+    onSettings: vi.fn(),
+    onClear: vi.fn(),
+    useStream: true,
+    onToggleStream: vi.fn(),
+  };
+
   afterEach(() => {
     cleanup();
+    vi.clearAllMocks();
+  });
+
+  describe("Compatibility Badges (#630)", () => {
+    test("renders compatibility badges when array is provided", () => {
+      render(<StatusBar {...defaultProps} compatibility={["v1.0", "Local", "Cloud"]} />);
+
+      const badges = screen.getAllByTestId("compatibility-badge");
+      expect(badges).toHaveLength(3);
+      expect(screen.getByText("v1.0")).toBeInTheDocument();
+      expect(screen.getByText("Local")).toBeInTheDocument();
+      expect(screen.getByText("Cloud")).toBeInTheDocument();
+    });
+
+    test("renders single badge when string is provided", () => {
+      render(<StatusBar {...defaultProps} compatibility="v2.0-Local" />);
+
+      const badge = screen.getByTestId("compatibility-badge");
+      expect(badge).toBeInTheDocument();
+      expect(screen.getByText("v2.0-Local")).toBeInTheDocument();
+    });
+
+    test("handles object input format gracefully", () => {
+      render(<StatusBar {...defaultProps} compatibility={{ env: "Local", ver: "v1" }} />);
+
+      const badges = screen.getAllByTestId("compatibility-badge");
+      expect(badges).toHaveLength(2);
+      expect(screen.getByText("Local")).toBeInTheDocument();
+      expect(screen.getByText("v1")).toBeInTheDocument();
+    });
+
+    test("does not render compatibility container if compatibility prop is null/undefined", () => {
+      render(<StatusBar {...defaultProps} compatibility={null} />);
+
+      expect(screen.queryByTestId("status-bar-compatibility")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("Source Trust Indicator Badges (#632)", () => {
+    test("renders trusted source badge when trustLevel is 'trusted' or 'verified'", () => {
+      render(<StatusBar trustLevel="verified" model="llama3" />);
+      const badge = screen.getByTestId("source-trust-badge");
+      expect(badge).toBeInTheDocument();
+      expect(badge).toHaveTextContent("Trusted Source");
+    });
+
+    test("renders untrusted source badge when trustLevel is 'untrusted'", () => {
+      render(<StatusBar trustLevel="untrusted" model="llama3" />);
+      const badge = screen.getByTestId("source-trust-badge");
+      expect(badge).toBeInTheDocument();
+      expect(badge).toHaveTextContent("Untrusted Source");
+    });
+
+    test("renders caution badge when trustLevel is 'caution' or 'medium'", () => {
+      render(<StatusBar trustLevel="caution" model="llama3" />);
+      const badge = screen.getByTestId("source-trust-badge");
+      expect(badge).toBeInTheDocument();
+      expect(badge).toHaveTextContent("Caution Source");
+    });
+
+    test("handles object input format for trustLevel gracefully", () => {
+      render(<StatusBar trustLevel={{ level: "trusted" }} model="llama3" />);
+      expect(screen.getByTestId("source-trust-badge")).toHaveTextContent("Trusted Source");
+    });
+
+    test("does not render trust badge when trustLevel is null or undefined", () => {
+      render(<StatusBar trustLevel={null} model="llama3" />);
+      expect(screen.queryByTestId("source-trust-badge")).not.toBeInTheDocument();
+    });
   });
 
   describe("Favorite & Pin Support (#634)", () => {

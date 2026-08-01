@@ -12,6 +12,44 @@ import {
   TrashIcon 
 } from "./Icons";
 
+// Helper badge renderer for source trust indicators (#632)
+function SourceTrustBadge({ trustLevel }) {
+  if (!trustLevel) return null;
+
+  const normalized = String(
+    typeof trustLevel === "object" ? trustLevel.level || trustLevel.status : trustLevel
+  ).toLowerCase();
+
+  let badgeStyle = "bg-gray-800 text-gray-400 border-gray-700";
+  let label = "Unknown Source";
+  let icon = "🛡️";
+
+  if (normalized.includes("untrusted") || normalized.includes("low") || normalized.includes("risk")) {
+    badgeStyle = "bg-rose-950/60 text-rose-300 border-rose-800/60";
+    label = "Untrusted Source";
+    icon = "⚠️";
+  } else if (normalized.includes("verified") || normalized.includes("trusted") || normalized.includes("high")) {
+    badgeStyle = "bg-emerald-950/60 text-emerald-300 border-emerald-800/60";
+    label = "Trusted Source";
+    icon = "✓";
+  } else if (normalized.includes("medium") || normalized.includes("caution")) {
+    badgeStyle = "bg-amber-950/60 text-amber-300 border-amber-800/60";
+    label = "Caution Source";
+    icon = "⚡";
+  }
+
+  return (
+    <span
+      data-testid="source-trust-badge"
+      className={`text-[10px] font-mono px-2 py-0.5 rounded border inline-flex items-center gap-1 ${badgeStyle}`}
+      title={`Source Trust Level: ${normalized}`}
+    >
+      <span>{icon}</span>
+      <span>{label}</span>
+    </span>
+  );
+}
+
 // Helper badge renderer for search refinement indicators (#633)
 function SearchRefinementBadge({ searchRefinement }) {
   if (!searchRefinement) return null;
@@ -41,8 +79,8 @@ function SearchRefinementBadge({ searchRefinement }) {
   return (
     <span
       data-testid="search-refinement-badge"
-      className={`text-[10px] font-mono px-2 py-0.5 rounded border inline-flex items-center gap-1 ${badgeStyle}`}
-      title={`Search Refinement Mode: ${mode}`}
+      className={`text-[10px] font-mono px-2 py-0.5 rounded border inline-flex items-center gap-1 shrink-0 ${badgeStyle}`}
+      title={`Active Search Refinement Mode: ${mode}`}
     >
       <span>{icon}</span>
       <span>{label}</span>
@@ -50,10 +88,45 @@ function SearchRefinementBadge({ searchRefinement }) {
   );
 }
 
+// Helper badge renderer for compatibility tags (#630)
+function CompatibilityBadge({ compatibility }) {
+  if (!compatibility) return null;
+
+  // Normalize array vs object/string format
+  const badges = Array.isArray(compatibility)
+    ? compatibility
+    : typeof compatibility === "object"
+    ? Object.values(compatibility)
+    : [compatibility];
+
+  return (
+    <div className="inline-flex items-center gap-1 flex-wrap" data-testid="status-bar-compatibility">
+      {badges.map((badge, idx) => {
+        const isLocal = String(badge).toLowerCase().includes("local") || String(badge).toLowerCase().includes("v1");
+        const badgeStyle = isLocal
+          ? "bg-emerald-950/60 text-emerald-400 border-emerald-800/60"
+          : "bg-blue-950/60 text-blue-400 border-blue-800/60";
+
+        return (
+          <span
+            key={idx}
+            data-testid="compatibility-badge"
+            className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${badgeStyle}`}
+          >
+            {badge}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function StatusBar({ 
   ollamaOk, 
   model, 
   docCount, 
+  compatibility,
+  trustLevel,
   searchRefinement,
   onUpload, 
   onPrompts, 
@@ -126,6 +199,11 @@ export default function StatusBar({
         )}
 
         <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-purple-900 text-purple-300">{model}</span>
+
+        {/* Compatibility Badges (#630) */}
+        {compatibility && <CompatibilityBadge compatibility={compatibility} />}
+        {/* Source Trust Indicator (#632) */}
+        {trustLevel && <SourceTrustBadge trustLevel={trustLevel} />}
 
         {/* Search Refinement Indicator (#633) */}
         {searchRefinement && <SearchRefinementBadge searchRefinement={searchRefinement} />}
