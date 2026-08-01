@@ -1,5 +1,15 @@
 import { useState, useEffect, useRef } from "react";
-import { AppLogoIcon, BatchIcon, DocumentsIcon, LightningIcon, OfflineIcon, OnlineIcon, PlugIcon, SettingsIcon, TrashIcon } from "./Icons";
+import { 
+  AppLogoIcon, 
+  BatchIcon, 
+  DocumentsIcon, 
+  LightningIcon, 
+  OfflineIcon, 
+  OnlineIcon, 
+  PlugIcon, 
+  SettingsIcon, 
+  TrashIcon 
+} from "./Icons";
 
 export default function StatusBar({ 
   ollamaOk, 
@@ -22,6 +32,11 @@ export default function StatusBar({
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
 
+  // Drag-and-drop state for action buttons (#637)
+  const defaultActionOrder = ["stream", "docs", "plugins", "clear", "settings"];
+  const [actionOrder, setActionOrder] = useState(defaultActionOrder);
+  const [draggedItem, setDraggedItem] = useState(null);
+
   // Close context menu on outside click
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -32,6 +47,64 @@ export default function StatusBar({
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  // Drag and Drop handlers (#637)
+  const handleDragStart = (e, key) => {
+    setDraggedItem(key);
+    e.dataTransfer.setData("text/plain", key);
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  };
+
+  const handleDrop = (e, targetKey) => {
+    e.preventDefault();
+    const sourceKey = e.dataTransfer.getData("text/plain") || draggedItem;
+    if (!sourceKey || sourceKey === targetKey) return;
+
+    const updated = [...actionOrder];
+    const draggedIndex = updated.indexOf(sourceKey);
+
+    if (draggedIndex !== -1) {
+      // Remove dragged item from its current position
+      updated.splice(draggedIndex, 1);
+      // Find updated index of target and insert right before it
+      const targetIndex = updated.indexOf(targetKey);
+      updated.splice(targetIndex, 0, sourceKey);
+      setActionOrder(updated);
+    }
+    setDraggedItem(null);
+  };
+
+  const renderActionButton = (key) => {
+    switch (key) {
+      case "stream":
+        return (
+          <Btn 
+            key="stream" 
+            onClick={onToggleStream} 
+            testId="btn-stream" 
+            title={useStream ? "Streaming ON" : "Streaming OFF"}
+            active={useStream} 
+            icon={useStream ? <LightningIcon className="w-3.5 h-3.5" /> : <BatchIcon className="w-3.5 h-3.5" />} 
+            label={useStream ? "Stream" : "Batch"} 
+          />
+        );
+      case "docs":
+        return <Btn key="docs" onClick={onUpload} testId="btn-docs" icon={<DocumentsIcon className="w-3.5 h-3.5" />} label="Docs" />;
+      case "plugins":
+        return <Btn key="plugins" onClick={onPlugins} testId="btn-plugins" icon={<PlugIcon className="w-3.5 h-3.5" />} label="Plugins" />;
+      case "clear":
+        return <Btn key="clear" onClick={onClear} testId="btn-clear" icon={<TrashIcon className="w-3.5 h-3.5" />} label="Clear" />;
+      case "settings":
+        return <Btn key="settings" onClick={onSettings} testId="btn-settings" icon={<SettingsIcon className="w-3.5 h-3.5" />} label="Settings" />;
+      default:
+        return null;
+    }
+  };
 
   return (
     <header className="flex items-center justify-between px-5 py-2.5 border-b border-gray-800 bg-gray-900 shrink-0 relative">
@@ -69,13 +142,21 @@ export default function StatusBar({
         {docCount > 0 && <StatusBadge testId="doc-count-badge" icon={<DocumentsIcon className="w-3.5 h-3.5 text-blue-300" />} className="bg-blue-900 text-blue-300" label={`${docCount} doc${docCount>1?"s":""}`} />}
       </div>
       
-      <div className="flex items-center gap-1.5">
-        <Btn onClick={onToggleStream} testId="btn-stream" title={useStream ? "Streaming ON" : "Streaming OFF"}
-          active={useStream} icon={useStream ? <LightningIcon className="w-3.5 h-3.5" /> : <BatchIcon className="w-3.5 h-3.5" />} label={useStream ? "Stream" : "Batch"} />
-        <Btn onClick={onUpload}   testId="btn-docs"   icon={<DocumentsIcon className="w-3.5 h-3.5" />} label="Docs"     />
-        <Btn onClick={onPlugins}  testId="btn-plugins" icon={<PlugIcon className="w-3.5 h-3.5" />} label="Plugins"  />
-        <Btn onClick={onClear}    testId="btn-clear"    icon={<TrashIcon className="w-3.5 h-3.5" />} label="Clear"    />
-        <Btn onClick={onSettings} testId="btn-settings" icon={<SettingsIcon className="w-3.5 h-3.5" />} label="Settings" />
+      <div className="flex items-center gap-1.5" data-testid="status-bar-actions">
+        {/* Reorderable Action Buttons (#637) */}
+        {actionOrder.map((key) => (
+          <div
+            key={key}
+            draggable
+            data-testid={`draggable-action-${key}`}
+            onDragStart={(e) => handleDragStart(e, key)}
+            onDragOver={handleDragOver}
+            onDrop={(e) => handleDrop(e, key)}
+            className="cursor-grab active:cursor-grabbing transition-opacity duration-150"
+          >
+            {renderActionButton(key)}
+          </div>
+        ))}
 
         {/* Contextual Action Menu (#635) */}
         <div className="relative" ref={menuRef}>

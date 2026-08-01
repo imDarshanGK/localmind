@@ -23,6 +23,50 @@ describe("StatusBar Component Suite", () => {
     cleanup();
   });
 
+  /* -------------------------------------------------------------------------- */
+  /*  Drag-and-Drop Action Button Ordering (#637)                               */
+  /* -------------------------------------------------------------------------- */
+  describe("Drag-and-Drop Action Button Ordering (#637)", () => {
+    test("renders action buttons inside draggable wrappers", () => {
+      render(<StatusBar model="llama3" />);
+      
+      const draggableStream = screen.getByTestId("draggable-action-stream");
+      const draggableSettings = screen.getByTestId("draggable-action-settings");
+
+      expect(draggableStream).toHaveAttribute("draggable", "true");
+      expect(draggableSettings).toHaveAttribute("draggable", "true");
+    });
+
+    test("reorders buttons when a drag-and-drop sequence occurs", () => {
+      render(<StatusBar model="llama3" />);
+
+      const streamDrag = screen.getByTestId("draggable-action-stream");
+      const settingsDrag = screen.getByTestId("draggable-action-settings");
+
+      // Mock DataTransfer storage for JSDOM environment
+      const mockDataStore = { "text/plain": "settings" };
+      const mockDataTransfer = {
+        setData: (type, val) => { mockDataStore[type] = val; },
+        getData: (type) => mockDataStore[type] || "",
+        effectAllowed: "move",
+        dropEffect: "move",
+      };
+
+      // Simulate dragging "settings" onto "stream"
+      fireEvent.dragStart(settingsDrag, { dataTransfer: mockDataTransfer });
+      fireEvent.drop(streamDrag, { dataTransfer: mockDataTransfer, preventDefault: vi.fn() });
+
+      const actionsContainer = screen.getByTestId("status-bar-actions");
+      const childTestIds = Array.from(actionsContainer.children)
+        .map((child) => child.getAttribute("data-testid"))
+        .filter(Boolean);
+
+      // Verify "settings" moved to index 0, right before "stream"
+      expect(childTestIds[0]).toBe("draggable-action-settings");
+      expect(childTestIds[1]).toBe("draggable-action-stream");
+    });
+  });
+
   describe("Favorite & Pin Support (#634)", () => {
     test("renders favorite button and handles toggle state", () => {
       const onToggleFavorite = vi.fn();
