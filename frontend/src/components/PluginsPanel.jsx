@@ -438,7 +438,7 @@ export default function PluginsPanel({ sessionId, onClose }) {
                       {isPinned ? "★" : "☆"}
                     </button>
 
-                    {/* Context Menu Trigger Button */}
+                    {/* Context Menu Trigger Button (#602) */}
                     <button
                       type="button"
                       onClick={(e) => toggleContextMenu(e, p.id)}
