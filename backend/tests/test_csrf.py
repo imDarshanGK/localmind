@@ -14,11 +14,14 @@ All tests share a single in-memory SQLite DB (via conftest.py bootstrap).
 
 import tempfile
 import time
+from unittest.mock import patch
 
+import middleware.csrf as csrf_module
 import pytest
 import services.db_service as db
 from app import app
 from fastapi.testclient import TestClient
+from middleware.csrf import compute_request_hash
 
 # ── shared test DB (same pattern as test_api.py) ─────────────────────────────
 _tmp = tempfile.mktemp(suffix="_csrf.db")
@@ -47,6 +50,7 @@ ATTACKER_ORIGINS = [
 
 # ── Safe methods — always pass regardless of Origin ──────────────────────────
 
+
 def test_get_no_origin_allowed():
     r = client.get("/api/sessions/")
     assert r.status_code == 200
@@ -66,6 +70,7 @@ def test_options_not_blocked():
 
 
 # ── Missing Origin — same-origin path, always allowed ────────────────────────
+
 
 def test_post_no_origin_allowed():
     """No Origin header means same-origin or direct client — not a CSRF vector."""
@@ -108,6 +113,7 @@ def test_patch_no_origin_allowed():
 
 # ── Valid Origins — requests from the known frontend must pass ────────────────
 
+
 @pytest.mark.parametrize("origin", VALID_ORIGINS)
 def test_post_valid_origin_allowed(origin):
     r = client.post(
@@ -115,10 +121,13 @@ def test_post_valid_origin_allowed(origin):
         json={"title": f"Valid Origin {origin}"},
         headers={"Origin": origin},
     )
-    assert r.status_code == 200, f"Expected 200 for origin={origin}, got {r.status_code}"
+    assert r.status_code == 200, (
+        f"Expected 200 for origin={origin}, got {r.status_code}"
+    )
 
 
 # ── Attacker Origins — cross-origin mutations must be blocked (403) ───────────
+
 
 @pytest.mark.parametrize("origin", ATTACKER_ORIGINS)
 def test_post_attacker_origin_blocked(origin):
@@ -127,7 +136,9 @@ def test_post_attacker_origin_blocked(origin):
         json={"title": "Should be blocked"},
         headers={"Origin": origin},
     )
-    assert r.status_code == 403, f"Expected 403 for origin={origin!r}, got {r.status_code}"
+    assert r.status_code == 403, (
+        f"Expected 403 for origin={origin!r}, got {r.status_code}"
+    )
     assert "CSRF" in r.json().get("detail", "")
 
 
@@ -171,6 +182,7 @@ def test_patch_attacker_origin_blocked(origin):
 
 # ── Referer fallback — normalised to origin for comparison ───────────────────
 
+
 def test_post_valid_referer_allowed():
     """Referer is used when Origin is absent; a valid Referer path must pass."""
     r = client.post(
@@ -193,6 +205,7 @@ def test_post_attacker_referer_blocked():
 
 # ── Plugin run endpoint ───────────────────────────────────────────────────────
 
+
 def test_plugin_run_no_origin_allowed():
     r = client.post(
         "/api/plugins/run",
@@ -212,41 +225,73 @@ def test_plugin_run_attacker_origin_blocked():
 
 # ── Prometheus metrics verification ──────────────────────────────────────────
 
+
 def test_prometheus_metrics():
     from prometheus_client import REGISTRY
-    
+
     # Get current values before the test
-    before_skipped = REGISTRY.get_sample_value('csrf_requests_total', {'status': 'skipped_safe_method'}) or 0.0
-    before_allowed = REGISTRY.get_sample_value('csrf_requests_total', {'status': 'allowed'}) or 0.0
-    before_rejected = REGISTRY.get_sample_value('csrf_requests_total', {'status': 'rejected'}) or 0.0
-    before_rejections = REGISTRY.get_sample_value('csrf_rejections_total', {'method': 'POST', 'reason': 'invalid_origin'}) or 0.0
-    
+    before_skipped = (
+        REGISTRY.get_sample_value(
+            "csrf_requests_total", {"status": "skipped_safe_method"}
+        )
+        or 0.0
+    )
+    before_allowed = (
+        REGISTRY.get_sample_value("csrf_requests_total", {"status": "allowed"}) or 0.0
+    )
+    before_rejected = (
+        REGISTRY.get_sample_value("csrf_requests_total", {"status": "rejected"}) or 0.0
+    )
+    before_rejections = (
+        REGISTRY.get_sample_value(
+            "csrf_rejections_total", {"method": "POST", "reason": "invalid_origin"}
+        )
+        or 0.0
+    )
+
     # 1. Trigger a skipped_safe_method
     client.get("/api/sessions/")
-    after_skipped = REGISTRY.get_sample_value('csrf_requests_total', {'status': 'skipped_safe_method'}) or 0.0
+    after_skipped = (
+        REGISTRY.get_sample_value(
+            "csrf_requests_total", {"status": "skipped_safe_method"}
+        )
+        or 0.0
+    )
     assert after_skipped > before_skipped
-    
+
     # 2. Trigger an allowed method
     client.post("/api/sessions/", json={"title": "Metric allowed"})
-    after_allowed = REGISTRY.get_sample_value('csrf_requests_total', {'status': 'allowed'}) or 0.0
+    after_allowed = (
+        REGISTRY.get_sample_value("csrf_requests_total", {"status": "allowed"}) or 0.0
+    )
     assert after_allowed > before_allowed
-    
+
     # 3. Trigger a rejected method
-    r = client.post("/api/sessions/", json={"title": "Metric rejected"}, headers={"Origin": "https://evil.com"})
+    r = client.post(
+        "/api/sessions/",
+        json={"title": "Metric rejected"},
+        headers={"Origin": "https://evil.com"},
+    )
     assert r.status_code == 403
-    
-    after_rejected = REGISTRY.get_sample_value('csrf_requests_total', {'status': 'rejected'}) or 0.0
+
+    after_rejected = (
+        REGISTRY.get_sample_value("csrf_requests_total", {"status": "rejected"}) or 0.0
+    )
     assert after_rejected > before_rejected
-    
-    after_rejections = REGISTRY.get_sample_value('csrf_rejections_total', {'method': 'POST', 'reason': 'invalid_origin'}) or 0.0
+
+    after_rejections = (
+        REGISTRY.get_sample_value(
+            "csrf_rejections_total", {"method": "POST", "reason": "invalid_origin"}
+        )
+        or 0.0
+    )
     assert after_rejections > before_rejections
+
 
 # ── Deduplication helpers & tests ─────────────────────────────────────────────
 
-import middleware.csrf as csrf_module
-from middleware.csrf import compute_request_hash
-
 csrf_module._DEDUPE_WINDOW_SECONDS = 60.0
+
 
 def _compute_hash(method: str, path: str, body_dict: dict) -> str:
     """Thin wrapper around the middleware's ``compute_request_hash``.
@@ -257,29 +302,36 @@ def _compute_hash(method: str, path: str, body_dict: dict) -> str:
     regardless of httpx version or JSON encoder differences.
     """
     import httpx as _httpx
+
     req = _httpx.Request(method, f"http://testserver{path}", json=body_dict)
     return compute_request_hash(_TESTCLIENT_HOST, method, path, req.content)
 
 
 def test_request_deduplication():
     from prometheus_client import REGISTRY
-    
-    before_dedup = REGISTRY.get_sample_value('csrf_requests_total', {'status': 'deduplicated'}) or 0.0
-    
+
+    before_dedup = (
+        REGISTRY.get_sample_value("csrf_requests_total", {"status": "deduplicated"})
+        or 0.0
+    )
+
     # 1. Send first request
     payload = {"title": "Dedupe test payload"}
     r1 = client.post("/api/sessions/", json=payload)
     assert r1.status_code == 200
-    
+
     # 2. Send EXACT same request (duplicate)
     r2 = client.post("/api/sessions/", json=payload)
-    
+
     # 3. Should return the exact same cached response
     assert r2.status_code == 200
     assert r2.json() == r1.json()
-    
+
     # 4. Metric should increment
-    after_dedup = REGISTRY.get_sample_value('csrf_requests_total', {'status': 'deduplicated'}) or 0.0
+    after_dedup = (
+        REGISTRY.get_sample_value("csrf_requests_total", {"status": "deduplicated"})
+        or 0.0
+    )
     assert after_dedup > before_dedup
 
 
@@ -429,14 +481,17 @@ def test_successful_response_is_still_cached_after_error_guard():
     r2 = client.post("/api/sessions/", json=payload)
     assert r2.status_code == 200
     assert r2.json() == r1.json(), "Deduplicated response did not match original"
-# ── Failure Recovery Tests ───────────────────────────────────────────────────
 
-from unittest.mock import patch
+
+# ── Failure Recovery Tests ───────────────────────────────────────────────────
 
 
 def test_security_middleware_failure_recovery_on_exception():
     """When an exception occurs during origin verification, middleware returns 500 fail-closed."""
-    with patch("middleware.csrf._origin_from_header", side_effect=RuntimeError("Header extraction fault")):
+    with patch(
+        "middleware.csrf._origin_from_header",
+        side_effect=RuntimeError("Header extraction fault"),
+    ):
         r = client.post(
             "/api/sessions/",
             json={"title": "Failure recovery test"},
@@ -447,8 +502,9 @@ def test_security_middleware_failure_recovery_on_exception():
 
 def test_security_middleware_failure_recovery_safe_methods():
     """Safe HTTP methods bypass origin processing and succeed even during header faults."""
-    with patch("middleware.csrf._origin_from_header", side_effect=RuntimeError("Header extraction fault")):
+    with patch(
+        "middleware.csrf._origin_from_header",
+        side_effect=RuntimeError("Header extraction fault"),
+    ):
         r = client.get("/api/sessions/")
         assert r.status_code == 200
-
-
