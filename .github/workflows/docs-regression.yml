@@ -6,11 +6,15 @@ on:
     paths:
       - "docs/**"
       - "*.md"
+      - "scripts/collect_docs_metrics.py"
+      - "tests/test_collect_docs_metrics.py"
   pull_request:
     branches: [main]
     paths:
       - "docs/**"
       - "*.md"
+      - "scripts/collect_docs_metrics.py"
+      - "tests/test_collect_docs_metrics.py"
 
 jobs:
   validate-docs:
@@ -28,6 +32,7 @@ jobs:
       - name: Run Markdown Lint (Syntax Regression)
         run: |
           npx markdownlint-cli "docs/**/*.md" "README.md" --config .markdownlint.json --ignore "node_modules"
+
       - name: Check Broken Links (Deploy Readiness Check)
         uses: gaurav-nelson/github-action-markdown-link-check@v1
         with:
@@ -35,4 +40,32 @@ jobs:
           use-verbose-mode: "yes"
           check-modified-files-only: "yes"
           base-branch: "main"
+
+      # --- ADDED FOR ISSUE #929: observability metrics for build & deploy docs ---
+      # Collects observable signals about the docs build (file count, size,
+      # headings, links, code blocks, BOMs) and emits them as Prometheus text.
+      # Also writes a baseline JSON file as a workflow artifact so a future
+      # --baseline run can detect drift between deploys.
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Collect docs metrics (Prometheus + JSON)
+        run: |
+          mkdir -p artifacts
+          python scripts/collect_docs_metrics.py --prometheus --json > artifacts/docs_metrics.json
+          cat artifacts/docs_metrics.json
+
+      - name: Upload docs metrics as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: docs-metrics-${{ github.sha }}
+          path: artifacts/docs_metrics.json
+          retention-days: 30
+
+      - name: Run docs metrics tests
+        run: |
+          python -m pip install --quiet pytest
+          python -m pytest tests/test_collect_docs_metrics.py -q
       
