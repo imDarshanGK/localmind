@@ -16,6 +16,7 @@ import services.db_service as db
 from app import app
 from fastapi.testclient import TestClient
 from models.schemas import ChatMessage, MessageRole, SourceChunk
+from services.citation_utils import build_sources
 
 # ─── Shared test client ──────────────────────────────────────────
 _tmp = tempfile.mktemp(suffix="_citations.db")
@@ -23,11 +24,6 @@ db.DB_PATH = _tmp
 db.init_db()
 
 client = TestClient(app)
-
-
-# ─── _build_sources() pure helper ───────────────────────────────
-# Import only the pure helper — no chromadb / sentence_transformers needed.
-from services.citation_utils import build_sources
 
 
 class TestBuildSources:
@@ -108,8 +104,8 @@ class TestBuildSources:
         assert s["chunk"] == 0
 
 
-
 # ─── Backward compatibility: ChatMessage accepts both shapes ─────
+
 
 class TestChatMessageBackwardCompat:
     """ChatMessage.sources must accept legacy List[str] and new List[dict]."""
@@ -142,12 +138,16 @@ class TestChatMessageBackwardCompat:
         msg = ChatMessage(
             role=MessageRole.assistant,
             content="Answer",
-            sources=["legacy.pdf", {"source": "new.txt", "chunk": 0, "preview": "text"}],
+            sources=[
+                "legacy.pdf",
+                {"source": "new.txt", "chunk": 0, "preview": "text"},
+            ],
         )
         assert len(msg.sources) == 2
 
 
 # ─── SourceChunk schema ──────────────────────────────────────────
+
 
 class TestSourceChunkSchema:
     def test_defaults(self):
@@ -169,8 +169,17 @@ class TestSourceChunkSchema:
 
 # ─── Chat endpoint returns SourceChunk-shaped sources ────────────
 
-@patch("routes.chat.ollama_service.is_ollama_running", new_callable=AsyncMock, return_value=True)
-@patch("routes.chat.ollama_service.chat", new_callable=AsyncMock, return_value="Here is the answer.")
+
+@patch(
+    "routes.chat.ollama_service.is_ollama_running",
+    new_callable=AsyncMock,
+    return_value=True,
+)
+@patch(
+    "routes.chat.ollama_service.chat",
+    new_callable=AsyncMock,
+    return_value="Here is the answer.",
+)
 @patch(
     "routes.chat.rag_service.retrieve_context",
     return_value=(
@@ -184,7 +193,12 @@ def test_chat_endpoint_returns_source_chunks(m_rag, m_chat, m_ollama):
 
     r2 = client.post(
         "/api/chat/",
-        json={"message": "What does the doc say?", "session_id": sid, "model": "llama3", "use_documents": True},
+        json={
+            "message": "What does the doc say?",
+            "session_id": sid,
+            "model": "llama3",
+            "use_documents": True,
+        },
     )
     assert r2.status_code == 200
     data = r2.json()
@@ -195,8 +209,16 @@ def test_chat_endpoint_returns_source_chunks(m_rag, m_chat, m_ollama):
     assert "Relevant excerpt" in src["preview"]
 
 
-@patch("routes.chat.ollama_service.is_ollama_running", new_callable=AsyncMock, return_value=True)
-@patch("routes.chat.ollama_service.chat", new_callable=AsyncMock, return_value="No docs needed.")
+@patch(
+    "routes.chat.ollama_service.is_ollama_running",
+    new_callable=AsyncMock,
+    return_value=True,
+)
+@patch(
+    "routes.chat.ollama_service.chat",
+    new_callable=AsyncMock,
+    return_value="No docs needed.",
+)
 @patch("routes.chat.rag_service.retrieve_context", return_value=("", []))
 def test_chat_endpoint_no_documents_empty_sources(m_rag, m_chat, m_ollama):
     r = client.post("/api/sessions/", json={"title": "No Doc Test"})
@@ -204,13 +226,19 @@ def test_chat_endpoint_no_documents_empty_sources(m_rag, m_chat, m_ollama):
 
     r2 = client.post(
         "/api/chat/",
-        json={"message": "Hello", "session_id": sid, "model": "llama3", "use_documents": False},
+        json={
+            "message": "Hello",
+            "session_id": sid,
+            "model": "llama3",
+            "use_documents": False,
+        },
     )
     assert r2.status_code == 200
     assert r2.json()["sources"] == []
 
 
 # ─── Round-trip: sources saved & loaded from SQLite ──────────────
+
 
 def test_sources_roundtrip_structured():
     """Structured source dicts survive JSON serialization through db_service."""
