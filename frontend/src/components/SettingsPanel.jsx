@@ -34,7 +34,7 @@ export default function SettingsPanel({ settings = {}, isLoading = false, onSave
     localStorage.setItem("localmind_settings_expanded", JSON.stringify(isExpanded));
   }, [isExpanded]);
 
-  const [copied, setCopied] = useState(false);
+  const [copyStatus, setCopyStatus] = useState("idle"); // idle | success | error
   const [errors, setErrors] = useState({});
   const [isSaving, setIsSaving] = useState(false);
 
@@ -107,15 +107,23 @@ export default function SettingsPanel({ settings = {}, isLoading = false, onSave
   };
 
   const handleCopySummary = () => {
-    const summaryText = `LocalMind Configuration Summary:\n- Model: ${form.default_model}\n- Language: ${form.default_language}\n- Temperature: ${form.temperature}\n- RAG Chunks: ${form.rag_top_k}\n- Max Turns: ${form.max_history_turns}\n- Theme: ${form.theme}`;
+  const summaryText = `LocalMind Configuration Summary:
+  - Model: ${form.default_model}
+  - Language: ${form.default_language}
+  - Temperature: ${form.temperature}
+  - RAG Chunks: ${form.rag_top_k}
+  - Max Turns: ${form.max_history_turns}
+  - Theme: ${form.theme}`;
+
     navigator.clipboard.writeText(summaryText)
       .then(() => {
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+        setCopyStatus("success");
+        setTimeout(() => setCopyStatus("idle"), 2000);
       })
-      .catch((err) => {
-        console.error("Failed to copy settings summary: ", err);
-      });
+    .catch(() => {
+      setCopyStatus("error");
+      setTimeout(() => setCopyStatus("idle"), 2000);
+    });
   };
 
   return (
@@ -370,12 +378,14 @@ export default function SettingsPanel({ settings = {}, isLoading = false, onSave
                 type="button"
                 onClick={handleCopySummary}
                 className={`text-[11px] px-3 py-1.5 rounded-lg transition font-medium border flex items-center justify-center gap-1.5 duration-200 w-full sm:w-auto mt-2 sm:mt-0 focus:outline-none focus:ring-2 focus:ring-purple-500 ${
-                  copied
+                  copyStatus === "success"
                     ? "bg-green-950/40 border-green-900/60 text-green-400"
-                    : "border-gray-700 text-gray-400 hover:bg-gray-800"
+                    : copyStatus === "error"
+                      ? "bg-red-950/40 border-red-900/60 text-red-400"
+                      : "border-gray-700 text-gray-400 hover:bg-gray-800"
                 }`}
               >
-                {copied ? <><span>✓</span><span>Copied!</span></> : <span>Copy Config Summary</span>}
+                {copyStatus === "success" ? <><span>✓</span><span>Copied!</span></> : copyStatus === "error" ? <><span>⚠</span><span>Copy failed</span></> : <span>Copy Config Summary</span>}
               </button>
             </div>
           </>

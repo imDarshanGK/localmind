@@ -9,6 +9,13 @@ vi.mock("./Icons", () => ({
   SettingsIcon: () => <span data-testid="settings-icon" />,
 }));
 
+Object.assign(navigator, {
+  clipboard: {
+    writeText: vi.fn(),
+  },
+});
+
+
 afterEach(() => {
   cleanup();
   localStorage.clear();
@@ -187,5 +194,38 @@ describe("SettingsPanel Accessibility Landmarks & Validation Suite (#580)", () =
     fireEvent.click(cancelButton);
 
     expect(mockOnClose).toHaveBeenCalledTimes(1);
+  });
+});
+describe("SettingsPanel Copy Feedback Suite (#790)", () => {
+  test("shows success feedback after copying configuration summary", async () => {
+    navigator.clipboard.writeText.mockResolvedValueOnce();
+
+    render(
+      <SettingsPanel
+        settings={mockSettings}
+        onSave={vi.fn()}
+        onClose={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByText("Copy Config Summary"));
+
+    expect(await screen.findByText("Copied!")).toBeInTheDocument();
+  });
+
+  test("shows failure feedback when copying configuration summary fails", async () => {
+    navigator.clipboard.writeText.mockRejectedValueOnce(new Error("Copy failed"));
+
+    render(
+      <SettingsPanel
+        settings={mockSettings}
+        onSave={vi.fn()}
+        onClose={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByText("Copy Config Summary"));
+
+    expect(await screen.findByText("Copy failed")).toBeInTheDocument();
   });
 });
