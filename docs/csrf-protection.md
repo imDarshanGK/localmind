@@ -1,10 +1,10 @@
-# CSRF Protection — LocalMind
+# Security Middleware — CSRF & Deduplication
 
 ## Overview
 
-LocalMind protects all state-changing API endpoints against Cross-Site Request
-Forgery (CSRF) using **Origin / Referer header validation** — an OWASP
-recommended defence for JSON REST APIs.
+LocalMind's `SecurityMiddleware` protects state-changing API endpoints through two distinct mechanisms:
+1. **CSRF Protection**: Validates Origin / Referer headers (an OWASP recommended defence).
+2. **Request Deduplication**: Uses a short-lived SQLite cache to idempotently handle duplicate requests (e.g. from UI double-clicks).
 
 ## Threat Model
 
@@ -25,8 +25,9 @@ This significantly reduces the CSRF surface, but a residual risk exists:
 
 ### Middleware: `backend/middleware/csrf.py`
 
-`OriginValidationMiddleware` wraps every request:
+`SecurityMiddleware` wraps every request, executing the following phases:
 
+#### Phase 1: CSRF Validation
 1. **Safe methods** (`GET`, `HEAD`, `OPTIONS`) — always passed through.
 2. **Mutating methods** (`POST`, `PUT`, `PATCH`, `DELETE`):
    - If **no `Origin` header** is present → request is allowed.
@@ -44,15 +45,22 @@ This significantly reduces the CSRF surface, but a residual risk exists:
    to guarantee a fail-closed security posture.
 
 
+#### Phase 2: Request Deduplication
+For allowed mutating requests, the middleware hashes the request (IP, method, path, and body) to prevent duplicate executions:
+- **First Request**: Stores a `'processing'` sentinel in `dedupe_cache` (SQLite) and forwards the request.
+- **Concurrent Duplicate**: If a matching request arrives while the first is still processing, it immediately receives `HTTP 409 Conflict`.
+- **Completed Request**: The response body and headers are persisted to the database. Identical requests arriving within the next 5 seconds are served directly from this cache.
+- **Error Responses (4xx/5xx)**: If the backend returns an error, the `'processing'` sentinel is immediately deleted. Errors are NOT cached, ensuring the client can retry and succeed immediately when the transient condition clears.
+
 ### Integration: `backend/app.py`
 
 ```python
 app.add_middleware(GZipMiddleware, minimum_size=1000)
-app.add_middleware(OriginValidationMiddleware, allowed_origins=cors_origins)
+app.add_middleware(SecurityMiddleware, allowed_origins=cors_origins)
 app.add_middleware(CORSMiddleware, ...)
 ```
 
-The CSRF middleware is registered **between** GZip and CORS so that rejected
+The middleware is registered **between** GZip and CORS so that rejected
 requests never receive `Access-Control-Allow-*` headers.
 
 ## Configuration
@@ -120,9 +128,17 @@ requests would break the application when the frontend is served by the same
 FastAPI process (production mode). It would also break direct API access from
 `curl` and the `pytest` test client — neither of which is a CSRF attack.
 
+### Single-Worker Deduplication Design
+
+The Request Deduplication logic uses a SQLite WAL-mode database to store cached responses. While SQLite handles concurrency well, the middleware design assumes a single-worker architecture (default for LocalMind):
+
+- **Concurrency Strategy**: We use `INSERT OR REPLACE` for the `'processing'` and `'done'` states. 
+
+- **Multi-Worker Limit**: If deployed with multiple Uvicorn/Gunicorn workers, two workers processing the same request in parallel might overwrite each other's cached responses (last-write-wins). This is perfectly acceptable for a local, single-user tool but is documented here for future maintainers exploring scaling out.
 ### Why Fail-Closed Failure Recovery?
 
 If header processing or origin validation fails unexpectedly (e.g. malformed headers or runtime errors during header inspection), allowing the request to proceed without validation could bypass security checks. Failing closed with an HTTP 500 error response and logging the traceback guarantees that security checks are strictly enforced.
+
 
 ## References
 
