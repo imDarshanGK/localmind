@@ -19,6 +19,7 @@ data/
 # Environment
 .env
 .env.local
+requirements_fixed.txt
 
 # Node
 node_modules/

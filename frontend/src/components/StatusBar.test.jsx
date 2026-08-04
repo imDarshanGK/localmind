@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
 import React from "react";
-import { describe, test, expect, afterEach, vi } from "vitest";
+import { describe, test, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import StatusBar from "./StatusBar";
 
-// Mock icon components
+// Mock Icon components
 vi.mock("./Icons", () => ({
   AppLogoIcon: () => <span data-testid="app-logo-icon" />,
   BatchIcon: () => <span data-testid="batch-icon" />,
@@ -15,14 +15,213 @@ vi.mock("./Icons", () => ({
   OnlineIcon: () => <span data-testid="online-icon" />,
   PlugIcon: () => <span data-testid="plug-icon" />,
   SettingsIcon: () => <span data-testid="settings-icon" />,
+  TemplateIcon: () => <span data-testid="template-icon" />,
   TrashIcon: () => <span data-testid="trash-icon" />,
 }));
 
 describe("StatusBar Component Suite", () => {
+  const defaultProps = {
+    ollamaOk: true,
+    model: "llama3",
+    docCount: 2,
+    compatibility: ["v1.0", "Local"],
+    onUpload: vi.fn(),
+    onPlugins: vi.fn(),
+    onSettings: vi.fn(),
+    onClear: vi.fn(),
+    useStream: true,
+    onToggleStream: vi.fn(),
+  };
+
   afterEach(() => {
     cleanup();
+    vi.clearAllMocks();
   });
 
+  /* -------------------------------------------------------------------------- */
+  /*  Role-based Hints Support (#640)                                           */
+  /* -------------------------------------------------------------------------- */
+  describe("Role-based Hints Support (#640)", () => {
+    test("renders role badge and default hint for userRole", () => {
+      render(<StatusBar model="llama3" userRole="admin" />);
+
+      const roleBadge = screen.getByTestId("role-hint-badge");
+      expect(roleBadge).toBeInTheDocument();
+      expect(roleBadge).toHaveTextContent("admin");
+      expect(roleBadge).toHaveAttribute(
+        "title",
+        "Admin Access: Full system controls available"
+      );
+    });
+
+    test("renders custom roleHint tooltip when explicitly passed", () => {
+      render(
+        <StatusBar 
+          model="llama3" 
+          userRole="editor" 
+          roleHint="Custom hint: Editing restricted in prod" 
+        />
+      );
+
+      const roleBadge = screen.getByTestId("role-hint-badge");
+      expect(roleBadge).toHaveAttribute("title", "Custom hint: Editing restricted in prod");
+    });
+
+    test("does not render role badge when userRole is omitted", () => {
+      render(<StatusBar model="llama3" />);
+      expect(screen.queryByTestId("role-hint-badge")).not.toBeInTheDocument();
+    });
+  });
+
+  /* -------------------------------------------------------------------------- */
+  /*  Theme Tokens Support (#639)                                               */
+  /* -------------------------------------------------------------------------- */
+  describe("Theme Tokens Support (#639)", () => {
+    test("applies default theme classes when no theme prop is provided", () => {
+      render(<StatusBar model="llama3" />);
+      const header = screen.getByTestId("status-bar-header");
+      expect(header).toHaveClass("bg-gray-900", "border-gray-800");
+    });
+
+    test("applies custom theme tokens provided via theme prop", () => {
+      const customTheme = {
+        bg: "bg-slate-950",
+        border: "border-slate-800",
+        textPrimary: "text-slate-100"
+      };
+
+      render(<StatusBar model="llama3" theme={customTheme} />);
+      const header = screen.getByTestId("status-bar-header");
+
+      expect(header).toHaveClass("bg-slate-950");
+      expect(header).toHaveClass("border-slate-800");
+    });
+  });
+
+  /* -------------------------------------------------------------------------- */
+  /*  Changelog Preview Badges (#636)                                           */
+  /* -------------------------------------------------------------------------- */
+  describe("Changelog Preview Badges (#636)", () => {
+    test("renders changelog badge and opens popover on click", () => {
+      render(
+        <StatusBar 
+          changelog={{ version: "v1.2.0", items: ["Added search mode", "Fixed status bar UI"] }} 
+          model="llama3" 
+        />
+      );
+
+      const badge = screen.getByTestId("changelog-badge");
+      expect(badge).toBeInTheDocument();
+      expect(badge).toHaveTextContent("v1.2.0");
+
+      fireEvent.click(badge);
+      expect(screen.getByTestId("changelog-popover")).toBeInTheDocument();
+      expect(screen.getByText("Added search mode")).toBeInTheDocument();
+      expect(screen.getByText("Fixed status bar UI")).toBeInTheDocument();
+    });
+
+    test("handles array input format for changelog", () => {
+      render(<StatusBar changelog={["Bug fix A", "Feature B"]} model="llama3" />);
+      
+      const badge = screen.getByTestId("changelog-badge");
+      expect(badge).toBeInTheDocument();
+
+      fireEvent.click(badge);
+      expect(screen.getByText("Bug fix A")).toBeInTheDocument();
+      expect(screen.getByText("Feature B")).toBeInTheDocument();
+    });
+
+    test("handles simple string input for changelog", () => {
+      render(<StatusBar changelog="v2.0 Release Notes" model="llama3" />);
+      
+      const badge = screen.getByTestId("changelog-badge");
+      fireEvent.click(badge);
+      expect(screen.getByText("v2.0 Release Notes")).toBeInTheDocument();
+    });
+
+    test("does not render changelog badge when prop is null/undefined", () => {
+      render(<StatusBar changelog={null} model="llama3" />);
+      expect(screen.queryByTestId("changelog-badge")).not.toBeInTheDocument();
+    });
+  });
+
+  /* -------------------------------------------------------------------------- */
+  /*  Compatibility Badges (#630)                                               */
+  /* -------------------------------------------------------------------------- */
+  describe("Compatibility Badges (#630)", () => {
+    test("renders compatibility badges when array is provided", () => {
+      render(<StatusBar {...defaultProps} compatibility={["v1.0", "Local", "Cloud"]} />);
+
+      const badges = screen.getAllByTestId("compatibility-badge");
+      expect(badges).toHaveLength(3);
+      expect(screen.getByText("v1.0")).toBeInTheDocument();
+      expect(screen.getByText("Local")).toBeInTheDocument();
+      expect(screen.getByText("Cloud")).toBeInTheDocument();
+    });
+
+    test("renders single badge when string is provided", () => {
+      render(<StatusBar {...defaultProps} compatibility="v2.0-Local" />);
+
+      const badge = screen.getByTestId("compatibility-badge");
+      expect(badge).toBeInTheDocument();
+      expect(screen.getByText("v2.0-Local")).toBeInTheDocument();
+    });
+
+    test("handles object input format gracefully", () => {
+      render(<StatusBar {...defaultProps} compatibility={{ env: "Local", ver: "v1" }} />);
+
+      const badges = screen.getAllByTestId("compatibility-badge");
+      expect(badges).toHaveLength(2);
+      expect(screen.getByText("Local")).toBeInTheDocument();
+      expect(screen.getByText("v1")).toBeInTheDocument();
+    });
+
+    test("does not render compatibility container if compatibility prop is null/undefined", () => {
+      render(<StatusBar {...defaultProps} compatibility={null} />);
+
+      expect(screen.queryByTestId("status-bar-compatibility")).not.toBeInTheDocument();
+    });
+  });
+
+  /* -------------------------------------------------------------------------- */
+  /*  Source Trust Indicator Badges (#632)                                      */
+  /* -------------------------------------------------------------------------- */
+  describe("Source Trust Indicator Badges (#632)", () => {
+    test("renders trusted source badge when trustLevel is 'trusted' or 'verified'", () => {
+      render(<StatusBar trustLevel="verified" model="llama3" />);
+      const badge = screen.getByTestId("source-trust-badge");
+      expect(badge).toBeInTheDocument();
+      expect(badge).toHaveTextContent("Trusted Source");
+    });
+
+    test("renders untrusted source badge when trustLevel is 'untrusted'", () => {
+      render(<StatusBar trustLevel="untrusted" model="llama3" />);
+      const badge = screen.getByTestId("source-trust-badge");
+      expect(badge).toBeInTheDocument();
+      expect(badge).toHaveTextContent("Untrusted Source");
+    });
+
+    test("renders caution badge when trustLevel is 'caution' or 'medium'", () => {
+      render(<StatusBar trustLevel="caution" model="llama3" />);
+      const badge = screen.getByTestId("source-trust-badge");
+      expect(badge).toBeInTheDocument();
+      expect(badge).toHaveTextContent("Caution Source");
+    });
+
+    test("handles object input format for trustLevel gracefully", () => {
+      render(<StatusBar trustLevel={{ level: "trusted" }} model="llama3" />);
+      expect(screen.getByTestId("source-trust-badge")).toHaveTextContent("Trusted Source");
+    });
+
+    test("does not render trust badge when trustLevel is null or undefined", () => {
+      render(<StatusBar trustLevel={null} model="llama3" />);
+      expect(screen.queryByTestId("source-trust-badge")).not.toBeInTheDocument();
+    });
+  });
+
+  /* -------------------------------------------------------------------------- */
+  /*  Search Refinement Badges (#633)                                           */
+  /* -------------------------------------------------------------------------- */
   describe("Search Refinement Badges (#633)", () => {
     test("renders semantic search refinement badge", () => {
       render(<StatusBar searchRefinement="semantic" model="llama3" />);
@@ -56,6 +255,93 @@ describe("StatusBar Component Suite", () => {
     });
   });
 
+  /* -------------------------------------------------------------------------- */
+  /*  Favorite & Pin Support (#634)                                             */
+  /* -------------------------------------------------------------------------- */
+  describe("Favorite & Pin Support (#634)", () => {
+    test("renders favorite button and handles toggle state", () => {
+      const onToggleFavorite = vi.fn();
+      const { rerender } = render(
+        <StatusBar model="llama3" isFavorite={false} onToggleFavorite={onToggleFavorite} />
+      );
+
+      const favBtn = screen.getByTestId("btn-favorite");
+      expect(favBtn).toHaveTextContent("☆");
+
+      fireEvent.click(favBtn);
+      expect(onToggleFavorite).toHaveBeenCalledTimes(1);
+
+      rerender(<StatusBar model="llama3" isFavorite={true} onToggleFavorite={onToggleFavorite} />);
+      expect(screen.getByTestId("btn-favorite")).toHaveTextContent("★");
+    });
+
+    test("renders pin button and handles toggle state", () => {
+      const onTogglePin = vi.fn();
+      const { rerender } = render(
+        <StatusBar model="llama3" isPinned={false} onTogglePin={onTogglePin} />
+      );
+
+      const pinBtn = screen.getByTestId("btn-pin");
+      expect(pinBtn).toHaveTextContent("📍");
+
+      fireEvent.click(pinBtn);
+      expect(onTogglePin).toHaveBeenCalledTimes(1);
+
+      rerender(<StatusBar model="llama3" isPinned={true} onTogglePin={onTogglePin} />);
+      expect(screen.getByTestId("btn-pin")).toHaveTextContent("📌");
+    });
+
+    test("does not render favorite or pin controls when handlers are omitted", () => {
+      render(<StatusBar model="llama3" />);
+      expect(screen.queryByTestId("btn-favorite")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("btn-pin")).not.toBeInTheDocument();
+    });
+  });
+
+  /* -------------------------------------------------------------------------- */
+  /*  Contextual Action Menus (#635)                                            */
+  /* -------------------------------------------------------------------------- */
+  describe("Contextual Action Menus (#635)", () => {
+    test("toggles contextual action dropdown menu on button click", () => {
+      render(<StatusBar model="llama3" />);
+      
+      expect(screen.queryByTestId("context-menu-dropdown")).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByTestId("btn-context-menu"));
+      expect(screen.getByTestId("context-menu-dropdown")).toBeInTheDocument();
+
+      fireEvent.click(screen.getByTestId("btn-context-menu"));
+      expect(screen.queryByTestId("context-menu-dropdown")).not.toBeInTheDocument();
+    });
+
+    test("renders custom contextual action items and executes callback", () => {
+      const handleAction = vi.fn();
+      const contextActions = [
+        { id: "act-1", label: "Custom Action", onClick: handleAction }
+      ];
+
+      render(<StatusBar model="llama3" contextActions={contextActions} />);
+
+      fireEvent.click(screen.getByTestId("btn-context-menu"));
+      const actionItem = screen.getByText("Custom Action");
+      expect(actionItem).toBeInTheDocument();
+
+      fireEvent.click(actionItem);
+      expect(handleAction).toHaveBeenCalledTimes(1);
+      expect(screen.queryByTestId("context-menu-dropdown")).not.toBeInTheDocument();
+    });
+
+    test("displays fallback when contextActions array is empty", () => {
+      render(<StatusBar model="llama3" contextActions={[]} />);
+
+      fireEvent.click(screen.getByTestId("btn-context-menu"));
+      expect(screen.getByText("No contextual actions")).toBeInTheDocument();
+    });
+  });
+
+  /* -------------------------------------------------------------------------- */
+  /*  Status Indicator Badges                                                   */
+  /* -------------------------------------------------------------------------- */
   describe("Status Indicator Badges", () => {
     test("renders model label correctly", () => {
       render(<StatusBar model="mistral-7b" />);
@@ -88,6 +374,9 @@ describe("StatusBar Component Suite", () => {
     });
   });
 
+  /* -------------------------------------------------------------------------- */
+  /*  Action Buttons & Interactions                                             */
+  /* -------------------------------------------------------------------------- */
   describe("Action Buttons & Interactions", () => {
     test("triggers corresponding action callbacks on button clicks", () => {
       const onUpload = vi.fn();

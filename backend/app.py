@@ -16,7 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from middleware.csrf import OriginValidationMiddleware
+from middleware.csrf import SecurityMiddleware
 from routes.chat import router as chat_router
 from routes.export import router as export_router
 from routes.models import router as models_router
@@ -25,7 +25,11 @@ from routes.prompt_templates import router as prompt_templates_router
 from routes.sessions import router as sessions_router
 from routes.settings import router as settings_router
 from routes.upload import router as upload_router
-from services.db_service import get_db, init_db
+from services.db_service import (
+    dedupe_clear_orphaned_processing,
+    get_db,
+    init_db,
+)
 from utils.config import settings
 
 
@@ -98,6 +102,10 @@ async def lifespan(app: FastAPI):
     logger.info("Starting LocalMind v2.0...")
     run_preflight_checks()
 
+    # Clear any 'processing' deduplication sentinels left over from a prior
+    # server run. They will never be resolved to 'done', so leaving them
+    # would produce false-409 responses for legitimate first retries.
+    dedupe_clear_orphaned_processing()
     # Start stream cleanup task
     from routes.chat import clean_expired_streams
 
@@ -136,12 +144,13 @@ async def add_request_correlation_id(request: Request, call_next):
     return response
 
 
+
 cors_origins = [
     origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()
 ]
 
 app.add_middleware(GZipMiddleware, minimum_size=1000)
-app.add_middleware(OriginValidationMiddleware, allowed_origins=cors_origins)
+app.add_middleware(SecurityMiddleware, allowed_origins=cors_origins)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
