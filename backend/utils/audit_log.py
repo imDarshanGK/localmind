@@ -5,6 +5,7 @@ Issue #797 — emits four lifecycle events (UPLOAD_QUEUED, PROCESSING, SUCCESS,
 FAILED) as structured JSON, without ever blocking the calling thread/coroutine
 and without ever letting a logging failure crash ingestion.
 """
+
 from __future__ import annotations
 
 import atexit
@@ -17,9 +18,11 @@ import time
 from contextlib import suppress
 from typing import Any
 
+from utils.config import settings
+
 _module_logger = logging.getLogger(__name__)
 
-AUDIT_LOG_DIR = os.getenv("AUDIT_LOG_DIR", "./data/logs")
+AUDIT_LOG_DIR = str(settings.audit_log_dir)
 AUDIT_LOG_FILE = os.path.join(AUDIT_LOG_DIR, "audit.jsonl")
 
 _audit_logger = logging.getLogger("audit.upload_queue")
@@ -35,13 +38,17 @@ class _JsonFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         payload: dict[str, Any] = {
             "event": getattr(record, "event", record.getMessage()),
-            "logged_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(record.created)),
+            "logged_at": time.strftime(
+                "%Y-%m-%dT%H:%M:%SZ", time.gmtime(record.created)
+            ),
         }
         payload.update(getattr(record, "audit_fields", {}))
         try:
             return json.dumps(payload, default=str)
         except (TypeError, ValueError):
-            return json.dumps({"event": payload.get("event", "unknown"), "serialization_error": True})
+            return json.dumps(
+                {"event": payload.get("event", "unknown"), "serialization_error": True}
+            )
 
 
 def _build_listener() -> logging.handlers.QueueListener:
@@ -58,13 +65,17 @@ def _build_listener() -> logging.handlers.QueueListener:
         file_handler.setFormatter(_JsonFormatter())
         handlers.append(file_handler)
     except OSError as e:
-        _module_logger.warning("audit_log_file_unavailable path=%s error=%s", AUDIT_LOG_FILE, e)
+        _module_logger.warning(
+            "audit_log_file_unavailable path=%s error=%s", AUDIT_LOG_FILE, e
+        )
 
     log_queue: queue.Queue = queue.Queue(-1)
     queue_handler = logging.handlers.QueueHandler(log_queue)
     _audit_logger.handlers = [queue_handler]
 
-    listener = logging.handlers.QueueListener(log_queue, *handlers, respect_handler_level=True)
+    listener = logging.handlers.QueueListener(
+        log_queue, *handlers, respect_handler_level=True
+    )
     listener.start()
     return listener
 
@@ -98,6 +109,7 @@ def _now_iso() -> str:
 
 
 # --- Public lifecycle API -------------------------------------------------
+
 
 def log_upload_queued(*, file_id: Any, file_size_bytes: int, user_id: str) -> None:
     _safe_emit(
@@ -134,7 +146,9 @@ def log_success(*, file_id: Any, user_id: str, duration_ms: float) -> None:
     )
 
 
-def log_failed(*, file_id: Any, user_id: str, duration_ms: float, error: str, stack_trace: str) -> None:
+def log_failed(
+    *, file_id: Any, user_id: str, duration_ms: float, error: str, stack_trace: str
+) -> None:
     _safe_emit(
         "FAILED",
         {

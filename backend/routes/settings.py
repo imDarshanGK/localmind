@@ -2,7 +2,6 @@
 
 import asyncio
 import logging
-import os
 import time
 from collections.abc import Callable
 from typing import Any
@@ -10,6 +9,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, status
 from models.schemas import AppSettings
 from services.db_service import get_settings, save_setting, save_settings
+from utils.config import settings
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -18,16 +18,7 @@ DEFAULT_SETTINGS_API_TIMEOUT_SECONDS = 2.0
 
 
 def _resolve_settings_timeout_seconds() -> float:
-    raw_timeout = os.getenv("SETTINGS_API_TIMEOUT_SECONDS", str(DEFAULT_SETTINGS_API_TIMEOUT_SECONDS))
-    try:
-        parsed_timeout = float(raw_timeout)
-    except ValueError:
-        logger.warning(
-            "settings_timeout_invalid raw_value=%s fallback_timeout_s=%s",
-            raw_timeout,
-            DEFAULT_SETTINGS_API_TIMEOUT_SECONDS,
-        )
-        return DEFAULT_SETTINGS_API_TIMEOUT_SECONDS
+    parsed_timeout = float(settings.settings_api_timeout_seconds)
     if parsed_timeout <= 0:
         logger.warning(
             "settings_timeout_non_positive timeout_s=%s fallback_timeout_s=%s",
@@ -41,7 +32,9 @@ def _resolve_settings_timeout_seconds() -> float:
 SETTINGS_API_TIMEOUT_SECONDS = _resolve_settings_timeout_seconds()
 
 
-async def _run_with_timeout(operation: str, function: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
+async def _run_with_timeout(
+    operation: str, function: Callable[..., Any], *args: Any, **kwargs: Any
+) -> Any:
     start_time = time.perf_counter()
     try:
         return await asyncio.wait_for(
@@ -60,9 +53,12 @@ async def _run_with_timeout(operation: str, function: Callable[..., Any], *args:
             status_code=status.HTTP_504_GATEWAY_TIMEOUT,
             detail=f"Settings {operation} operation timed out after {SETTINGS_API_TIMEOUT_SECONDS} seconds.",
         ) from exc
+
+
 @router.get("/")
 async def get_all():
     return await _run_with_timeout("read", get_settings)
+
 
 @router.put("/")
 async def update_settings(body: AppSettings):
@@ -70,44 +66,52 @@ async def update_settings(body: AppSettings):
     if body.temperature < 0.0 or body.temperature > 2.0:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=[{
-                "loc": ["body", "temperature"],
-                "msg": "Temperature must scale cleanly between 0.0 and 2.0.",
-                "type": "value_error"
-            }]
+            detail=[
+                {
+                    "loc": ["body", "temperature"],
+                    "msg": "Temperature must scale cleanly between 0.0 and 2.0.",
+                    "type": "value_error",
+                }
+            ],
         )
 
     # 2. Enforce safety validation boundary limits on RAG Context Chunks
     if body.rag_top_k < 1 or body.rag_top_k > 10:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=[{
-                "loc": ["body", "rag_top_k"],
-                "msg": "RAG Context chunks selection must stay between 1 and 10.",
-                "type": "value_error"
-            }]
+            detail=[
+                {
+                    "loc": ["body", "rag_top_k"],
+                    "msg": "RAG Context chunks selection must stay between 1 and 10.",
+                    "type": "value_error",
+                }
+            ],
         )
 
     # 3. Enforce safety validation boundary limits on RAG Chunk Size
     if body.rag_chunk_size < 100 or body.rag_chunk_size > 2000:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=[{
-                "loc": ["body", "rag_chunk_size"],
-                "msg": "RAG chunk size must be between 100 and 2000 characters.",
-                "type": "value_error"
-            }]
+            detail=[
+                {
+                    "loc": ["body", "rag_chunk_size"],
+                    "msg": "RAG chunk size must be between 100 and 2000 characters.",
+                    "type": "value_error",
+                }
+            ],
         )
 
     # 4. Enforce safety validation boundary limits on RAG Chunk Overlap
     if body.rag_chunk_overlap < 0 or body.rag_chunk_overlap > 200:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=[{
-                "loc": ["body", "rag_chunk_overlap"],
-                "msg": "RAG chunk overlap must be between 0 and 200 characters.",
-                "type": "value_error"
-            }]
+            detail=[
+                {
+                    "loc": ["body", "rag_chunk_overlap"],
+                    "msg": "RAG chunk overlap must be between 0 and 200 characters.",
+                    "type": "value_error",
+                }
+            ],
         )
 
     current_settings = get_settings()
@@ -125,6 +129,7 @@ async def update_settings(body: AppSettings):
 
     await _run_with_timeout("save", save_settings, payload)
     return await _run_with_timeout("read", get_settings)
+
 
 @router.put("/{key}")
 async def update_one(key: str, value: dict):

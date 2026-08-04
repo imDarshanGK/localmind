@@ -5,16 +5,16 @@ Ollama Service — Local LLM inference with streaming support
 import asyncio
 import json
 import logging
-import os
 from collections.abc import AsyncGenerator
 
 import httpx
 from utils.cache import TTLCache
+from utils.config import settings
 from utils.retry import with_retry
 
 logger = logging.getLogger(__name__)
 
-OLLAMA_BASE_URL = os.getenv("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
+OLLAMA_BASE_URL = settings.ollama_host.rstrip("/")
 TIMEOUT = 180.0
 
 SYSTEM_PROMPTS = {
@@ -47,6 +47,7 @@ def _build_messages(message: str, context: str, history: list, language: str) ->
 # Global cache for model metadata (5 minute TTL)
 model_metadata_cache = TTLCache(ttl_seconds=300)
 
+
 @with_retry(max_attempts=3, initial_backoff=1.0)
 async def chat(
     message: str,
@@ -75,6 +76,7 @@ async def chat(
         response.raise_for_status()
         return response.json()["message"]["content"]
 
+
 async def chat_stream(
     message: str,
     model: str = "llama3",
@@ -92,7 +94,7 @@ async def chat_stream(
         "stream": True,
         "options": {"temperature": temperature, "top_p": 0.9, "num_predict": 2048},
     }
-    
+
     max_attempts = 3
     actual_max_attempts = max(1, max_attempts)
     attempt = 1
@@ -103,23 +105,25 @@ async def chat_stream(
         try:
             async with (
                 httpx.AsyncClient(timeout=TIMEOUT) as client,
-                client.stream("POST", f"{OLLAMA_BASE_URL}/api/chat", json=payload) as resp,
+                client.stream(
+                    "POST", f"{OLLAMA_BASE_URL}/api/chat", json=payload
+                ) as resp,
             ):
                 resp.raise_for_status()
                 async for line in resp.aiter_lines():
-                        if line.strip():
-                            try:
-                                data = json.loads(line)
-                                token = data.get("message", {}).get("content", "")
-                                if token:
-                                    yield token
-                                if data.get("done"):
-                                    break
-                            except json.JSONDecodeError:
-                                continue
+                    if line.strip():
+                        try:
+                            data = json.loads(line)
+                            token = data.get("message", {}).get("content", "")
+                            if token:
+                                yield token
+                            if data.get("done"):
+                                break
+                        except json.JSONDecodeError:
+                            continue
             # If we exit the context manager normally, we are done, break out of retry loop
             break
-        
+
         except httpx.RequestError as e:
             is_transient = True
             error_msg = f"Network Error: {type(e).__name__}"
@@ -136,10 +140,14 @@ async def chat_stream(
 
         if is_transient:
             if attempt == actual_max_attempts:
-                logger.error(f"chat_stream failed after {actual_max_attempts} attempts. Last error: {error_msg}")
+                logger.error(
+                    f"chat_stream failed after {actual_max_attempts} attempts. Last error: {error_msg}"
+                )
                 raise last_exc
-            
-            logger.warning(f"chat_stream failed ({error_msg}). Retrying in {backoff}s... (Attempt {attempt}/{actual_max_attempts})")
+
+            logger.warning(
+                f"chat_stream failed ({error_msg}). Retrying in {backoff}s... (Attempt {attempt}/{actual_max_attempts})"
+            )
             await asyncio.sleep(backoff)
             attempt += 1
             backoff *= 2
@@ -154,12 +162,14 @@ async def list_models() -> list[dict]:
             models = []
             for m in resp.json().get("models", []):
                 size_gb = round(m.get("size", 0) / 1e9, 1)
-                models.append({
-                    "name": m["name"],
-                    "size": f"{size_gb} GB",
-                    "status": "available",
-                    "modified_at": m.get("modified_at", ""),
-                })
+                models.append(
+                    {
+                        "name": m["name"],
+                        "size": f"{size_gb} GB",
+                        "status": "available",
+                        "modified_at": m.get("modified_at", ""),
+                    }
+                )
             return models
         except Exception as e:  # noqa: BLE001
             logger.warning(f"Could not list models: {e}")
@@ -178,18 +188,17 @@ async def get_model_info(model_name: str) -> dict:
     async with httpx.AsyncClient(timeout=8.0) as client:
         try:
             resp = await client.post(
-                f"{OLLAMA_BASE_URL}/api/show",
-                json={"name": model_name}
+                f"{OLLAMA_BASE_URL}/api/show", json={"name": model_name}
             )
             resp.raise_for_status()
             info = resp.json()
-            
+
             # Populate cache
             model_metadata_cache.set(model_name, info)
             return info
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:
-                return {} # Model not found
+                return {}  # Model not found
             raise
         except Exception as e:
             logger.warning(f"Could not fetch metadata for model '{model_name}': {e}")
@@ -209,14 +218,15 @@ async def pull_model(model_name: str) -> AsyncGenerator[str, None]:
             async with (
                 httpx.AsyncClient(timeout=600.0) as client,
                 client.stream(
-                    "POST", f"{OLLAMA_BASE_URL}/api/pull",
-                    json={"name": model_name, "stream": True}
+                    "POST",
+                    f"{OLLAMA_BASE_URL}/api/pull",
+                    json={"name": model_name, "stream": True},
                 ) as resp,
             ):
                 resp.raise_for_status()
                 async for line in resp.aiter_lines():
-                        if line.strip():
-                            yield line + "\n"
+                    if line.strip():
+                        yield line + "\n"
             break
         except httpx.RequestError as e:
             is_transient = True
@@ -243,8 +253,7 @@ async def delete_model(model_name: str) -> bool:
     async with httpx.AsyncClient(timeout=30.0) as client:
         try:
             resp = await client.delete(
-                f"{OLLAMA_BASE_URL}/api/delete",
-                json={"name": model_name}
+                f"{OLLAMA_BASE_URL}/api/delete", json={"name": model_name}
             )
             return resp.status_code == 200
         except Exception:  # noqa: BLE001

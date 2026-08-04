@@ -10,7 +10,6 @@ import sqlite3
 import time
 import uuid
 from contextlib import asynccontextmanager
-from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -26,7 +25,12 @@ from routes.prompt_templates import router as prompt_templates_router
 from routes.sessions import router as sessions_router
 from routes.settings import router as settings_router
 from routes.upload import router as upload_router
-from services.db_service import dedupe_clear_orphaned_processing, get_db, init_db
+from services.db_service import (
+    dedupe_clear_orphaned_processing,
+    get_db,
+    init_db,
+)
+from utils.config import settings
 
 
 # --- Issue #284 Engine Stability: Contextual Thread-Safe Log Formatter ---
@@ -53,7 +57,7 @@ root_logger.setLevel(logging.INFO)
 root_logger.handlers = [stream_handler]
 
 logger = logging.getLogger(__name__)
-FRONTEND_DIST = Path(os.getenv("FRONTEND_DIST", "/app/frontend/dist"))
+FRONTEND_DIST = settings.frontend_dist
 
 
 def run_preflight_checks():
@@ -102,7 +106,6 @@ async def lifespan(app: FastAPI):
     # server run. They will never be resolved to 'done', so leaving them
     # would produce false-409 responses for legitimate first retries.
     dedupe_clear_orphaned_processing()
-
     # Start stream cleanup task
     from routes.chat import clean_expired_streams
 
@@ -141,11 +144,9 @@ async def add_request_correlation_id(request: Request, call_next):
     return response
 
 
-default_cors_origins = "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://localhost:8000"
+
 cors_origins = [
-    origin.strip()
-    for origin in os.getenv("CORS_ORIGINS", default_cors_origins).split(",")
-    if origin.strip()
+    origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()
 ]
 
 app.add_middleware(GZipMiddleware, minimum_size=1000)

@@ -1,4 +1,5 @@
 """Upload routes — /api/upload"""
+
 import logging
 import os
 import time
@@ -17,6 +18,7 @@ from fastapi import (
 from models.schemas import UploadResponse
 from services import db_service
 from utils import audit_log
+from utils.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -26,46 +28,81 @@ def _safe_audit(fn, **kwargs):
     try:
         fn(**kwargs)
     except Exception as e:  # noqa: BLE001
-        logger.warning("audit_hook_failed hook=%s error=%s", getattr(fn, "__name__", fn), e)
+        logger.warning(
+            "audit_hook_failed hook=%s error=%s", getattr(fn, "__name__", fn), e
+        )
 
 
 router = APIRouter()
 
 ALLOWED = {
-    ".txt", ".md", ".pdf", ".docx", ".doc", ".html",
-    ".htm", ".csv", ".json", ".xml", ".rtf", ".odt",
-    ".epub", ".log", ".tsv", ".ini", ".cfg", ".yaml", ".yml"
+    ".txt",
+    ".md",
+    ".pdf",
+    ".docx",
+    ".doc",
+    ".html",
+    ".htm",
+    ".csv",
+    ".json",
+    ".xml",
+    ".rtf",
+    ".odt",
+    ".epub",
+    ".log",
+    ".tsv",
+    ".ini",
+    ".cfg",
+    ".yaml",
+    ".yml",
 }
-MAX_BYTES = 50 * 1024 * 1024  # 50 MB
+MAX_BYTES = settings.max_file_size
 
-UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", "./data/uploads"))
+UPLOAD_DIR = settings.upload_dir
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 
 @router.post("/", response_model=UploadResponse)
-async def upload(file: UploadFile = File(...), session_id: str = Form(...), background_tasks: BackgroundTasks = None):  # noqa: B008
-    logger.info("upload_request route=/upload session=%s file=%s", session_id, file.filename)
+async def upload(
+    file: UploadFile = File(...),  # noqa: B008
+    session_id: str = Form(...),
+    background_tasks: BackgroundTasks = None,
+):
+    logger.info(
+        "upload_request route=/upload session=%s file=%s", session_id, file.filename
+    )
     ext = Path(file.filename).suffix.lower()
     if ext not in ALLOWED:
-        logger.warning("upload_rejected reason=unsupported_type ext=%s file=%s", ext, file.filename)
+        logger.warning(
+            "upload_rejected reason=unsupported_type ext=%s file=%s", ext, file.filename
+        )
         raise HTTPException(status_code=400, detail=f"File type {ext} not allowed.")
-    
+
     content = await file.read()
     if len(content) > MAX_BYTES:
-        logger.warning("upload_rejected reason=file_too_large size_bytes=%s limit=%s", len(content), MAX_BYTES)
+        logger.warning(
+            "upload_rejected reason=file_too_large size_bytes=%s limit=%s",
+            len(content),
+            MAX_BYTES,
+        )
         raise HTTPException(status_code=413, detail="File too large (max 50MB).")
-    
+
     file_path = UPLOAD_DIR / f"{session_id}_{file.filename}"
     file_path.write_bytes(content)
     size_kb = max(1, len(content) // 1024)
-    
+
     # Restored original repository database calls:
     db_service.create_session(session_id)
-    doc_id = db_service.save_document(session_id, file.filename, str(file_path), 0, size_kb, status="queued")
-    
+    doc_id = db_service.save_document(
+        session_id, file.filename, str(file_path), 0, size_kb, status="queued"
+    )
+
     logger.info(
         "document_queued route=/upload session=%s file=%s doc_id=%s size_kb=%s",
-        session_id, file.filename, doc_id, size_kb,
+        session_id,
+        file.filename,
+        doc_id,
+        size_kb,
     )
 
     # --- Issue #797: structured audit log — UPLOAD_QUEUED ---
@@ -77,10 +114,12 @@ async def upload(file: UploadFile = File(...), session_id: str = Form(...), back
     )
 
     if background_tasks:
-        background_tasks.add_task(process_document_task, str(file_path), session_id, doc_id)
+        background_tasks.add_task(
+            process_document_task, str(file_path), session_id, doc_id
+        )
     else:
         process_document_task(str(file_path), session_id, doc_id)
-        
+
     # Fixed Pydantic validation schema matching:
     return UploadResponse(
         doc_id=doc_id,
@@ -88,7 +127,7 @@ async def upload(file: UploadFile = File(...), session_id: str = Form(...), back
         file_size_kb=size_kb,
         chunks_indexed=0,
         status="queued",
-        message=f"'{file.filename}' uploaded and processing started."
+        message=f"'{file.filename}' uploaded and processing started.",
     )
 
 
@@ -100,14 +139,17 @@ def process_document_task(file_path: str, session_id: str, doc_id: int):
 
     try:
         from services import rag_service
+
         db_service.update_document_status(doc_id, "processing")
         chunks = rag_service.index_document(file_path, session_id, doc_id=doc_id)
         # Restored original status completion name ("completed"):
         db_service.update_document_status(doc_id, "completed", chunks_indexed=chunks)
-        
+
         logger.info(
             "document_indexed route=/upload session=%s doc_id=%s chunks=%s",
-            session_id, doc_id, chunks,
+            session_id,
+            doc_id,
+            chunks,
         )
 
         # --- Issue #797: structured audit log — SUCCESS ---
@@ -121,7 +163,9 @@ def process_document_task(file_path: str, session_id: str, doc_id: int):
     except Exception as e:  # noqa: BLE001
         logger.error(
             "document_failed route=/upload session=%s doc_id=%s error=%s",
-            session_id, doc_id, e,
+            session_id,
+            doc_id,
+            e,
         )
 
         # --- Issue #797: structured audit log — FAILED ---
@@ -140,34 +184,51 @@ def process_document_task(file_path: str, session_id: str, doc_id: int):
 
 @router.get("/preview")
 async def preview_document(filename: str = Query(...), session_id: str = Query(...)):
-    logger.info("preview_request route=/upload/preview session=%s file=%s", session_id, filename)
+    logger.info(
+        "preview_request route=/upload/preview session=%s file=%s", session_id, filename
+    )
     file_path = UPLOAD_DIR / f"{session_id}_{filename}"
     if not file_path.exists():
         logger.warning("preview_failed reason=file_not_found path=%s", file_path)
         raise HTTPException(status_code=404, detail="Document file not found.")
-    
+
     try:
         TEXT_FORMATS = {
-            ".txt", ".md", ".html", ".htm", ".csv", ".json", 
-            ".xml", ".log", ".tsv", ".ini", ".cfg", ".yaml", 
-            ".yml", ".srt", ".vtt"
+            ".txt",
+            ".md",
+            ".html",
+            ".htm",
+            ".csv",
+            ".json",
+            ".xml",
+            ".log",
+            ".tsv",
+            ".ini",
+            ".cfg",
+            ".yaml",
+            ".yml",
+            ".srt",
+            ".vtt",
         }
         ext = Path(file_path).suffix.lower()
         if ext in TEXT_FORMATS:
             content = file_path.read_text(encoding="utf-8", errors="ignore")
         else:
             from services.rag_service import LOADERS
+
             loader_cls = LOADERS.get(ext)
             if not loader_cls:
                 content = file_path.read_text(encoding="utf-8", errors="ignore")
             else:
                 docs = loader_cls(str(file_path)).load()
                 content = "\n".join([doc.page_content for doc in docs])
-        
+
         return {"content": content}
     except Exception as e:  # noqa: BLE001
         logger.error("preview_failed path=%s error=%s", file_path, e)
-        raise HTTPException(status_code=500, detail=f"Failed to read document preview: {e!s}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to read document preview: {e!s}"
+        )
 
 
 @router.get("/", response_model=list)
@@ -180,13 +241,13 @@ async def delete_document(doc_id: int, session_id: str = Query(...)):
     doc = db_service.get_document_by_id(doc_id)
     if not doc or doc.get("session_id") != session_id:
         raise HTTPException(status_code=404, detail="Document not found.")
-    
+
     file_path = doc.get("file_path", "")
     if file_path and os.path.exists(file_path):
         try:
             os.remove(file_path)
         except OSError as e:
             logger.warning("file_delete_failed path=%s error=%s", file_path, e)
-            
+
     db_service.delete_document(doc_id)
     return {"status": "success", "message": f"Document #{doc_id} deleted."}

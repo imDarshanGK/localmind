@@ -13,9 +13,11 @@ from contextlib import contextmanager
 from sqlite3 import OperationalError
 
 import grapheme
+from utils.config import settings
 
 # ------------------------Vacuum Scheduling--------------------------------------------------------
-VACUUM_THRESHOLD = int(os.getenv("DB_VACUUM_THRESHOLD", "500"))
+VACUUM_THRESHOLD = settings.db_vacuum_threshold
+
 
 def _get_deleted_counter(conn) -> int:
     row = conn.execute(
@@ -23,7 +25,8 @@ def _get_deleted_counter(conn) -> int:
     ).fetchone()
     return int(row["value"]) if row else 0
 
-def _increment_deleted_counter(conn,count:int) -> int:
+
+def _increment_deleted_counter(conn, count: int) -> int:
     new_value = _get_deleted_counter(conn) + count
     conn.execute(
         "INSERT OR REPLACE INTO app_settings (key,value,updated_at) VALUES (?,?, datetime('now'))",
@@ -31,9 +34,10 @@ def _increment_deleted_counter(conn,count:int) -> int:
     )
     return new_value
 
+
 def run_vacuum():
-    """ Run VACUUM outside any transaction to reclaim disk space."""
-    conn = sqlite3.connect(DB_PATH, timeout=5, isolation_level = None)
+    """Run VACUUM outside any transaction to reclaim disk space."""
+    conn = sqlite3.connect(DB_PATH, timeout=5, isolation_level=None)
     try:
         conn.execute("VACUUM")
         conn.execute(
@@ -42,8 +46,9 @@ def run_vacuum():
     finally:
         conn.close()
 
+
 def _maybe_vacuum(deleted_count: int):
-    """Track deletions and trigger VACUUM once threshold is crossed."""       
+    """Track deletions and trigger VACUUM once threshold is crossed."""
     if deleted_count <= 0:
         return
     with get_db() as conn:
@@ -53,6 +58,7 @@ def _maybe_vacuum(deleted_count: int):
 
 
 # ─── Backup / Restore ────────────────────────────────────────────────────────
+
 
 def backup_db(dest_path: str) -> None:
     """Create a consistent backup of the live database at *dest_path*.
@@ -96,9 +102,7 @@ def restore_db(src_path: str) -> None:
     """
     src_path = str(src_path)
     if not os.path.exists(src_path):
-        raise FileNotFoundError(
-            f"restore_db: backup file not found at '{src_path}'"
-        )
+        raise FileNotFoundError(f"restore_db: backup file not found at '{src_path}'")
 
     try:
         src = sqlite3.connect(src_path, timeout=5)
@@ -114,9 +118,10 @@ def restore_db(src_path: str) -> None:
         ) from exc
 
 
-
-DB_PATH = os.getenv("DB_PATH", "./data/localmind.db")
-os.makedirs(os.path.dirname(DB_PATH) if os.path.dirname(DB_PATH) else ".", exist_ok=True)
+DB_PATH = str(settings.db_path)
+os.makedirs(
+    os.path.dirname(DB_PATH) if os.path.dirname(DB_PATH) else ".", exist_ok=True
+)
 logger = logging.getLogger(__name__)
 
 
@@ -136,16 +141,15 @@ def get_db():
             break
 
         except OperationalError as e:
-             if "locked" in str(e).lower() and attempt < retries - 1:
-                    logger.warning(
-                        "Database locked (attempt %d/%d). Retrying...",
-                        attempt + 1,
-                        retries,
-                    )
-                    time.sleep(delay)
-                    continue
-             raise
-
+            if "locked" in str(e).lower() and attempt < retries - 1:
+                logger.warning(
+                    "Database locked (attempt %d/%d). Retrying...",
+                    attempt + 1,
+                    retries,
+                )
+                time.sleep(delay)
+                continue
+            raise
 
     try:
         yield conn
@@ -154,9 +158,7 @@ def get_db():
     except OperationalError as e:
         if "locked" in str(e).lower():
             conn.rollback()
-            raise RuntimeError(
-                "Database is busy. Please try again in a moment."
-            ) from e
+            raise RuntimeError("Database is busy. Please try again in a moment.") from e
         conn.rollback()
         raise
 
@@ -167,6 +169,7 @@ def get_db():
     finally:
         if conn:
             conn.close()
+
 
 def init_db():
     """Create all tables on startup."""
@@ -257,7 +260,6 @@ def init_db():
             CREATE INDEX IF NOT EXISTS idx_dedupe_expires ON dedupe_cache (expires_at);
 
             INSERT OR IGNORE INTO app_settings (key, value) VALUES
-                ('default_model', '"llama3"'),
                 ('default_language', '"en"'),
                 ('temperature', '0.7'),
                 ('max_history_turns', '10'),
@@ -267,20 +269,37 @@ def init_db():
                            
 
         """)
+        conn.execute(
+            "INSERT OR IGNORE INTO app_settings (key, value) VALUES (?, ?)",
+            ("default_model", json.dumps(settings.default_model)),
+        )
         try:
-            conn.execute("ALTER TABLE documents ADD COLUMN status TEXT DEFAULT 'completed'")
+            conn.execute(
+                "ALTER TABLE documents ADD COLUMN status TEXT DEFAULT 'completed'"
+            )
         except sqlite3.OperationalError:
             pass  # column already exists
 
-        cols = [row[1] for row in conn.execute("PRAGMA table_info(messages)").fetchall()]
+        cols = [
+            row[1] for row in conn.execute("PRAGMA table_info(messages)").fetchall()
+        ]
         if "benchmarks" not in cols:
             conn.execute("ALTER TABLE messages ADD COLUMN benchmarks TEXT DEFAULT '{}'")
 
-        cols_sessions = [row[1] for row in conn.execute("PRAGMA table_info(sessions)").fetchall()]
+        cols_sessions = [
+            row[1] for row in conn.execute("PRAGMA table_info(sessions)").fetchall()
+        ]
         if "language" not in cols_sessions:
             conn.execute("ALTER TABLE sessions ADD COLUMN language TEXT DEFAULT 'en'")
+
+
 # ─── Sessions ────────────────────────────────────────────────
-def create_session(session_id: str, title: str = "New Chat", model: str = "llama3", language: str = "en") -> dict:
+def create_session(
+    session_id: str,
+    title: str = "New Chat",
+    model: str = "llama3",
+    language: str = "en",
+) -> dict:
     with get_db() as conn:
         conn.execute(
             "INSERT OR IGNORE INTO sessions (id, title, model, language) VALUES (?, ?, ?, ?)",
@@ -291,25 +310,43 @@ def create_session(session_id: str, title: str = "New Chat", model: str = "llama
 
 def get_session(session_id: str) -> dict | None:
     with get_db() as conn:
-        row = conn.execute("SELECT * FROM sessions WHERE id=?", (session_id,)).fetchone()
+        row = conn.execute(
+            "SELECT * FROM sessions WHERE id=?", (session_id,)
+        ).fetchone()
         return dict(row) if row else None
 
 
-def update_session(session_id: str, title: str | None = None, model: str | None = None, language: str | None = None):
+def update_session(
+    session_id: str,
+    title: str | None = None,
+    model: str | None = None,
+    language: str | None = None,
+):
     with get_db() as conn:
         if title is not None:
-            conn.execute("UPDATE sessions SET title=?, updated_at=datetime('now') WHERE id=?", (title, session_id))
+            conn.execute(
+                "UPDATE sessions SET title=?, updated_at=datetime('now') WHERE id=?",
+                (title, session_id),
+            )
         if model is not None:
-            conn.execute("UPDATE sessions SET model=?, updated_at=datetime('now') WHERE id=?", (model, session_id))
+            conn.execute(
+                "UPDATE sessions SET model=?, updated_at=datetime('now') WHERE id=?",
+                (model, session_id),
+            )
         if language is not None:
-            conn.execute("UPDATE sessions SET language=?, updated_at=datetime('now') WHERE id=?", (language, session_id))
+            conn.execute(
+                "UPDATE sessions SET language=?, updated_at=datetime('now') WHERE id=?",
+                (language, session_id),
+            )
 
 
 def delete_session(session_id: str):
     """Deletes a session, clears its physical document assets from disk, and removes database rows."""
     with get_db() as conn:
         # 1. Fetch all physical file paths for documents bound to this session
-        rows = conn.execute("SELECT file_path FROM documents WHERE session_id=?", (session_id,)).fetchall()
+        rows = conn.execute(
+            "SELECT file_path FROM documents WHERE session_id=?", (session_id,)
+        ).fetchall()
         for row in rows:
             if row["file_path"]:
                 physical_path = row["file_path"]
@@ -318,7 +355,9 @@ def delete_session(session_id: str):
                         os.remove(physical_path)
                         print(f"Cleaned up session document asset: {physical_path}")
                 except Exception as file_err:  # noqa: BLE001
-                    print(f"Warning: Failed to delete session asset {physical_path}: {file_err!s}")
+                    print(
+                        f"Warning: Failed to delete session asset {physical_path}: {file_err!s}"
+                    )
 
         # 2. Gather counts for vacuum scheduling metric tracking
         msg_count = conn.execute(
@@ -330,7 +369,7 @@ def delete_session(session_id: str):
         cur = conn.execute("DELETE FROM sessions WHERE id=?", (session_id,))
         deleted = cur.rowcount + msg_count + doc_count
 
-    _maybe_vacuum(deleted)   
+    _maybe_vacuum(deleted)
 
 
 def clear_all_sessions():
@@ -359,7 +398,7 @@ def toggle_message_reaction(message_id: int, emoji: str) -> str:
         # Check if this specific emoji reaction already exists for this message
         row = conn.execute(
             "SELECT id FROM message_reactions WHERE message_id = ? AND emoji = ?",
-            (message_id, emoji)
+            (message_id, emoji),
         ).fetchone()
 
         if row:
@@ -368,7 +407,7 @@ def toggle_message_reaction(message_id: int, emoji: str) -> str:
         else:
             conn.execute(
                 "INSERT INTO message_reactions (message_id, emoji) VALUES (?, ?)",
-                (message_id, emoji)
+                (message_id, emoji),
             )
             return "added"
 
@@ -378,7 +417,7 @@ def get_reactions_for_message(message_id: int) -> list[str]:
     with get_db() as conn:
         rows = conn.execute(
             "SELECT emoji FROM message_reactions WHERE message_id = ? ORDER BY created_at ASC",
-            (message_id,)
+            (message_id,),
         ).fetchall()
         return [r["emoji"] for r in rows]
 
@@ -389,14 +428,17 @@ def get_session_reactions_map(session_id: str) -> dict[int, list[str]]:
     Returns a dictionary mapping message_id -> list of emojis.
     """
     with get_db() as conn:
-        rows = conn.execute("""
+        rows = conn.execute(
+            """
             SELECT r.message_id, r.emoji 
             FROM message_reactions r
             JOIN messages m ON r.message_id = m.id
             WHERE m.session_id = ?
             ORDER BY r.created_at ASC
-        """, (session_id,)).fetchall()
-        
+        """,
+            (session_id,),
+        ).fetchall()
+
         reactions_map = {}
         for r in rows:
             msg_id = r["message_id"]
@@ -404,7 +446,15 @@ def get_session_reactions_map(session_id: str) -> dict[int, list[str]]:
                 reactions_map[msg_id] = []
             reactions_map[msg_id].append(r["emoji"])
         return reactions_map
-def save_message(session_id: str, role: str, content: str, sources: list | None = None, benchmarks: dict | None = None):
+
+
+def save_message(
+    session_id: str,
+    role: str,
+    content: str,
+    sources: list | None = None,
+    benchmarks: dict | None = None,
+):
     sources = sources or []
     with get_db() as conn:
         conn.execute(
@@ -425,7 +475,9 @@ def save_message(session_id: str, role: str, content: str, sources: list | None 
                     title = grapheme.slice(content, start=0, end=40) + "..."
                 else:
                     title = content
-                conn.execute("UPDATE sessions SET title=? WHERE id=?", (title, session_id))
+                conn.execute(
+                    "UPDATE sessions SET title=? WHERE id=?", (title, session_id)
+                )
 
 
 def get_history(session_id: str, limit: int = 20) -> list[dict]:
@@ -450,7 +502,7 @@ def get_messages_full(session_id: str) -> list[dict]:
                 "content": r["content"],
                 "sources": json.loads(r["sources"] or "[]"),
                 "created_at": r["created_at"],
-                "benchmarks": json.loads(r["benchmarks"] or {})
+                "benchmarks": json.loads(r["benchmarks"] or {}),
             }
             for r in rows
         ]
@@ -461,7 +513,7 @@ def clear_messages(session_id: str):
         cur = conn.execute("DELETE FROM messages WHERE session_id=?", (session_id,))
         deleted = cur.rowcount
         conn.execute("UPDATE sessions SET message_count=0 WHERE id=?", (session_id,))
-    _maybe_vacuum(deleted)    
+    _maybe_vacuum(deleted)
 
 
 def delete_message(session_id: str, message_id: int) -> int:
@@ -486,7 +538,14 @@ def delete_message(session_id: str, message_id: int) -> int:
 
 
 # ─── Documents ───────────────────────────────────────────────
-def save_document(session_id: str, filename: str, file_path: str, chunks: int, size_kb: float, status: str = "completed") -> int:
+def save_document(
+    session_id: str,
+    filename: str,
+    file_path: str,
+    chunks: int,
+    size_kb: float,
+    status: str = "completed",
+) -> int:
     with get_db() as conn:
         cursor = conn.execute(
             "INSERT INTO documents (session_id, filename, file_path, chunks_indexed, file_size_kb, status) VALUES (?,?,?,?,?,?)",
@@ -494,10 +553,14 @@ def save_document(session_id: str, filename: str, file_path: str, chunks: int, s
         )
         return cursor.lastrowid
 
+
 def update_document_status(doc_id: int, status: str, chunks_indexed: int | None = None):
     with get_db() as conn:
         if chunks_indexed is not None:
-            conn.execute("UPDATE documents SET status=?, chunks_indexed=? WHERE id=?", (status, chunks_indexed, doc_id))
+            conn.execute(
+                "UPDATE documents SET status=?, chunks_indexed=? WHERE id=?",
+                (status, chunks_indexed, doc_id),
+            )
         else:
             conn.execute("UPDATE documents SET status=? WHERE id=?", (status, doc_id))
 
@@ -515,8 +578,10 @@ def delete_document(doc_id: int):
     """Deletes the physical uploaded file from disk and removes its record entry from SQLite."""
     with get_db() as conn:
         # 1. Fetch the physical file path before deleting the database reference row
-        row = conn.execute("SELECT file_path FROM documents WHERE id=?", (doc_id,)).fetchone()
-        
+        row = conn.execute(
+            "SELECT file_path FROM documents WHERE id=?", (doc_id,)
+        ).fetchone()
+
         if row and row["file_path"]:
             physical_path = row["file_path"]
             try:
@@ -526,13 +591,16 @@ def delete_document(doc_id: int):
                     print(f"Successfully deleted physical file asset: {physical_path}")
             except Exception as file_err:  # noqa: BLE001
                 # Log the error but continue so the database doesn't lock or desync
-                print(f"Warning: Failed to clean up disk file {physical_path}: {file_err!s}")
+                print(
+                    f"Warning: Failed to clean up disk file {physical_path}: {file_err!s}"
+                )
 
         # 3. Clean up the database record entries
         cur = conn.execute("DELETE FROM documents WHERE id=?", (doc_id,))
         deleted = cur.rowcount
-        
-    _maybe_vacuum(deleted)    
+
+    _maybe_vacuum(deleted)
+
 
 # ─── Settings ────────────────────────────────────────────────
 def get_settings() -> dict:
@@ -562,13 +630,14 @@ def save_settings(settings: dict[str, object]) -> None:
 
 # ─── Plugin logs ─────────────────────────────────────────────
 
+
 def get_plugin_logs(limit: int = 50) -> list[dict]:
     with get_db() as conn:
         rows = conn.execute(
-            "SELECT * FROM plugin_logs ORDER BY created_at DESC LIMIT ?",
-            (limit,)
+            "SELECT * FROM plugin_logs ORDER BY created_at DESC LIMIT ?", (limit,)
         ).fetchall()
         return [dict(r) for r in rows]
+
 
 def log_plugin(session_id: str, plugin: str, inp: str, out: str, success: bool = True):
     with get_db() as conn:
@@ -580,9 +649,10 @@ def log_plugin(session_id: str, plugin: str, inp: str, out: str, success: bool =
 
 # ─── Shareable Sessions (Issue #270) ─────────────────────────
 
+
 def create_shared_session(session_id: str) -> str:
     """
-    Captures a frozen snapshot of a chat session's history 
+    Captures a frozen snapshot of a chat session's history
     and returns a unique, obfuscated sharing ID string.
     """
     # 1. Fetch current session parameters
@@ -606,7 +676,7 @@ def create_shared_session(session_id: str) -> str:
             INSERT INTO shared_sessions (id, session_id, title, model, snapshot_json)
             VALUES (?, ?, ?, ?, ?)
             """,
-            (share_id, session_id, session["title"], session["model"], snapshot_str)
+            (share_id, session_id, session["title"], session["model"], snapshot_str),
         )
     return share_id
 
@@ -618,7 +688,7 @@ def get_shared_session(share_id: str) -> dict | None:
     with get_db() as conn:
         row = conn.execute(
             "SELECT title, model, snapshot_json, created_at FROM shared_sessions WHERE id = ?",
-            (share_id,)
+            (share_id,),
         )
         row = row.fetchone()
 
@@ -629,16 +699,21 @@ def get_shared_session(share_id: str) -> dict | None:
         "id": share_id,
         "title": row["title"],
         "model": row["model"],
-        "messages": json.loads(row["snapshot_json"]),  # Turn string array back into live json dicts
-        "created_at": row["created_at"]
+        "messages": json.loads(
+            row["snapshot_json"]
+        ),  # Turn string array back into live json dicts
+        "created_at": row["created_at"],
     }
+
+
 # ─── Prompt Templates (Updated Signatures) ───────────────────
+
 
 def create_prompt_template(prompt_title: str, prompt: str) -> dict:
     with get_db() as conn:
         cursor = conn.execute(
             "INSERT INTO prompt_templates (name, prompt) VALUES (?, ?)",
-            (prompt_title, prompt)
+            (prompt_title, prompt),
         )
         template_id = cursor.lastrowid
     return get_prompt_template(template_id)
@@ -647,8 +722,8 @@ def create_prompt_template(prompt_title: str, prompt: str) -> dict:
 def get_prompt_template(template_id: int) -> dict | None:
     with get_db() as conn:
         row = conn.execute(
-            "SELECT id, name AS prompt_title, prompt, created_at FROM prompt_templates WHERE id = ?", 
-            (template_id,)
+            "SELECT id, name AS prompt_title, prompt, created_at FROM prompt_templates WHERE id = ?",
+            (template_id,),
         ).fetchone()
         return dict(row) if row else None
 
@@ -661,12 +736,19 @@ def get_all_prompt_templates() -> list[dict]:
         return [dict(r) for r in rows]
 
 
-def update_prompt_template(template_id: int, prompt_title: str | None = None, prompt: str | None = None) -> dict | None:
+def update_prompt_template(
+    template_id: int, prompt_title: str | None = None, prompt: str | None = None
+) -> dict | None:
     with get_db() as conn:
         if prompt_title:
-            conn.execute("UPDATE prompt_templates SET name=? WHERE id=?", (prompt_title, template_id))
+            conn.execute(
+                "UPDATE prompt_templates SET name=? WHERE id=?",
+                (prompt_title, template_id),
+            )
         if prompt:
-            conn.execute("UPDATE prompt_templates SET prompt=? WHERE id=?", (prompt, template_id))
+            conn.execute(
+                "UPDATE prompt_templates SET prompt=? WHERE id=?", (prompt, template_id)
+            )
     return get_prompt_template(template_id)
 
 

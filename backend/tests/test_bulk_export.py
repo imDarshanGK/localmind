@@ -19,19 +19,19 @@ def clear_db():
     
 def test_bulk_export_json_success():
     # 1. Create two test sessions
-    db.create_session("sess_1", title="Session One", model="llama3", language="en")
-    db.create_session("sess_2", title="Session Two", model="mistral", language="fr")
+    db.create_session("sess_json_1", title="Session One", model="llama3", language="en")
+    db.create_session("sess_json_2", title="Session Two", model="mistral", language="fr")
 
-    db.save_message("sess_1", "user", "Hello from user 1")
-    db.save_message("sess_1", "assistant", "Response 1")
+    db.save_message("sess_json_1", "user", "Hello from user 1")
+    db.save_message("sess_json_1", "assistant", "Response 1")
 
-    db.save_message("sess_2", "user", "Bonjour")
-    db.save_message("sess_2", "assistant", "Salut")
+    db.save_message("sess_json_2", "user", "Bonjour")
+    db.save_message("sess_json_2", "assistant", "Salut")
 
     # 2. Call bulk export
     response = client.post(
         "/api/export/sessions",
-        json={"session_ids": ["sess_1", "sess_2"], "format": "json"}
+        json={"session_ids": ["sess_json_1", "sess_json_2"], "format": "json"}
     )
     assert response.status_code == 200
     assert response.headers["Content-Type"].startswith("application/json")
@@ -46,13 +46,13 @@ def test_bulk_export_json_success():
 
     # Check structure
     sess_1_data = payload["sessions"][0]
-    assert sess_1_data["session"]["id"] == "sess_1"
+    assert sess_1_data["session"]["id"] == "sess_json_1"
     assert sess_1_data["session"]["title"] == "Session One"
     assert len(sess_1_data["messages"]) == 2
     assert sess_1_data["messages"][0]["content"] == "Hello from user 1"
 
     sess_2_data = payload["sessions"][1]
-    assert sess_2_data["session"]["id"] == "sess_2"
+    assert sess_2_data["session"]["id"] == "sess_json_2"
     assert sess_2_data["session"]["title"] == "Session Two"
     assert len(sess_2_data["messages"]) == 2
     assert sess_2_data["messages"][0]["content"] == "Bonjour"
@@ -112,7 +112,7 @@ def test_bulk_export_validation_empty_ids():
 def test_bulk_export_validation_invalid_format():
     response = client.post(
         "/api/export/sessions",
-        json={"session_ids": ["sess_1"], "format": "html"}
+        json={"session_ids": ["sess_invalid_format"], "format": "html"}
     )
     assert response.status_code == 422
     errors = response.json()["detail"]
@@ -120,18 +120,18 @@ def test_bulk_export_validation_invalid_format():
 
 
 def test_bulk_export_mixed_valid_invalid():
-    # sess_1 exists, sess_invalid does not
-    db.create_session("sess_1", title="Valid Session")
-    db.save_message("sess_1", "user", "Hello")
+    # sess_mixed exists, sess_invalid does not
+    db.create_session("sess_mixed", title="Valid Session")
+    db.save_message("sess_mixed", "user", "Hello")
 
     response = client.post(
         "/api/export/sessions",
-        json={"session_ids": ["sess_1", "sess_invalid"], "format": "json"}
+        json={"session_ids": ["sess_mixed", "sess_invalid"], "format": "json"}
     )
     assert response.status_code == 200
     payload = response.json()
     assert len(payload["sessions"]) == 1
-    assert payload["sessions"][0]["session"]["id"] == "sess_1"
+    assert payload["sessions"][0]["session"]["id"] == "sess_mixed"
 
 
 def test_bulk_export_all_invalid():
