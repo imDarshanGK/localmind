@@ -429,6 +429,8 @@ def test_successful_response_is_still_cached_after_error_guard():
     r2 = client.post("/api/sessions/", json=payload)
     assert r2.status_code == 200
     assert r2.json() == r1.json(), "Deduplicated response did not match original"
+
+
 # ── Failure Recovery Tests ───────────────────────────────────────────────────
 
 from unittest.mock import patch
@@ -450,5 +452,4 @@ def test_security_middleware_failure_recovery_safe_methods():
     with patch("middleware.csrf._origin_from_header", side_effect=RuntimeError("Header extraction fault")):
         r = client.get("/api/sessions/")
         assert r.status_code == 200
-
 
