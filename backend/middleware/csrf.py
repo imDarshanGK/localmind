@@ -137,12 +137,7 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         try:
             origin = _origin_from_header(request)
 
-            if origin is None:
-                # No Origin / Referer — allow (same-origin or non-browser client).
-                CSRF_REQUESTS.labels(status="allowed").inc()
-                return await call_next(request)
-
-            if origin not in self._allowed:
+            if origin is not None and origin not in self._allowed:
                 logger.warning(
                     "CSRF check failed: method=%s path=%s origin=%r not in allowlist",
                     request.method,
