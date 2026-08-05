@@ -39,7 +39,7 @@ describe("StatusBar Component Suite", () => {
   });
 
   /* -------------------------------------------------------------------------- */
-  /*  Role-based Hints Support (#640)                                           */
+  /* Role-based Hints Support (#640)                                            */
   /* -------------------------------------------------------------------------- */
   describe("Role-based Hints Support (#640)", () => {
     test("renders role badge and default hint for userRole", () => {
@@ -74,7 +74,7 @@ describe("StatusBar Component Suite", () => {
   });
 
   /* -------------------------------------------------------------------------- */
-  /*  Theme Tokens Support (#639)                                               */
+  /* Theme Tokens Support (#639)                                                */
   /* -------------------------------------------------------------------------- */
   describe("Theme Tokens Support (#639)", () => {
     test("applies default theme classes when no theme prop is provided", () => {
@@ -99,7 +99,7 @@ describe("StatusBar Component Suite", () => {
   });
 
   /* -------------------------------------------------------------------------- */
-  /*  Changelog Preview Badges (#636)                                           */
+  /* Changelog Preview Badges (#636)                                            */
   /* -------------------------------------------------------------------------- */
   describe("Changelog Preview Badges (#636)", () => {
     test("renders changelog badge and opens popover on click", () => {
@@ -146,7 +146,7 @@ describe("StatusBar Component Suite", () => {
   });
 
   /* -------------------------------------------------------------------------- */
-  /*  Compatibility Badges (#630)                                               */
+  /* Compatibility Badges (#630)                                                */
   /* -------------------------------------------------------------------------- */
   describe("Compatibility Badges (#630)", () => {
     test("renders compatibility badges when array is provided", () => {
@@ -184,7 +184,7 @@ describe("StatusBar Component Suite", () => {
   });
 
   /* -------------------------------------------------------------------------- */
-  /*  Source Trust Indicator Badges (#632)                                      */
+  /* Source Trust Indicator Badges (#632)                                       */
   /* -------------------------------------------------------------------------- */
   describe("Source Trust Indicator Badges (#632)", () => {
     test("renders trusted source badge when trustLevel is 'trusted' or 'verified'", () => {
@@ -220,7 +220,7 @@ describe("StatusBar Component Suite", () => {
   });
 
   /* -------------------------------------------------------------------------- */
-  /*  Search Refinement Badges (#633)                                           */
+  /* Search Refinement Badges (#633)                                            */
   /* -------------------------------------------------------------------------- */
   describe("Search Refinement Badges (#633)", () => {
     test("renders semantic search refinement badge", () => {
@@ -256,7 +256,7 @@ describe("StatusBar Component Suite", () => {
   });
 
   /* -------------------------------------------------------------------------- */
-  /*  Favorite & Pin Support (#634)                                             */
+  /* Favorite & Pin Support (#634)                                             */
   /* -------------------------------------------------------------------------- */
   describe("Favorite & Pin Support (#634)", () => {
     test("renders favorite button and handles toggle state", () => {
@@ -299,7 +299,7 @@ describe("StatusBar Component Suite", () => {
   });
 
   /* -------------------------------------------------------------------------- */
-  /*  Contextual Action Menus (#635)                                            */
+  /* Contextual Action Menus (#635)                                             */
   /* -------------------------------------------------------------------------- */
   describe("Contextual Action Menus (#635)", () => {
     test("toggles contextual action dropdown menu on button click", () => {
@@ -340,7 +340,7 @@ describe("StatusBar Component Suite", () => {
   });
 
   /* -------------------------------------------------------------------------- */
-  /*  Status Indicator Badges                                                   */
+  /* Status Indicator Badges                                                    */
   /* -------------------------------------------------------------------------- */
   describe("Status Indicator Badges", () => {
     test("renders model label correctly", () => {
@@ -375,7 +375,7 @@ describe("StatusBar Component Suite", () => {
   });
 
   /* -------------------------------------------------------------------------- */
-  /*  Action Buttons & Interactions                                             */
+  /* Action Buttons & Interactions                                              */
   /* -------------------------------------------------------------------------- */
   describe("Action Buttons & Interactions", () => {
     test("triggers corresponding action callbacks on button clicks", () => {

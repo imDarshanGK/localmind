@@ -1,0 +1,215 @@
+name: "1"
+
+on:
+  workflow_dispatch:
+
+permissions:
+  pull-requests: write
+  issues: write
+  contents: write
+
+jobs:
+  auto-merge-loop:
+    name: Auto Merge Loop
+    runs-on: ubuntu-latest
+    steps:
+      - name: Evaluate and Process PRs
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
+          script: |
+            const { owner, repo } = context.repo;
+            const commentedPRs = new Map(); // Track PR number -> commit SHA for conflict messages
+            const missingKeywordPRs = new Set();
+
+            async function processPR(prNumber, prBody) {
+              console.log(`\nEvaluating PR #${prNumber}`);
+              
+              const body = prBody || "";
+              const hasClosingKeyword = /(close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)\s+(#\d+|https:\/\/github\.com\/[^\/]+\/[^\/]+\/issues\/\d+)/i.test(body);
+              
+              let mergeable = null;
+              let mergeableState = null;
+              let prData = null;
+              
+              // Retry loop because PR mergeable state might be null immediately after creation
+              for (let attempt = 1; attempt <= 10; attempt++) {
+                const { data: pr } = await github.rest.pulls.get({
+                  owner,
+                  repo,
+                  pull_number: prNumber
+                });
+                
+                mergeable = pr.mergeable;
+                mergeableState = pr.mergeable_state;
+                prData = pr;
+                
+                if (mergeable !== null) {
+                  break;
+                }
+                
+                console.log(`Mergeable status is null, retrying (${attempt}/10) in 5 seconds...`);
+                await new Promise(r => setTimeout(r, 5000));
+              }
+              
+              // Fetch current labels
+              const { data: labels } = await github.rest.issues.listLabelsOnIssue({
+                owner,
+                repo,
+                issue_number: prNumber
+              });
+              const currentLabels = labels.map(l => l.name);
+              
+              const addLabel = async (label) => {
+                if (!currentLabels.includes(label)) {
+                  console.log(`Adding label: ${label}`);
+                  await github.rest.issues.addLabels({
+                    owner,
+                    repo,
+                    issue_number: prNumber,
+                    labels: [label]
+                  });
+                }
+              };
+              
+              const removeLabel = async (label) => {
+                if (currentLabels.includes(label)) {
+                  console.log(`Removing label: ${label}`);
+                  try {
+                    await github.rest.issues.removeLabel({
+                      owner,
+                      repo,
+                      issue_number: prNumber,
+                      name: label
+                    });
+                  } catch (e) {
+                    console.error(`Could not remove label ${label}:`, e.message);
+                  }
+                }
+              };
+              
+              if (mergeable === false || mergeableState === "dirty") {
+                console.log("Merge conflicts detected.");
+                await removeLabel("Blue");
+                
+                const currentSha = prData.head.sha;
+                
+                if (commentedPRs.get(prNumber) !== currentSha) {
+                  const author = prData.user.login;
+                  const commentBody = `@${author} it looks like this PR has some merge conflicts; mind resolving them so we can get it merged? 🚀`;
+                  
+                  try {
+                    console.log(`Commenting on PR #${prNumber} about merge conflicts for commit ${currentSha}...`);
+                    await github.rest.issues.createComment({
+                      owner,
+                      repo,
+                      issue_number: prNumber,
+                      body: commentBody
+                    });
+                    commentedPRs.set(prNumber, currentSha);
+                  } catch (e) {
+                    console.error(`Failed to comment on PR #${prNumber}:`, e.message);
+                  }
+                }
+              } else {
+                const hasAssignees = prData.assignees && prData.assignees.length > 0;
+                const hasECSoCLabel = currentLabels.some(l => l.toLowerCase().replace(/[^a-z0-9]/g, '').includes('ecsoc26'));
+                const hasDoNotMergeLabel = currentLabels.some(l => l.toLowerCase() === 'do-not-merge');
+
+                if (hasDoNotMergeLabel) {
+                  console.log(`PR #${prNumber} has 'do-not-merge' label. Skipping auto-merge.`);
+                  return false;
+                }
+
+                if (!hasClosingKeyword || !hasAssignees || !hasECSoCLabel) {
+                  let missing = [];
+                  if (!hasClosingKeyword) missing.push("a closing keyword");
+                  if (!hasAssignees) missing.push("an assignee");
+                  if (!hasECSoCLabel) missing.push("the ECSoC26 label");
+                  
+                  console.log(`PR #${prNumber} is missing: ${missing.join(', ')}. Skipping auto-merge.`);
+                  
+                  if (!missingKeywordPRs.has(prNumber)) {
+                    const assigneesToTag = prData.assignees && prData.assignees.length > 0 
+                      ? prData.assignees.map(a => `@${a.login}`).join(" ") 
+                      : `@${prData.user.login}`;
+                    const missingMsg = `${assigneesToTag} This PR cannot be merged because it is missing: **${missing.join(', ')}**. Please ensure the PR has a linked issue with an assignee and the ECSoC26 label, and that the PR description contains the closing keyword.`;
+                    
+                    try {
+                      await github.rest.issues.createComment({
+                        owner,
+                        repo,
+                        issue_number: prNumber,
+                        body: missingMsg
+                      });
+                      missingKeywordPRs.add(prNumber);
+                    } catch (e) {
+                      console.error(`Failed to comment on missing requirements for PR #${prNumber}:`, e.message);
+                    }
+                  }
+                  return false;
+                }
+
+                console.log(`PR mergeable state is: ${mergeableState}`);
+                
+                if (mergeable === true) {
+                  console.log("No merge conflicts and requirements met. Proceeding with auto-merge.");
+                  await addLabel("Blue");
+                  
+                  try {
+                    console.log(`Auto-merging PR #${prNumber} into main...`);
+                    await github.rest.pulls.merge({
+                      owner,
+                      repo,
+                      pull_number: prNumber,
+                      merge_method: 'squash'
+                    });
+                    console.log(`✅ Successfully merged PR #${prNumber}`);
+                    return true;
+                  } catch (e) {
+                    console.error(`❌ Failed to auto-merge PR #${prNumber}:`, e.message);
+                  }
+                } else {
+                  console.log(`PR is not ready to merge yet (mergeable is ${mergeable}). Waiting for checks/approvals.`);
+                  await removeLabel("Blue");
+                }
+              }
+              return false;
+            }
+
+            console.log("Manual trigger detected. Entering continuous auto-merge loop...");
+            while (true) {
+              console.log("Fetching all open PRs...");
+              let page = 1;
+              let hasMore = true;
+              let anyMerged = false;
+              
+              while (hasMore) {
+                const { data: openPRs } = await github.rest.pulls.list({
+                  owner,
+                  repo,
+                  state: 'open',
+                  per_page: 100,
+                  page
+                });
+                
+                for (const pr of openPRs) {
+                  const wasMerged = await processPR(pr.number, pr.body);
+                  if (wasMerged) {
+                    anyMerged = true;
+                    console.log(`✅ Evaluating next PR immediately without waiting...`);
+                  }
+                }
+                
+                if (openPRs.length < 100) hasMore = false;
+                page++;
+              }
+              
+              console.log("✅ Finished processing all open PRs for this cycle.");
+              
+              if (!anyMerged) {
+                // If nothing was merged in this cycle, wait a bit before checking again to avoid spamming the API
+                console.log("No PRs were merged in this cycle. Sleeping for 1 minute before checking again...");
+                await new Promise(r => setTimeout(r, 60000));
+              }
+            }
