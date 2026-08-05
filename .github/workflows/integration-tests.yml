@@ -35,7 +35,7 @@ jobs:
           version: latest
 
       - name: Run Integration Tests
-        run: pnpm run test:integration
+        run: pnpm test -- --run
         env:
           # Supabase local URLs are default in CI
           VITE_SUPABASE_URL: http://127.0.0.1:54321
