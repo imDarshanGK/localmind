@@ -8,7 +8,10 @@ const LANGUAGES = [
   { code: "ta", label: "தமிழ்" },
   { code: "te", label: "తెలుగు" },
   { code: "kn", label: "ಕನ್ನಡ" },
-  { code: "fr", label: "Français" }
+  { code: "fr", label: "Français" },
+  { code: "de", label: "Deutsch" },
+  { code: "es", label: "Español" },
+  { code: "ja", label: "日本語" },
 ];
 
 export default function SettingsPanel({ settings = {}, isLoading = false, onSave, onClose }) {
