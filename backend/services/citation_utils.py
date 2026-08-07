@@ -7,10 +7,12 @@ without triggering the chromadb / sentence-transformers import chain.
 
 from __future__ import annotations
 
+import math
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Iterable
+from typing import Any
 
 PREVIEW_MAX_CHARS = 300
 
@@ -88,7 +90,7 @@ class RankWeights:
     recency: float = RECENCY_WEIGHT_DEFAULT
     authority: float = AUTHORITY_WEIGHT_DEFAULT
 
-    def normalised(self) -> "RankWeights":
+    def normalised(self) -> RankWeights:
         total = self.relevance + self.recency + self.authority
         if total <= 0:
             return RankWeights(0.0, 0.0, 0.0)
@@ -155,7 +157,7 @@ def _relevance_score(distance: Any) -> float:
         d = float(distance)
     except (TypeError, ValueError):
         return 0.0
-    if d != d:  # NaN
+    if math.isnan(d):  # NaN
         return 0.0
     return max(0.0, min(1.0, 1.0 - d / 2.0))
 

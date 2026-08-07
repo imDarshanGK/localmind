@@ -37,7 +37,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from services.citation_utils import (  # noqa: E402
+from services.citation_utils import (
     DEFAULT_AUTHORITY_RULES,
     RankWeights,
     _authority_score,
@@ -60,7 +60,9 @@ class TestParseIsoformat:
         assert dt.year == 2026 and dt.day == 22
 
     def test_naive_datetime_is_treated_as_utc(self):
-        dt = _parse_isoformat(datetime(2026, 7, 22, 10, 0, 0))
+        # ruff DTZ001 — pass tzinfo explicitly. Use timezone.utc to match
+        # the test's assertion that naive input is treated as UTC.
+        dt = _parse_isoformat(datetime(2026, 7, 22, 10, 0, 0, tzinfo=timezone.utc))
         assert dt is not None
         assert dt.tzinfo == timezone.utc
 
