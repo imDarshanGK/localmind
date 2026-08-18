@@ -1,12 +1,28 @@
+ fix/upload-panel-errors
+import { useState, useRef } from "react";
+import { uploadDocument, deleteDocument } from "../utils/api";
+import { CheckIcon, DocumentsIcon, ErrorIcon, SpinnerIcon, UploadIcon, FileIcon } from "./Icons";
+
+const ALLOWED_EXTENSIONS = ["pdf", "txt", "csv", "docx", "md", "html"];
+const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024; // 50MB
+
+export default function UploadPanel({ sessionId, documents, onUploaded, onClose }) {
+
 import { useState, useRef, useEffect } from "react";
 import { uploadDocument, deleteDocument, previewDocument } from "../utils/api";
 import { CheckIcon, DocumentsIcon, ErrorIcon, SpinnerIcon, UploadIcon, FileIcon, CopyIcon } from "./Icons";
 
 export default function UploadPanel({ sessionId, documents, isLoading = false, onUploaded, onClose, show, minimalMode, feedbackTimeout = 2000 }) {
+main
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
+ fix/upload-panel-errors
+  const fileRef = useRef();
+
+  async function handleFile(file) {
+    if (!file) return;
 
   // Staged draft workspace state slot allocation (#574)
   const [draftFile, setDraftFile] = useState(null);
@@ -117,70 +133,42 @@ export default function UploadPanel({ sessionId, documents, isLoading = false, o
       return filename === file.name;
     });
   }
+main
 
-  // Initialize persistence layer state from localStorage based on active sessionId (#570)
-  const [isCollapsed, setIsCollapsed] = useState(() => {
-    try {
-      const saved = localStorage.getItem(`upload-panel-collapsed:${sessionId}`);
-      return saved === "true";
-    } catch (e) {
-      return false;
-    }
-  });
+    setError("");
+    setResult(null);
 
-  // Sync view state configurations safely as explicit string values (#570)
-  useEffect(() => {
-    try {
-      localStorage.setItem(`upload-panel-collapsed:${sessionId}`, String(isCollapsed));
-    } catch (e) {
-      console.warn("localStorage persistence layer allocation blocked:", e);
-    }
-  }, [isCollapsed, sessionId]);
-
-  // Poll for document status updates if any are queued/processing
-  useEffect(() => {
-    if (minimalMode || !show) return;
-    const isProcessing = documents.some(d => d.status === "queued" || d.status === "processing");
-    if (!isProcessing) return;
-    const interval = setInterval(() => {
-      onUploaded(); // Triggers refreshDocuments
-    }, 2000);
-    return () => clearInterval(interval);
-  }, [documents, onUploaded, minimalMode, show]);
-
-  async function handleFileSelect(file) {
-    if (!file) return;
-
-    if (isDuplicateFile(file)) {
-      setError(`"${file.name}" has already been added.`);
-      setResult(null);
+    // 1. Check file extension
+    const ext = file.name.split(".").pop().toLowerCase();
+    if (!ALLOWED_EXTENSIONS.includes(ext)) {
+      setError(`Unsupported file format (.${ext}). Allowed: ${ALLOWED_EXTENSIONS.join(", ")}`);
+      if (fileRef.current) fileRef.current.value = "";
       return;
     }
 
-    setError("");
-    setResult(null);
-    setDraftFile(file);
-  }
+    // 2. Check file size
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      setError("File size exceeds 50MB limit.");
+      if (fileRef.current) fileRef.current.value = "";
+      return;
+    }
 
-  async function commitDraftUpload() {
-    if (!draftFile) return;
     setUploading(true);
-    setError("");
-    setResult(null);
+
     try {
-      const data = await uploadDocument(draftFile, sessionId);
+      const data = await uploadDocument(file, sessionId);
       setResult(data);
-      onUploaded(data.filename);
+      if (onUploaded) onUploaded(data.filename);
     } catch (e) {
-      setError(e.message);
+      const errMsg = e?.response?.data?.detail || e?.message || "Failed to upload document.";
+      setError(typeof errMsg === "object" ? JSON.stringify(errMsg) : String(errMsg));
     } finally {
       setUploading(false);
-      setDraftFile(null);
-      if (fileRef.current) {
-        fileRef.current.value = "";
-      }
+      if (fileRef.current) fileRef.current.value = "";
     }
   }
+
+fix/upload-panel-errors
 
   // Global event listener to dismiss panel when Escape key is pressed (#567)
   useEffect(() => {
@@ -246,37 +234,26 @@ export default function UploadPanel({ sessionId, documents, isLoading = false, o
 
     setUploading(false);
   }
-
+ main
   function onDrop(e) {
     e.preventDefault();
     setDragging(false);
-    handleFileSelect(e.dataTransfer.files[0]);
-  }
-
-  // Intercept keyboard interactions (Space/Enter) on the interactive dropzone box layout (#567)
-  function handleDropzoneKeyDown(e) {
-    if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
-      fileRef.current.click();
-    }
-  }
-
-  async function handleTriggerPreview(filename) {
-    setLoadingPreview(true);
-    setPreviewFilename(filename);
-    setPreviewError(null);
-    try {
-      const data = await previewDocument(filename, sessionId);
-      setPreviewContent(data.content || "No textual content available to display.");
-    } catch (e) {
-      setPreviewError(e.message || "Failed to load document preview");
-      setPreviewContent(null);
-    } finally {
-      setLoadingPreview(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleFile(e.dataTransfer.files[0]);
     }
   }
 
   return (
+ fix/upload-panel-errors
+    <div className="border-b border-gray-800 bg-gray-900 px-5 py-4 shrink-0">
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-sm font-semibold text-white inline-flex items-center gap-1.5">
+          <DocumentsIcon className="w-4 h-4" />
+          Documents
+        </p>
+        <button onClick={onClose} className="text-gray-500 hover:text-gray-300 text-lg leading-none">
+          &times;
+
     <section
       data-testid="upload-panel"
       aria-labelledby="upload-panel-title"
@@ -322,11 +299,70 @@ export default function UploadPanel({ sessionId, documents, isLoading = false, o
           aria-label="Close upload panel"
         >
           ×
+ main
         </button>
       </div>
 
+      {/* Drop zone */}
+      <div
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragging(true);
+        }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={onDrop}
+        onClick={() => fileRef.current && fileRef.current.click()}
+        className={`border-2 border-dashed rounded-xl px-4 py-5 text-center cursor-pointer transition mb-3 ${
+          dragging ? "border-purple-500 bg-purple-900/20" : "border-gray-700 hover:border-purple-600 hover:bg-gray-800/50"
+        }`}
+      >
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".pdf,.txt,.csv,.docx,.md,.html"
+          className="hidden"
+          onChange={(e) => {
+            if (e.target.files && e.target.files[0]) {
+              handleFile(e.target.files[0]);
+            }
+          }}
+        />
+        <p className="text-2xl mb-1 flex justify-center">
+          {uploading ? <SpinnerIcon className="w-7 h-7 text-purple-400" /> : <UploadIcon className="w-7 h-7 text-gray-300" />}
+        </p>
+        <p className="text-sm text-gray-400">
+          {uploading ? "Indexing document..." : "Drop file here or click to browse"}
+        </p>
+        <p className="text-xs text-gray-600 mt-1">PDF · TXT · CSV · DOCX · MD · HTML · max 50MB</p>
+      </div>
+
+      {result && (
+        <p className="text-xs text-green-400 mb-2 inline-flex items-center gap-1">
+          <CheckIcon className="w-3.5 h-3.5" />
+          {result.message}
+        </p>
+      )}
       {error && (
-        <div data-testid="upload-error-banner" className="mb-3 text-xs bg-red-950/40 border border-red-900/60 text-red-400 p-2.5 rounded-lg flex items-start gap-2">
+ fix/upload-panel-errors
+        <p className="text-xs text-red-400 mb-2 inline-flex items-center gap-1">
+          <ErrorIcon className="w-3.5 h-3.5" />
+          {error}
+        </p>
+      )}
+
+      {/* Uploaded docs list */}
+      {documents && documents.length > 0 && (
+        <div>
+          <p className="text-xs text-gray-500 mb-1">Indexed documents:</p>
+          {documents.map((d, i) => (
+            <div key={i} className="flex items-center justify-between text-xs bg-gray-800 rounded-lg px-3 py-1.5 mb-1">
+              <span className="text-gray-300 truncate inline-flex items-center gap-1">
+                <FileIcon className="w-3.5 h-3.5" />
+                {d.filename || d}
+              </span>
+              {d.chunks_indexed && <span className="text-gray-500 ml-2 shrink-0">{d.chunks_indexed} chunks</span>}
+
+      <div data-testid="upload-error-banner" className="mb-3 text-xs bg-red-950/40 border border-red-900/60 text-red-400 p-2.5 rounded-lg flex items-start gap-2">
           <ErrorIcon className="w-4 h-4 text-red-400 shrink-0 mt-0.5" aria-hidden="true" />
           <div className="flex-1">
             <p className="font-semibold text-red-300">Upload Failure</p>
@@ -676,45 +712,19 @@ export default function UploadPanel({ sessionId, documents, isLoading = false, o
                   Close
                 </button>
               </div>
+
             </div>
-            {previewError ? (
-              <div className="p-8 flex flex-col items-center justify-center text-center">
-                <div className="w-12 h-12 bg-red-900/30 border border-red-500/30 rounded-full flex items-center justify-center text-red-500 mb-4">
-                  ⚠️
-                </div>
-                <h4 className="text-white font-medium mb-2">Failed to Load Preview</h4>
-                <p className="text-gray-400 text-xs max-w-md mb-6">{previewError}</p>
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => {
-                      setPreviewContent(null);
-                      setPreviewError(null);
-                      setPreviewFilename("");
-                    }}
-                    className="px-4 py-2 text-xs font-medium text-gray-300 hover:text-white bg-gray-800 hover:bg-gray-750 border border-gray-700 rounded-lg transition"
-                  >
-                    Clear Selection
-                  </button>
-                  <button
-                    onClick={() => handleTriggerPreview(previewFilename)}
-                    className="px-4 py-2 text-xs font-medium text-white bg-purple-600 hover:bg-purple-750 rounded-lg transition shadow-md shadow-purple-900/20"
-                  >
-                    Retry
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="p-5 overflow-y-auto flex-1 text-xs text-gray-300 font-mono whitespace-pre-wrap leading-relaxed bg-gray-950/40 selection:bg-purple-900">
-                {previewContent}
-              </div>
-            )}
-          </div>
+          ))}
         </div>
       )}
+ fix/upload-panel-errors
+    </div>
+
       {/* Accessible copy confirmation feedback helper */}
       <span className="sr-only" aria-live="polite" data-testid="copy-aria-feedback">
         {ariaFeedback}
       </span>
     </section>
+ main
   );
 }
