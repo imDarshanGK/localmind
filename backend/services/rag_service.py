@@ -60,7 +60,12 @@ def index_document(file_path: str, session_id: str, doc_id: int | None = None) -
         raise ValueError(f"Unsupported file type: {ext}. Supported: {list(LOADERS)}")
 
     docs = loader_cls(file_path).load()
-    
+
+    # Guard: if the loader returned no documents (e.g. a zero-page PDF or an empty text file),
+    # return early without attempting to split or upsert to ChromaDB.
+    if not docs:
+        return 0
+
     # Fetch live chunk size and overlap bounds configuration directly from database cache settings
     from services.db_service import get_settings
     current_settings = get_settings()
