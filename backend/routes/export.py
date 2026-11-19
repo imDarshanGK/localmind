@@ -37,6 +37,69 @@ class BulkSessionExportRequest(BaseModel):
         return v
 
 
+_TABLE_SEPARATOR_RE = re.compile(r"^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$")
+
+
+def escape_markdown_table_pipes(text: str) -> str:
+    """Escape stray pipe characters inside Markdown table cells.
+
+    Only lines that belong to a GFM table (header, separator and body rows)
+    are touched. Fenced code blocks and prose are left as-is. A row with more
+    cells than the separator declares has its surplus pipes escaped so the
+    table keeps its column count instead of breaking apart.
+    """
+    lines = text.split("\n")
+    out: list[str] = []
+    in_fence = False
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        if line.lstrip().startswith("```"):
+            in_fence = not in_fence
+            out.append(line)
+            i += 1
+            continue
+        is_table_header = (
+            not in_fence
+            and "|" in line
+            and i + 1 < len(lines)
+            and "|" in lines[i + 1]
+            and _TABLE_SEPARATOR_RE.match(lines[i + 1]) is not None
+        )
+        if not is_table_header:
+            out.append(line)
+            i += 1
+            continue
+
+        col_count = len(lines[i + 1].strip().strip("|").split("|"))
+        out.append(line)
+        out.append(lines[i + 1])
+        i += 2
+        while i < len(lines) and "|" in lines[i] and lines[i].strip() and not lines[i].lstrip().startswith("```"):
+            out.append(_escape_row(lines[i], col_count))
+            i += 1
+    return "\n".join(out)
+
+
+def _escape_row(row: str, col_count: int) -> str:
+    """Escape surplus unescaped pipes in one table row so it has col_count cells."""
+    stripped = row.strip()
+    leading = stripped.startswith("|")
+    trailing = stripped.endswith("|") and len(stripped) > 1
+    inner = stripped[1 if leading else 0 : len(stripped) - 1 if trailing else len(stripped)]
+    # Split on unescaped pipes only.
+    cells = re.split(r"(?<!\\)\|", inner)
+    if len(cells) <= col_count:
+        return row
+    head = cells[: col_count - 1]
+    tail = "\\|".join(cells[col_count - 1 :])
+    rebuilt = head + [tail]
+    result = "| " if leading else ""
+    result += " | ".join(c.strip() for c in rebuilt)
+    result += " |" if trailing else ""
+    return result
+
+
 def export_session_json(session: dict, messages: list, ts: str) -> str:
     return json.dumps({"session": session, "messages": messages, "exported_at": ts}, indent=2, ensure_ascii=False)
 
@@ -47,7 +110,7 @@ def export_session_markdown(session: dict, messages: list, ts: str) -> str:
     lines = [f"# {title}\n", f"*Exported: {ts} | Model: {session.get('model','?')}*\n\n---\n"]
     for m in messages:
         role_label = "**You**" if m["role"] == "user" else "**LocalMind**"
-        msg_block = f"{role_label}\n\n{m['content'].strip()}"
+        msg_block = f"{role_label}\n\n{escape_markdown_table_pipes(m['content'].strip())}"
         
         if m["role"] == "assistant" and m.get("sources"):
             source_names = []
@@ -203,7 +266,7 @@ async def export_messages(req: ExportMessagesRequest):
         lines = ["# LocalMind – Exported Messages\n", f"*Exported: {ts}*\n\n---\n"]
         for m in messages:
             role_label = "**You**" if m["role"] == "user" else "**LocalMind**"
-            msg_block = f"{role_label}\n\n{m['content'].strip()}"
+            msg_block = f"{role_label}\n\n{escape_markdown_table_pipes(m['content'].strip())}"
 
             if m["role"] == "assistant" and m.get("sources"):
                 source_names = []

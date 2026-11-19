@@ -156,3 +156,43 @@ def test_bulk_export_single_valid_session():
     payload = response.json()
     assert len(payload["sessions"]) == 1
     assert payload["sessions"][0]["session"]["id"] == "sess_single"
+
+
+def test_markdown_export_escapes_pipes_in_table_cells():
+    """Stray pipes inside a table cell must be escaped so the table keeps its shape."""
+    from routes.export import escape_markdown_table_pipes
+
+    table = (
+        "| Name | Note |\n"
+        "| --- | --- |\n"
+        "| Alice | likes a | b |\n"
+        "| Bob | plain |"
+    )
+    lines = escape_markdown_table_pipes(table).split("\n")
+    assert lines[0] == "| Name | Note |"
+    assert lines[1] == "| --- | --- |"
+    assert lines[2] == "| Alice | likes a \\| b |"
+    assert lines[3] == "| Bob | plain |"
+
+
+def test_markdown_export_leaves_code_fences_and_prose_pipes_alone():
+    from routes.export import escape_markdown_table_pipes
+
+    text = "Use `cat f | grep x` here.\n\n```\n| a | b | c |\n```"
+    assert escape_markdown_table_pipes(text) == text
+
+
+def test_bulk_export_markdown_escapes_table_pipes_end_to_end():
+    db.create_session("sess_pipe", title="Pipe Chat", model="llama3")
+    db.save_message(
+        "sess_pipe",
+        "assistant",
+        "| Cmd | Desc |\n| --- | --- |\n| ls | list a | b |",
+    )
+    response = client.post(
+        "/api/export/sessions",
+        json={"session_ids": ["sess_pipe"], "format": "markdown"},
+    )
+    assert response.status_code == 200
+    content = response.content.decode("utf-8")
+    assert "| ls | list a \\| b |" in content
